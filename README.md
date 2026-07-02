@@ -4,23 +4,35 @@ Web app quản lý & giao việc nội bộ lấy cảm hứng UX từ Asana, đ
 
 ## Chạy dự án
 
+Monorepo npm workspaces: `apps/web` (frontend) + `apps/api` (backend NestJS, Phase 3).
+
 ```bash
 npm install
-npm run dev      # http://localhost:5173
-npm run build    # build production vào dist/
+npm run dev        # frontend http://localhost:5173
+npm run build      # build frontend vào apps/web/dist/
+
+# Backend (cần PostgreSQL, xem apps/api/.env.example)
+npm run db:migrate # tạo/áp migration Prisma
+npm run db:seed    # seed dữ liệu demo
+npm run dev:api    # API http://localhost:3000/api/v1
 ```
 
 ## Công nghệ
 
-- **React 18 + Vite** — không TypeScript, giữ đơn giản cho MVP
+- **React 18 + Vite** — frontend, không TypeScript, giữ đơn giản cho MVP
 - **React Router 6** — điều hướng SPA
 - **lucide-react** — bộ icon
-- **CSS thuần** ([src/styles.css](src/styles.css)) — design system biến CSS, không cần framework
+- **CSS thuần** ([apps/web/src/styles.css](apps/web/src/styles.css)) — design system biến CSS
+- **NestJS + Prisma + PostgreSQL** — backend Phase 3 ([kế hoạch](docs/phase3-backend-plan.md))
 
 ## Cấu trúc thư mục
 
 ```
-src/
+apps/api/               # Backend NestJS (Phase 3)
+├── prisma/             # schema.prisma, migrations, seed.mjs
+└── src/                # modules: health, tasks, departments, channels
+
+apps/web/src/
 ├── data/
 │   ├── constants.js      # Trạng thái, ưu tiên, section, vai trò
 │   └── mock.js           # Mock data: 10 user, 4 phòng ban, 3 channel, 28 task

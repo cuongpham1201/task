@@ -1,0 +1,295 @@
+// Schema theo docs/phase3-backend-plan.md
+// Lưu ý: PK dùng String (text) chứa UUID thay vì kiểu uuid thuần —
+// cho phép seed giữ nguyên id dễ đọc từ mock ('u1', 't1'…) để demo liền mạch.
+// CHECK constraint theo scope được thêm thủ công trong migration SQL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  manager
+  member
+
+  @@map("user_role")
+}
+
+enum TaskScope {
+  personal
+  department
+  channel
+
+  @@map("task_scope")
+}
+
+enum TaskStatus {
+  todo
+  doing
+  waiting
+  done
+  paused
+
+  @@map("task_status")
+}
+
+enum TaskPriority {
+  low
+  normal
+  high
+  urgent
+
+  @@map("task_priority")
+}
+
+enum TaskSection {
+  suvu
+  kehoach
+  hangngay
+  phatsinh
+
+  @@map("task_section")
+}
+
+enum ActivityAction {
+  create
+  assign
+  status
+  due
+  priority
+  progress
+  comment
+  complete
+  subtask
+  attachment
+  collaborator
+
+  @@map("activity_action")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  entraId      String?  @unique @map("entra_id")
+  email        String   @unique
+  displayName  String   @map("display_name")
+  departmentId String?  @map("department_id")
+  role         UserRole @default(member)
+  jobTitle     String?  @map("job_title")
+  avatarUrl    String?  @map("avatar_url")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  department          Department?        @relation("DeptMembers", fields: [departmentId], references: [id])
+  managedDepartments  Department[]       @relation("DeptManager")
+  ownedChannels       Channel[]          @relation("ChannelOwner")
+  channelMemberships  ChannelMember[]    @relation("ChannelMemberships")
+  channelMembersAdded ChannelMember[]    @relation("ChannelMemberAddedBy")
+  createdTasks        Task[]             @relation("TaskCreator")
+  assignedTasks       Task[]             @relation("TaskAssignee")
+  completedTasks      Task[]             @relation("TaskCompletedBy")
+  collaborations      TaskCollaborator[]
+  watching            TaskWatcher[]
+  subtasks            Subtask[]
+  comments            Comment[]
+  activities          Activity[]
+  notifications       Notification[]
+  attachments         Attachment[]
+
+  @@map("users")
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  color     String?
+  managerId String?  @map("manager_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  manager User?  @relation("DeptManager", fields: [managerId], references: [id])
+  members User[] @relation("DeptMembers")
+  tasks   Task[]
+
+  @@map("departments")
+}
+
+model Channel {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  ownerId     String?  @map("owner_id")
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  owner   User?           @relation("ChannelOwner", fields: [ownerId], references: [id])
+  members ChannelMember[]
+  tasks   Task[]
+
+  @@map("channels")
+}
+
+model ChannelMember {
+  channelId String   @map("channel_id")
+  userId    String   @map("user_id")
+  addedById String?  @map("added_by")
+  addedAt   DateTime @default(now()) @map("added_at")
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User    @relation("ChannelMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  addedBy User?   @relation("ChannelMemberAddedBy", fields: [addedById], references: [id])
+
+  @@id([channelId, userId])
+  @@map("channel_members")
+}
+
+model Task {
+  id            String       @id @default(uuid())
+  title         String
+  description   String       @default("")
+  scope         TaskScope
+  departmentId  String?      @map("department_id")
+  channelId     String?      @map("channel_id")
+  section       TaskSection?
+  creatorId     String       @map("creator_id")
+  assigneeId    String       @map("assignee_id")
+  status        TaskStatus   @default(todo)
+  priority      TaskPriority @default(normal)
+  startDate     DateTime?    @map("start_date") @db.Date
+  dueDate       DateTime?    @map("due_date") @db.Date
+  progress      Int          @default(0) @db.SmallInt
+  sortOrder     Float        @default(0) @map("sort_order")
+  archived      Boolean      @default(false)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  completedAt   DateTime?    @map("completed_at")
+  completedById String?      @map("completed_by")
+
+  department  Department? @relation(fields: [departmentId], references: [id])
+  channel     Channel?    @relation(fields: [channelId], references: [id])
+  creator     User        @relation("TaskCreator", fields: [creatorId], references: [id])
+  assignee    User        @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  completedBy User?       @relation("TaskCompletedBy", fields: [completedById], references: [id])
+
+  collaborators TaskCollaborator[]
+  watchers      TaskWatcher[]
+  subtasks      Subtask[]
+  comments      Comment[]
+  activities    Activity[]
+  attachments   Attachment[]
+
+  @@index([assigneeId])
+  @@index([departmentId, status])
+  @@index([channelId])
+  @@index([dueDate])
+  @@map("tasks")
+}
+
+model TaskCollaborator {
+  taskId String @map("task_id")
+  userId String @map("user_id")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+  @@map("task_collaborators")
+}
+
+model TaskWatcher {
+  taskId String @map("task_id")
+  userId String @map("user_id")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+  @@map("task_watchers")
+}
+
+model Subtask {
+  id         String   @id @default(uuid())
+  taskId     String   @map("task_id")
+  title      String
+  done       Boolean  @default(false)
+  assigneeId String?  @map("assignee_id")
+  sortOrder  Float    @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  task     Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignee User? @relation(fields: [assigneeId], references: [id])
+
+  @@index([taskId])
+  @@map("subtasks")
+}
+
+model Comment {
+  id        String    @id @default(uuid())
+  taskId    String    @map("task_id")
+  userId    String    @map("user_id")
+  content   String
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([taskId, createdAt])
+  @@map("comments")
+}
+
+model Activity {
+  id        BigInt         @id @default(autoincrement())
+  taskId    String         @map("task_id")
+  userId    String         @map("user_id")
+  action    ActivityAction
+  metadata  Json           @default("{}")
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  task          Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id])
+  notifications Notification[]
+
+  @@index([taskId, createdAt])
+  @@map("activities")
+}
+
+model Notification {
+  id         BigInt    @id @default(autoincrement())
+  userId     String    @map("user_id")
+  activityId BigInt    @map("activity_id")
+  readAt     DateTime? @map("read_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model Attachment {
+  id           String    @id @default(uuid())
+  taskId       String    @map("task_id")
+  uploadedById String    @map("uploaded_by")
+  fileName     String    @map("file_name")
+  mimeType     String    @map("mime_type")
+  sizeBytes    BigInt    @map("size_bytes")
+  driveId      String    @map("drive_id")
+  driveItemId  String    @map("drive_item_id")
+  webUrl       String    @map("web_url")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  task       Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy User @relation(fields: [uploadedById], references: [id])
+
+  @@index([taskId])
+  @@map("attachments")
+}
