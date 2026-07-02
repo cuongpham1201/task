@@ -27,7 +27,10 @@ const MY_TABS = [
 ]
 
 export default function Dashboard() {
-  const { state, currentUser, myTasks, departmentTasks, channelTasks, selectTask } = useApp()
+  const {
+    currentUser, myTasks, departmentTasks, channelTasks, selectTask,
+    visibleDepartments, visibleChannels,
+  } = useApp()
   const [tab, setTab] = useState('upcoming')
 
   const mine = myTasks()
@@ -48,7 +51,6 @@ export default function Dashboard() {
     return mine.filter((t) => t.status === 'done').slice(0, 6)
   }, [tab, mine])
 
-  const myChannels = state.channels.filter((c) => c.members.includes(currentUser.id))
 
   return (
     <div className="page">
@@ -101,7 +103,7 @@ export default function Dashboard() {
         <div className="card">
           <div className="card-head"><h2>Phòng ban / Channel</h2></div>
           <div className="dash-dept-list">
-            {state.departments.map((d) => {
+            {visibleDepartments.map((d) => {
               const ts = departmentTasks(d.id)
               const open = ts.filter((t) => t.status !== 'done').length
               const over = ts.filter(isOverdue).length
@@ -116,7 +118,7 @@ export default function Dashboard() {
                 </Link>
               )
             })}
-            {myChannels.map((c) => {
+            {visibleChannels.map((c) => {
               const ts = channelTasks(c.id)
               const open = ts.filter((t) => t.status !== 'done').length
               const over = ts.filter(isOverdue).length

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { X, CheckCircle2, Circle, Plus, Send, CalendarDays } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
-import { StatusSelect, PrioritySelect } from '../shared/badges'
+import { StatusBadge, PriorityBadge, StatusSelect, PrioritySelect } from '../shared/badges'
 import { SelectMenu } from '../shared/Dropdown'
 import { toInputDate, fromInputDate, timeAgo, formatDateFull } from '../../utils/date'
 import { activityText } from '../../utils/activity'
@@ -44,8 +44,9 @@ function AssigneeSelect({ value, onChange }) {
 
 export default function TaskDetailPanel() {
   const {
-    state, usersById, getTask, getSubtasks, getComments, getActivities,
-    selectTask, updateTask, setStatus, setProgress, toggleComplete,
+    state, usersById, perms, getTask, getSubtasks, getComments, getActivities,
+    selectTask, updateTaskField, setStatus, setProgress, toggleComplete,
+    assignTask, setDueDate, setPriority,
     addComment, toggleSubtask, addSubtask, taskContextLabel,
   } = useApp()
 
@@ -68,13 +69,26 @@ export default function TaskDetailPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id])
 
+  // Đồng bộ progress hiển thị khi task đổi từ nơi khác (VD: tick hoàn thành)
+  useEffect(() => {
+    if (task) setProgressLocal(task.progress || 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.progress])
+
   if (!task) return null
 
   const subs = getSubtasks(task.id)
   const comments = getComments(task.id)
   const acts = getActivities(task.id)
   const creator = usersById[task.creatorId]
+  const assignee = usersById[task.assigneeId]
   const isDone = task.status === 'done'
+
+  // Phân quyền: quyết định control nào được thao tác
+  const canStatus = perms.updateStatus(task)
+  const canManage = perms.manage(task)
+  const canSubs = perms.subtasks(task)
+  const canCmt = perms.comment(task)
 
   const submitComment = () => {
     const text = commentText.trim()
@@ -97,6 +111,8 @@ export default function TaskDetailPanel() {
         <div className="detail-head">
           <button
             className={`btn btn-complete ${isDone ? 'is-done' : ''}`}
+            disabled={!canStatus}
+            title={canStatus ? '' : 'Bạn không có quyền cập nhật task này'}
             onClick={() => toggleComplete(task)}
           >
             {isDone ? <CheckCircle2 size={15} /> : <Circle size={15} />}
@@ -117,10 +133,16 @@ export default function TaskDetailPanel() {
               )}
             </Field>
             <Field label="Người phụ trách">
-              <AssigneeSelect
-                value={task.assigneeId}
-                onChange={(id) => updateTask(task.id, { assigneeId: id })}
-              />
+              {canManage ? (
+                <AssigneeSelect
+                  value={task.assigneeId}
+                  onChange={(id) => assignTask(task.id, id)}
+                />
+              ) : (
+                assignee && (
+                  <span className="cell-user"><Avatar user={assignee} size={24} /> {assignee.displayName}</span>
+                )
+              )}
             </Field>
             <Field label="Người phối hợp">
               {task.collaboratorIds.length === 0 ? (
@@ -140,21 +162,30 @@ export default function TaskDetailPanel() {
             </Field>
             <Field label="Phòng ban / Channel">{taskContextLabel(task)}</Field>
             <Field label="Trạng thái">
-              <StatusSelect value={task.status} onChange={(s) => setStatus(task.id, s)} />
+              {canStatus ? (
+                <StatusSelect value={task.status} onChange={(s) => setStatus(task.id, s)} />
+              ) : (
+                <StatusBadge status={task.status} />
+              )}
             </Field>
             <Field label="Độ ưu tiên">
-              <PrioritySelect
-                value={task.priority}
-                onChange={(p) => updateTask(task.id, { priority: p })}
-              />
+              {canManage ? (
+                <PrioritySelect
+                  value={task.priority}
+                  onChange={(p) => setPriority(task.id, p)}
+                />
+              ) : (
+                <PriorityBadge priority={task.priority} />
+              )}
             </Field>
             <Field label="Ngày bắt đầu">
               <span className="date-input-wrap">
                 <CalendarDays size={14} />
                 <input
                   type="date"
+                  disabled={!canManage}
                   value={toInputDate(task.startDate)}
-                  onChange={(e) => updateTask(task.id, { startDate: fromInputDate(e.target.value) })}
+                  onChange={(e) => updateTaskField(task.id, { startDate: fromInputDate(e.target.value) })}
                 />
               </span>
             </Field>
@@ -163,8 +194,9 @@ export default function TaskDetailPanel() {
                 <CalendarDays size={14} />
                 <input
                   type="date"
+                  disabled={!canManage}
                   value={toInputDate(task.dueDate)}
-                  onChange={(e) => updateTask(task.id, { dueDate: fromInputDate(e.target.value) })}
+                  onChange={(e) => setDueDate(task.id, fromInputDate(e.target.value))}
                 />
               </span>
             </Field>
@@ -173,10 +205,12 @@ export default function TaskDetailPanel() {
                 <input
                   type="range"
                   min="0" max="100" step="5"
+                  disabled={!canStatus}
                   value={progressLocal}
                   onChange={(e) => setProgressLocal(Number(e.target.value))}
                   onMouseUp={() => setProgress(task.id, progressLocal)}
                   onTouchEnd={() => setProgress(task.id, progressLocal)}
+                  onKeyUp={() => setProgress(task.id, progressLocal)}
                 />
                 <span className="progress-label">{progressLocal}%</span>
               </span>
@@ -187,12 +221,13 @@ export default function TaskDetailPanel() {
             <h3>Mô tả</h3>
             <textarea
               className="detail-desc"
-              placeholder="Thêm mô tả chi tiết…"
+              placeholder={canStatus ? 'Thêm mô tả chi tiết…' : 'Không có mô tả'}
+              readOnly={!canStatus}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               onBlur={() => {
-                if (description !== task.description) {
-                  updateTask(task.id, { description })
+                if (canStatus && description !== task.description) {
+                  updateTaskField(task.id, { description })
                 }
               }}
               rows={3}
@@ -207,6 +242,7 @@ export default function TaskDetailPanel() {
                   <input
                     type="checkbox"
                     checked={s.done}
+                    disabled={!canSubs}
                     onChange={() => toggleSubtask(s.id)}
                   />
                   <span className="subtask-title">{s.title}</span>
@@ -216,15 +252,17 @@ export default function TaskDetailPanel() {
                 </label>
               ))}
             </div>
-            <div className="subtask-add">
-              <Plus size={15} />
-              <input
-                placeholder="Thêm việc con…"
-                value={newSubtask}
-                onChange={(e) => setNewSubtask(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && submitSubtask()}
-              />
-            </div>
+            {canSubs && (
+              <div className="subtask-add">
+                <Plus size={15} />
+                <input
+                  placeholder="Thêm việc con…"
+                  value={newSubtask}
+                  onChange={(e) => setNewSubtask(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && submitSubtask()}
+                />
+              </div>
+            )}
           </div>
 
           <div className="detail-section">
@@ -284,17 +322,23 @@ export default function TaskDetailPanel() {
           </div>
         </div>
 
-        <div className="comment-input">
-          <input
-            placeholder="Viết bình luận…"
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submitComment()}
-          />
-          <button className="btn btn-primary" onClick={submitComment} title="Gửi">
-            <Send size={15} />
-          </button>
-        </div>
+        {canCmt ? (
+          <div className="comment-input">
+            <input
+              placeholder="Viết bình luận…"
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submitComment()}
+            />
+            <button className="btn btn-primary" onClick={submitComment} title="Gửi">
+              <Send size={15} />
+            </button>
+          </div>
+        ) : (
+          <div className="comment-input">
+            <p className="muted">Bạn không tham gia công việc này nên không thể bình luận.</p>
+          </div>
+        )}
       </aside>
     </>
   )

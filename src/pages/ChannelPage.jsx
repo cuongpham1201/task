@@ -19,7 +19,7 @@ const TABS = [
 
 export default function ChannelPage() {
   const { id } = useParams()
-  const { state, usersById, channelTasks, openCreateModal, getTask, selectTask } = useApp()
+  const { state, usersById, perms, channelTasks, openCreateModal, getTask, selectTask } = useApp()
   const [tab, setTab] = useState('list')
   const [statusFilter, setStatusFilter] = useState('all')
   const [assigneeFilter, setAssigneeFilter] = useState('all')
@@ -57,12 +57,14 @@ export default function ChannelPage() {
         </div>
         <div className="page-head-actions">
           <AvatarGroup users={members} />
-          <button
-            className="btn btn-primary"
-            onClick={() => openCreateModal({ scope: 'channel', channelId: channel.id })}
-          >
-            <Plus size={15} /> Tạo công việc
-          </button>
+          {perms.createChannelTask(channel) && (
+            <button
+              className="btn btn-primary"
+              onClick={() => openCreateModal({ scope: 'channel', channelId: channel.id })}
+            >
+              <Plus size={15} /> Tạo công việc
+            </button>
+          )}
         </div>
       </div>
 

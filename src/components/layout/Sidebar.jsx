@@ -8,7 +8,7 @@ import BrandLogo from '../shared/BrandLogo'
 import { ROLES } from '../../data/constants'
 
 export default function Sidebar() {
-  const { state, currentUser, inboxItems } = useApp()
+  const { state, currentUser, inboxItems, visibleDepartments, visibleChannels } = useApp()
   const unread = inboxItems().filter(
     (a) => new Date(a.createdAt) > new Date(state.inboxReadAt)
   ).length
@@ -39,7 +39,7 @@ export default function Sidebar() {
 
         <div className="side-section">
           <span className="side-section-title"><Building2 size={13} /> Phòng ban</span>
-          {state.departments.map((d) => (
+          {visibleDepartments.map((d) => (
             <NavLink key={d.id} to={`/departments/${d.id}`} className={linkClass}>
               <span className="side-dot" data-code={d.code} />
               <span className="side-link-text">{d.name}</span>
@@ -49,7 +49,7 @@ export default function Sidebar() {
 
         <div className="side-section">
           <span className="side-section-title"><Hash size={13} /> Channel / Dự án</span>
-          {state.channels.map((c) => (
+          {visibleChannels.map((c) => (
             <NavLink key={c.id} to={`/channels/${c.id}`} className={linkClass}>
               <Hash size={15} className="side-hash" />
               <span className="side-link-text">{c.name}</span>

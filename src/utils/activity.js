@@ -1,4 +1,5 @@
-import { STATUS } from '../data/constants'
+import { STATUS, PRIORITY } from '../data/constants'
+import { formatDateFull } from './date'
 
 // Diễn giải một activity thành câu tiếng Việt
 export function activityText(activity, usersById) {
@@ -7,11 +8,21 @@ export function activityText(activity, usersById) {
     case 'create':
       return 'đã tạo công việc'
     case 'assign': {
+      const from = usersById[meta.from]
       const to = usersById[meta.to]
-      return `đã giao việc cho ${to ? to.displayName : '—'}`
+      if (meta.from && from && meta.from !== meta.to) {
+        return `đã chuyển người phụ trách từ ${from.displayName} sang ${to?.displayName || '—'}`
+      }
+      return `đã giao việc cho ${to?.displayName || '—'}`
     }
     case 'status':
       return `đã chuyển trạng thái sang “${STATUS[meta.to]?.label || meta.to}”`
+    case 'due':
+      return meta.to
+        ? `đã đổi deadline sang ${formatDateFull(meta.to)}`
+        : 'đã bỏ deadline'
+    case 'priority':
+      return `đã đổi độ ưu tiên sang “${PRIORITY[meta.to]?.label || meta.to}”`
     case 'progress':
       return `đã cập nhật tiến độ lên ${meta.to}%`
     case 'comment':

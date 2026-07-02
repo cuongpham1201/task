@@ -1,7 +1,7 @@
 import { CheckCircle2, Circle, MessageSquare, GitBranch } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
-import { StatusSelect, PriorityBadge } from '../shared/badges'
+import { StatusBadge, StatusSelect, PriorityBadge } from '../shared/badges'
 import ProgressBar from '../shared/ProgressBar'
 import EmptyState from '../shared/EmptyState'
 import { dueLabel } from '../../utils/date'
@@ -9,7 +9,7 @@ import { SECTIONS, SECTION_ORDER } from '../../data/constants'
 
 function TaskRow({ task, showContext }) {
   const {
-    usersById, selectTask, toggleComplete, setStatus,
+    usersById, perms, selectTask, toggleComplete, setStatus,
     getSubtasks, getComments, taskContextLabel,
   } = useApp()
   const creator = usersById[task.creatorId]
@@ -17,13 +17,18 @@ function TaskRow({ task, showContext }) {
   const commentCount = getComments(task.id).length
   const due = dueLabel(task)
   const isDone = task.status === 'done'
+  const canStatus = perms.updateStatus(task)
 
   return (
     <tr className={`task-row ${isDone ? 'done' : ''}`} onClick={() => selectTask(task.id)}>
       <td className="col-title">
         <button
           className={`tick ${isDone ? 'ticked' : ''}`}
-          title={isDone ? 'Đánh dấu chưa hoàn thành' : 'Đánh dấu hoàn thành'}
+          disabled={!canStatus}
+          title={
+            !canStatus ? 'Bạn không có quyền cập nhật task này'
+              : isDone ? 'Đánh dấu chưa hoàn thành' : 'Đánh dấu hoàn thành'
+          }
           onClick={(e) => { e.stopPropagation(); toggleComplete(task) }}
         >
           {isDone ? <CheckCircle2 size={18} /> : <Circle size={18} />}
@@ -52,7 +57,11 @@ function TaskRow({ task, showContext }) {
       </td>
       {showContext && <td className="col-context">{taskContextLabel(task)}</td>}
       <td className="col-status" onClick={(e) => e.stopPropagation()}>
-        <StatusSelect value={task.status} onChange={(s) => setStatus(task.id, s)} />
+        {canStatus ? (
+          <StatusSelect value={task.status} onChange={(s) => setStatus(task.id, s)} />
+        ) : (
+          <StatusBadge status={task.status} />
+        )}
       </td>
       <td className="col-priority"><PriorityBadge priority={task.priority} /></td>
       <td className={`col-due due-${due.tone}`}>{due.text}</td>

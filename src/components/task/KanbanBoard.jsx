@@ -6,17 +6,22 @@ import { KANBAN_COLUMNS, STATUS, PRIORITY } from '../../data/constants'
 import { dueLabel } from '../../utils/date'
 
 function KanbanCard({ task, onDragStart }) {
-  const { usersById, selectTask, getSubtasks, getComments } = useApp()
+  const { usersById, perms, selectTask, getSubtasks, getComments } = useApp()
   const assignee = usersById[task.assigneeId]
   const subs = getSubtasks(task.id)
   const commentCount = getComments(task.id).length
   const due = dueLabel(task)
+  // Chỉ cho kéo thả khi có quyền đổi trạng thái (guard trong store vẫn chặn lần nữa)
+  const canDrag = perms.updateStatus(task)
 
   return (
     <div
       className="kanban-card"
-      draggable
-      onDragStart={(e) => onDragStart(e, task)}
+      draggable={canDrag}
+      onDragStart={(e) => {
+        if (!canDrag) { e.preventDefault(); return }
+        onDragStart(e, task)
+      }}
       onClick={() => selectTask(task.id)}
     >
       <span className={`kanban-priority priority-${task.priority}`}>

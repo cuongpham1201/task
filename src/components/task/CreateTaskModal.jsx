@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { X, Plus, Trash2 } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
@@ -6,30 +6,74 @@ import { PRIORITY, PRIORITY_ORDER, SECTIONS, SECTION_ORDER, SCOPES } from '../..
 import { fromInputDate } from '../../utils/date'
 
 export default function CreateTaskModal() {
-  const { state, currentUser, closeCreateModal, createTask } = useApp()
+  const { state, currentUser, closeCreateModal, createTask, visibleChannels } = useApp()
   const defaults = state.createModal?.defaults || {}
 
-  const [form, setForm] = useState(() => ({
-    title: '',
-    description: '',
-    // Nhân viên mặc định tạo việc cá nhân, quản lý tạo việc phòng ban
-    scope: defaults.scope || (currentUser.role === 'member' ? 'personal' : 'department'),
-    departmentId: defaults.departmentId || currentUser.departmentId,
-    channelId: defaults.channelId || state.channels[0]?.id,
-    section: defaults.section || 'suvu',
-    assigneeId: currentUser.id,
-    collaboratorIds: [],
-    startDate: '',
-    dueDate: '',
-    priority: 'normal',
-  }))
+  // Phân quyền tạo task:
+  // - department: admin (mọi phòng) / manager (phòng mình)
+  // - channel: admin hoặc thành viên channel
+  // - personal: ai cũng được
+  const canDeptScope = currentUser.role !== 'member'
+  const deptOptions = currentUser.role === 'admin'
+    ? state.departments
+    : state.departments.filter((d) => d.id === currentUser.departmentId)
+  const channelOptions = visibleChannels
+
+  const scopeAllowed = (s) =>
+    s === 'personal' ||
+    (s === 'department' ? canDeptScope && deptOptions.length > 0 : channelOptions.length > 0)
+
+  const [form, setForm] = useState(() => {
+    const scope = defaults.scope && scopeAllowed(defaults.scope)
+      ? defaults.scope
+      : (canDeptScope ? 'department' : 'personal')
+    return {
+      title: '',
+      description: '',
+      scope,
+      departmentId:
+        deptOptions.some((d) => d.id === defaults.departmentId)
+          ? defaults.departmentId
+          : (deptOptions[0]?.id || null),
+      channelId:
+        channelOptions.some((c) => c.id === defaults.channelId)
+          ? defaults.channelId
+          : (channelOptions[0]?.id || null),
+      section: defaults.section || 'suvu',
+      assigneeId: currentUser.id,
+      collaboratorIds: [],
+      startDate: '',
+      dueDate: '',
+      priority: 'normal',
+    }
+  })
   const [subtaskTitles, setSubtaskTitles] = useState([])
   const [subtaskInput, setSubtaskInput] = useState('')
   const [error, setError] = useState('')
 
-  if (!state.createModal) return null
-
   const set = (patch) => setForm((f) => ({ ...f, ...patch }))
+
+  // Người phụ trách giới hạn theo phạm vi đã chọn
+  const assigneePool = useMemo(() => {
+    if (form.scope === 'department') {
+      return state.users.filter((u) => u.departmentId === form.departmentId)
+    }
+    if (form.scope === 'channel') {
+      const channel = state.channels.find((c) => c.id === form.channelId)
+      return (channel?.members || []).map((id) => state.users.find((u) => u.id === id)).filter(Boolean)
+    }
+    return [currentUser] // personal: tự phụ trách
+  }, [form.scope, form.departmentId, form.channelId, state.users, state.channels, currentUser])
+
+  // Đổi phạm vi → đảm bảo assignee còn nằm trong pool
+  useEffect(() => {
+    if (!assigneePool.some((u) => u.id === form.assigneeId)) {
+      set({ assigneeId: assigneePool[0]?.id || currentUser.id })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assigneePool])
+
+  if (!state.createModal) return null
 
   const toggleCollaborator = (id) =>
     set({
@@ -68,8 +112,9 @@ export default function CreateTaskModal() {
     )
   }
 
-  // Người phối hợp không gồm người phụ trách
-  const collaboratorOptions = state.users.filter((u) => u.id !== form.assigneeId)
+  // Người phối hợp: cùng pool với người phụ trách (personal: mời ai cũng được)
+  const collaboratorOptions = (form.scope === 'personal' ? state.users : assigneePool)
+    .filter((u) => u.id !== form.assigneeId)
 
   return (
     <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && closeCreateModal()}>
@@ -104,16 +149,18 @@ export default function CreateTaskModal() {
           <div className="form-field">
             <span>Loại công việc</span>
             <div className="scope-options">
-              {Object.entries(SCOPES).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={`scope-option ${form.scope === key ? 'active' : ''}`}
-                  onClick={() => set({ scope: key })}
-                >
-                  {label}
-                </button>
-              ))}
+              {Object.entries(SCOPES)
+                .filter(([key]) => scopeAllowed(key))
+                .map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`scope-option ${form.scope === key ? 'active' : ''}`}
+                    onClick={() => set({ scope: key })}
+                  >
+                    {label}
+                  </button>
+                ))}
             </div>
           </div>
 
@@ -122,10 +169,11 @@ export default function CreateTaskModal() {
               <label className="form-field">
                 <span>Phòng ban</span>
                 <select
-                  value={form.departmentId}
+                  value={form.departmentId || ''}
+                  disabled={deptOptions.length <= 1}
                   onChange={(e) => set({ departmentId: e.target.value })}
                 >
-                  {state.departments.map((d) => (
+                  {deptOptions.map((d) => (
                     <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
                 </select>
@@ -144,8 +192,8 @@ export default function CreateTaskModal() {
           {form.scope === 'channel' && (
             <label className="form-field">
               <span>Channel / Dự án</span>
-              <select value={form.channelId} onChange={(e) => set({ channelId: e.target.value })}>
-                {state.channels.map((c) => (
+              <select value={form.channelId || ''} onChange={(e) => set({ channelId: e.target.value })}>
+                {channelOptions.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
@@ -157,9 +205,10 @@ export default function CreateTaskModal() {
               <span>Người phụ trách</span>
               <select
                 value={form.assigneeId}
+                disabled={form.scope === 'personal'}
                 onChange={(e) => set({ assigneeId: e.target.value })}
               >
-                {state.users.map((u) => (
+                {assigneePool.map((u) => (
                   <option key={u.id} value={u.id}>{u.displayName}</option>
                 ))}
               </select>
@@ -187,6 +236,9 @@ export default function CreateTaskModal() {
                   <Avatar user={u} size={18} /> {u.displayName}
                 </button>
               ))}
+              {collaboratorOptions.length === 0 && (
+                <span className="muted">Không có người phù hợp</span>
+              )}
             </div>
           </div>
 

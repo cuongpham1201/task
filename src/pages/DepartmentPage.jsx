@@ -16,7 +16,7 @@ const VIEWS = [
 
 export default function DepartmentPage() {
   const { id } = useParams()
-  const { state, usersById, departmentTasks, openCreateModal } = useApp()
+  const { state, usersById, perms, departmentTasks, openCreateModal } = useApp()
   const [view, setView] = useState('list')
 
   const dept = state.departments.find((d) => d.id === id)
@@ -43,12 +43,14 @@ export default function DepartmentPage() {
         </div>
         <div className="page-head-actions">
           <AvatarGroup users={members} />
-          <button
-            className="btn btn-primary"
-            onClick={() => openCreateModal({ scope: 'department', departmentId: dept.id })}
-          >
-            <Plus size={15} /> Tạo công việc
-          </button>
+          {perms.createDeptTask(dept.id) && (
+            <button
+              className="btn btn-primary"
+              onClick={() => openCreateModal({ scope: 'department', departmentId: dept.id })}
+            >
+              <Plus size={15} /> Tạo công việc
+            </button>
+          )}
         </div>
       </div>
 

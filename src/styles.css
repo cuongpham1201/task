@@ -163,14 +163,14 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .btn-complete.is-done { background: var(--green-soft); border-color: var(--green); color: var(--green); }
 
 /* ============ Dropdown ============ */
-.dropdown { position: relative; display: inline-block; }
+.dropdown { display: inline-block; }
+/* Menu render qua portal, định vị fixed bằng inline style trong Dropdown.jsx */
 .dropdown-menu {
-  position: absolute; top: calc(100% + 4px); left: 0; z-index: 70; min-width: 200px;
+  min-width: 200px;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: var(--shadow-lg); padding: 5px; display: flex; flex-direction: column;
   max-height: 320px; overflow-y: auto;
 }
-.dropdown-menu.align-right { left: auto; right: 0; }
 .dropdown-item {
   display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
   padding: 8px 10px; border: none; background: none; border-radius: 6px;
