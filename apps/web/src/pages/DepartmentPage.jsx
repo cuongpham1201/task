@@ -7,6 +7,7 @@ import KanbanBoard from '../components/task/KanbanBoard'
 import CalendarView from '../components/task/CalendarView'
 import { AvatarGroup } from '../components/shared/Avatar'
 import { isOverdue } from '../utils/date'
+import { deptColor } from '../utils/color'
 
 const VIEWS = [
   { key: 'list', label: 'Danh sách', icon: List },
@@ -24,7 +25,7 @@ export default function DepartmentPage() {
 
   const tasks = departmentTasks(dept.id)
   const members = state.users.filter((u) => u.orgUnitId === dept.id)
-  const manager = usersById[dept.managerId]
+  const managerName = dept.managerName
   const openCount = tasks.filter((t) => t.status !== 'done').length
   const overdueCount = tasks.filter(isOverdue).length
 
@@ -33,10 +34,10 @@ export default function DepartmentPage() {
       <div className="page-head">
         <div>
           <h1>
-            <span className="side-dot big" data-code={dept.code} /> {dept.name}
+            <span className="side-dot big" style={{ background: deptColor(dept.code) }} /> {dept.name}
           </h1>
           <p className="page-sub">
-            Trưởng phòng: <strong>{manager?.displayName}</strong>
+            Trưởng phòng: <strong>{managerName || '—'}</strong>
             {' · '}{openCount} việc đang mở
             {overdueCount > 0 && <span className="text-overdue"> · {overdueCount} việc quá hạn</span>}
           </p>

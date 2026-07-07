@@ -49,7 +49,7 @@ export default function CreateTaskModal() {
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }))
 
-  // Người phụ trách giới hạn theo phạm vi đã chọn
+  // Người thực hiện giới hạn theo phạm vi đã chọn
   const assigneePool = useMemo(() => {
     if (form.scope === 'department') {
       return state.users.filter((u) => u.orgUnitId === form.departmentId)
@@ -199,7 +199,7 @@ export default function CreateTaskModal() {
 
           <div className="form-row">
             <label className="form-field">
-              <span>Người phụ trách</span>
+              <span>Người thực hiện</span>
               <select
                 value={form.assigneeId}
                 disabled={form.scope === 'personal'}

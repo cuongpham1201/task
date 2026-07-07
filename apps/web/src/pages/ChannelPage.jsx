@@ -89,7 +89,7 @@ export default function ChannelPage() {
             ))}
           </select>
           <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)}>
-            <option value="all">Người phụ trách: Tất cả</option>
+            <option value="all">Người thực hiện: Tất cả</option>
             {members.map((u) => (
               <option key={u.id} value={u.id}>{u.displayName}</option>
             ))}

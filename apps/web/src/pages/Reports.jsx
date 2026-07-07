@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ClipboardList, CheckCircle2, AlertTriangle, Percent } from 'lucide-react'
 import { useApp } from '../store/AppContext'
+import { deptColor } from '../utils/color'
 import TaskTable from '../components/task/TaskTable'
 import { isOverdue, diffDays } from '../utils/date'
 
@@ -139,7 +140,7 @@ export default function Reports() {
             {deptStats.map((d) => (
               <div key={d.id} className="report-bar-row">
                 <span className="report-bar-name">
-                  <span className="side-dot" data-code={d.code} /> {d.name}
+                  <span className="side-dot" style={{ background: deptColor(d.code) }} /> {d.name}
                 </span>
                 <span className="report-bar-track">
                   <span className="report-bar-fill" style={{ width: `${d.rate}%` }} />

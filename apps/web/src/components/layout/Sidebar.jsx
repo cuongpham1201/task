@@ -3,6 +3,7 @@ import {
   Home, CheckSquare, Inbox, BarChart3, Settings, Building2, Hash,
 } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
+import { deptColor } from '../../utils/color'
 import Avatar from '../shared/Avatar'
 import BrandLogo from '../shared/BrandLogo'
 import { ROLES } from '../../data/constants'
@@ -44,7 +45,7 @@ export default function Sidebar() {
             <span className="side-section-title"><Building2 size={13} /> {g.block.name}</span>
             {g.depts.map((d) => (
               <NavLink key={d.id} to={`/departments/${d.id}`} className={linkClass}>
-                <span className="side-dot" data-code={d.code} />
+                <span className="side-dot" style={{ background: deptColor(d.code) }} />
                 <span className="side-link-text">{d.name}</span>
               </NavLink>
             ))}
@@ -55,7 +56,7 @@ export default function Sidebar() {
             <span className="side-section-title"><Building2 size={13} /> Phòng ban</span>
             {ungrouped.map((d) => (
               <NavLink key={d.id} to={`/departments/${d.id}`} className={linkClass}>
-                <span className="side-dot" data-code={d.code} />
+                <span className="side-dot" style={{ background: deptColor(d.code) }} />
                 <span className="side-link-text">{d.name}</span>
               </NavLink>
             ))}

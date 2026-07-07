@@ -22,7 +22,7 @@ export class NotificationsController {
   @Get()
   async list(@AuthUser() claims: AuthClaims) {
     const me = await this.users.resolveFromClaims(claims)
-    return this.notifications.listForUser(me.id)
+    return this.notifications.listForUser(me)
   }
 
   @Get('unread-count')

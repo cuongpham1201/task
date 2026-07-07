@@ -57,9 +57,15 @@ export class BootstrapController {
     const allOrg = await this.prisma.orgUnit.findMany({ where: { active: true }, orderBy: { sortOrder: 'asc' } })
     const orgWorkspaces = await this.prisma.workspace.findMany({ where: { type: 'org_unit' }, select: { id: true, orgUnitId: true } })
     const wsByOrg = new Map(orgWorkspaces.map((w) => [w.orgUnitId, w.id]))
+    // Trưởng phòng/quản lý từ org_unit_roles (department_manager)
+    const mgrRoles = await this.prisma.orgUnitRole.findMany({
+      where: { role: 'department_manager', active: true },
+      include: { user: { select: { displayName: true } } },
+    })
+    const mgrByOrg = new Map(mgrRoles.map((r) => [r.orgUnitId, r.user.displayName]))
     const departments = allOrg
       .filter((o) => o.type === 'department' && (me.role === 'admin' || visibleOrgIds.includes(o.id)))
-      .map((o) => ({ id: o.id, name: o.name, code: o.code, blockId: o.parentId, legalEntity: o.legalEntity, workspaceId: wsByOrg.get(o.id) ?? null }))
+      .map((o) => ({ id: o.id, name: o.name, code: o.code, blockId: o.parentId, legalEntity: o.legalEntity, workspaceId: wsByOrg.get(o.id) ?? null, managerName: mgrByOrg.get(o.id) ?? null }))
     const blockIds = new Set(departments.map((d) => d.blockId).filter(Boolean) as string[])
     const blocks = allOrg.filter((o) => o.type === 'block' && blockIds.has(o.id)).map((o) => ({ id: o.id, name: o.name, code: o.code }))
 
@@ -87,7 +93,7 @@ export class BootstrapController {
       subtasks,
       comments,
       activities,
-      notifications: await this.notifications.listForUser(me.id),
+      notifications: await this.notifications.listForUser(me),
     }
   }
 }

@@ -4,6 +4,7 @@ import {
   ClipboardList, CheckCircle2, AlertTriangle, MessageCircleQuestion, Hash,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
+import { deptColor } from '../utils/color'
 import { StatusBadge } from '../components/shared/badges'
 import EmptyState from '../components/shared/EmptyState'
 import {
@@ -109,7 +110,7 @@ export default function Dashboard() {
               const over = ts.filter(isOverdue).length
               return (
                 <Link key={d.id} to={`/departments/${d.id}`} className="dash-dept">
-                  <span className="side-dot" data-code={d.code} />
+                  <span className="side-dot" style={{ background: deptColor(d.code) }} />
                   <span className="dash-dept-name">{d.name}</span>
                   <span className="dash-dept-stat">{open} đang mở</span>
                   <span className={`dash-dept-stat ${over > 0 ? 'overdue' : ''}`}>

@@ -49,7 +49,7 @@ export default function Settings() {
                   <tr key={d.id}>
                     <td>{d.name}</td>
                     <td>{d.code}</td>
-                    <td>{usersById[d.managerId]?.displayName}</td>
+                    <td>{d.managerName || "—"}</td>
                     <td>{state.users.filter((u) => u.orgUnitId === d.id).length}</td>
                   </tr>
                 ))}

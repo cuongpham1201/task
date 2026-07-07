@@ -4,6 +4,7 @@ import {
   Home, CheckSquare, Hash, Inbox, MoreHorizontal, Building2, BarChart3, Settings, LogOut, X,
 } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
+import { deptColor } from '../../utils/color'
 import { useAuth } from '../../auth/AuthProvider'
 
 /** Sheet trượt từ đáy màn hình (mobile action sheet). */
@@ -77,7 +78,7 @@ export default function MobileNav() {
           <div className="sheet-group-title"><Building2 size={13} /> Phòng ban</div>
           {visibleDepartments.map((d) => (
             <Link key={d.id} to={`/departments/${d.id}`} className="sheet-item">
-              <span className="side-dot" data-code={d.code} /> {d.name}
+              <span className="side-dot" style={{ background: deptColor(d.code) }} /> {d.name}
             </Link>
           ))}
           <div className="sheet-divider" />

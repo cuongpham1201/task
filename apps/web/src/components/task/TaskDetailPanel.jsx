@@ -186,7 +186,7 @@ export default function TaskDetailPanel() {
                 <span className="cell-user"><Avatar user={creator} size={24} /> {creator.displayName}</span>
               )}
             </Field>
-            <Field label="Người phụ trách">
+            <Field label="Người thực hiện">
               {canManage ? (
                 <AssigneeSelect
                   value={task.assigneeId}

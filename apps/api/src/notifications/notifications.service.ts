@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { VisibilityService, type Me } from '../common/visibility.service'
 
 type EmitArgs = {
   task: { id: string; assigneeId: string; creatorId: string }
@@ -12,7 +13,10 @@ type EmitArgs = {
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly vis: VisibilityService,
+  ) {}
 
   /**
    * Trong 1 transaction: tạo Activity + fan-out Notification cho stakeholders (trừ actor).
@@ -49,14 +53,29 @@ export class NotificationsService {
     return activity
   }
 
-  async listForUser(userId: string) {
+  // Chỉ trả thông báo mà user CÒN quyền xem task (defense-in-depth privacy).
+  async listForUser(me: Me) {
     const rows = await this.prisma.notification.findMany({
-      where: { userId },
+      where: { userId: me.id },
       include: { activity: { select: { action: true, metadata: true, userId: true } } },
       orderBy: { createdAt: 'desc' },
       take: 100,
     })
-    return rows.map((n) => ({
+    const taskIds = [...new Set(rows.map((r) => r.taskId).filter(Boolean) as string[])]
+    let visible = new Set<string>()
+    if (taskIds.length && me.role !== 'admin') {
+      const vis = await this.vis.taskWhere(me)
+      const rowsVis = await this.prisma.task.findMany({
+        where: { AND: [{ id: { in: taskIds } }, vis] },
+        select: { id: true },
+      })
+      visible = new Set(rowsVis.map((t) => t.id))
+    } else if (me.role === 'admin') {
+      visible = new Set(taskIds)
+    }
+    return rows
+      .filter((n) => !n.taskId || visible.has(n.taskId))
+      .map((n) => ({
       id: String(n.id),
       type: n.type,
       taskId: n.taskId,
