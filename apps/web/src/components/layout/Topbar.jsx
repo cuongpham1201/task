@@ -1,14 +1,17 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Plus } from 'lucide-react'
+import { Search, Plus, Menu } from 'lucide-react'
+import BrandLogo from '../shared/BrandLogo'
 import { useApp } from '../../store/AppContext'
+import { useAuth } from '../../auth/AuthProvider'
 import Avatar from '../shared/Avatar'
 import Dropdown from '../shared/Dropdown'
 import { StatusBadge } from '../shared/badges'
 import { ROLES } from '../../data/constants'
 
-export default function Topbar() {
+export default function Topbar({ onMenu }) {
   const { state, currentUser, selectTask, openCreateModal, taskContextLabel } = useApp()
+  const { logout } = useAuth()
   const [query, setQuery] = useState('')
 
   const results = useMemo(() => {
@@ -21,6 +24,12 @@ export default function Topbar() {
 
   return (
     <header className="topbar">
+      <button className="btn btn-ghost mobile-only topbar-menu" onClick={onMenu} aria-label="Mở menu">
+        <Menu size={22} />
+      </button>
+      <span className="topbar-brand mobile-only">
+        <BrandLogo size={20} /> <strong>Giao việc</strong>
+      </span>
       <div className="search-box">
         <Search size={16} className="search-icon" />
         <input
@@ -52,7 +61,7 @@ export default function Topbar() {
 
       <div className="topbar-actions">
         <button className="btn btn-primary" onClick={() => openCreateModal()}>
-          <Plus size={16} /> Tạo công việc
+          <Plus size={16} /> <span className="hide-mobile">Tạo công việc</span>
         </button>
         <Dropdown
           align="right"
@@ -64,7 +73,7 @@ export default function Topbar() {
             <span className="user-menu-role">{ROLES[currentUser.role]}</span>
           </div>
           <Link to="/settings" className="dropdown-item">Cài đặt tài khoản</Link>
-          <button className="dropdown-item" disabled>Đăng xuất (demo)</button>
+          <button className="dropdown-item" onClick={logout}>Đăng xuất</button>
         </Dropdown>
       </div>
     </header>

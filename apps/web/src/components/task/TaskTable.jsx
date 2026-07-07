@@ -4,6 +4,8 @@ import Avatar from '../shared/Avatar'
 import { StatusBadge, StatusSelect, PriorityBadge } from '../shared/badges'
 import ProgressBar from '../shared/ProgressBar'
 import EmptyState from '../shared/EmptyState'
+import TaskCardMobile from './TaskCardMobile'
+import useIsMobile from '../../utils/useIsMobile'
 import { dueLabel } from '../../utils/date'
 import { SECTIONS, SECTION_ORDER } from '../../data/constants'
 
@@ -87,8 +89,36 @@ function TableHead({ showContext }) {
 }
 
 export default function TaskTable({ tasks, showContext = true, groupBySection = false, emptyText = 'Không có công việc nào' }) {
+  const isMobile = useIsMobile()
+
   if (tasks.length === 0) {
     return <EmptyState title={emptyText} hint="Nhấn “Tạo công việc” để thêm việc mới." />
+  }
+
+  // Mobile: card list thay bảng nhiều cột (desktop giữ nguyên table)
+  if (isMobile) {
+    if (!groupBySection) {
+      return (
+        <div className="task-card-list">
+          {tasks.map((t) => <TaskCardMobile key={t.id} task={t} showContext={showContext} />)}
+        </div>
+      )
+    }
+    const groups = SECTION_ORDER
+      .map((key) => ({ key, name: SECTIONS[key], items: tasks.filter((t) => t.section === key) }))
+      .filter((g) => g.items.length > 0)
+    return (
+      <div className="task-card-list">
+        {groups.map((g) => (
+          <div key={g.key} className="task-card-group">
+            <div className="task-card-group-head">
+              {g.name} <span className="section-count">{g.items.length}</span>
+            </div>
+            {g.items.map((t) => <TaskCardMobile key={t.id} task={t} showContext={showContext} />)}
+          </div>
+        ))}
+      </div>
+    )
   }
 
   if (!groupBySection) {

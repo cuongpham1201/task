@@ -1,7 +1,12 @@
+import { useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AppProvider, useApp } from './store/AppContext'
+import { AuthProvider } from './auth/AuthProvider'
+import LoginGate from './auth/LoginGate'
 import Sidebar from './components/layout/Sidebar'
 import Topbar from './components/layout/Topbar'
+import MobileDrawer from './components/layout/MobileDrawer'
+import MobileNav from './components/layout/MobileNav'
 import TaskDetailPanel from './components/task/TaskDetailPanel'
 import CreateTaskModal from './components/task/CreateTaskModal'
 import Dashboard from './pages/Dashboard'
@@ -14,11 +19,13 @@ import Settings from './pages/Settings'
 
 function AppShell() {
   const { state } = useApp()
+  const [drawerOpen, setDrawerOpen] = useState(false)
   return (
     <div className="app-shell">
       <Sidebar />
+      <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
       <div className="app-main">
-        <Topbar />
+        <Topbar onMenu={() => setDrawerOpen(true)} />
         <main className="app-content">
           <Routes>
             <Route path="/" element={<Dashboard />} />
@@ -34,6 +41,7 @@ function AppShell() {
       <TaskDetailPanel />
       {/* Mount lại mỗi lần mở để form nhận defaults mới */}
       {state.createModal && <CreateTaskModal />}
+      <MobileNav />
     </div>
   )
 }
@@ -41,9 +49,15 @@ function AppShell() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppProvider>
-        <AppShell />
-      </AppProvider>
+      <AuthProvider>
+        <LoginGate>
+          {(me, bootstrap) => (
+            <AppProvider currentUserId={me.id} bootstrap={bootstrap}>
+              <AppShell />
+            </AppProvider>
+          )}
+        </LoginGate>
+      </AuthProvider>
     </BrowserRouter>
   )
 }
