@@ -109,6 +109,10 @@ export class TasksService {
   async setStatus(me: Me, id: string, status: string) {
     const task = await this.loadOr404(id)
     this.policy.assert(this.policy.canUpdateStatus(me, task), 'Không có quyền đổi trạng thái')
+    // Đang chờ nghiệm thu → không đổi tay; phải qua Đạt/Trả lại (trừ người có quyền nghiệm thu)
+    if (task.status === 'submitted' && !this.policy.canReview(me, task)) {
+      throw new BadRequestException('Việc đang chờ nghiệm thu — chờ kết quả Đạt/Trả lại.')
+    }
     if (status === 'done' && task.completionMode === 'review_required' && !this.policy.canReview(me, task)) {
       throw new BadRequestException('Việc này cần nghiệm thu — hãy "Nộp nghiệm thu" thay vì tự đóng.')
     }

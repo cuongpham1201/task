@@ -17,7 +17,9 @@ const TYPE_TEXT = {
 }
 
 export default function Inbox() {
-  const { notifications, unreadCount, usersById, getTask, selectTask, markInboxRead } = useApp()
+  const {
+    notifications, unreadCount, usersById, getTask, selectTask, markInboxRead, markNotificationRead,
+  } = useApp()
 
   return (
     <div className="page page-narrow">
@@ -47,7 +49,10 @@ export default function Inbox() {
               <button
                 key={n.id}
                 className={`inbox-item ${unread ? 'unread' : ''}`}
-                onClick={() => task && selectTask(task.id)}
+                onClick={() => {
+                  if (unread) markNotificationRead(n.id)
+                  if (task) selectTask(task.id)
+                }}
               >
                 <Avatar user={actor} size={32} />
                 <span className="inbox-content">

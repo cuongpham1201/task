@@ -810,6 +810,13 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .review-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .review-pending { font-size: 13px; font-weight: 600; color: var(--text-soft); }
 
+/* Nút hành động nhỏ trên dòng (sửa/xóa subtask, comment) */
+.row-action { padding: 4px; min-height: 0 !important; color: var(--text-muted); }
+.row-action:hover { color: var(--text); }
+.detail-head-actions { display: inline-flex; align-items: center; gap: 2px; }
+.title-edit { vertical-align: 2px; margin-left: 6px; }
+.comment-head-right { display: inline-flex; align-items: center; gap: 4px; }
+
 /* Toggle "Cần nghiệm thu" trong modal tạo việc */
 .review-toggle {
   display: flex; align-items: flex-start; gap: 10px; cursor: pointer;

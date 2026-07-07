@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { X, CheckCircle2, Circle, Plus, Send, CalendarDays, ThumbsUp, Undo2 } from 'lucide-react'
+import {
+  X, CheckCircle2, Circle, Plus, Send, CalendarDays, ThumbsUp, Undo2, Pencil, Trash2,
+} from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
 import { StatusBadge, PriorityBadge, StatusSelect, PrioritySelect } from '../shared/badges'
@@ -48,6 +50,7 @@ export default function TaskDetailPanel() {
     selectTask, updateTaskField, setStatus, setProgress, toggleComplete,
     assignTask, setDueDate, setPriority, submitTask, reviewTask,
     addComment, toggleSubtask, addSubtask, taskContextLabel,
+    archiveTask, updateSubtask, deleteSubtask, editComment, deleteComment,
   } = useApp()
 
   const task = state.selectedTaskId ? getTask(state.selectedTaskId) : null
@@ -140,13 +143,42 @@ export default function TaskDetailPanel() {
               {isDone ? 'Đã hoàn thành' : 'Đánh dấu hoàn thành'}
             </button>
           )}
-          <button className="btn btn-ghost" onClick={() => selectTask(null)} title="Đóng">
-            <X size={18} />
-          </button>
+          <span className="detail-head-actions">
+            {canManage && (
+              <button
+                className="btn btn-ghost"
+                title="Xóa công việc"
+                onClick={() => {
+                  if (window.confirm(`Xóa công việc "${task.title}"?`)) archiveTask(task.id)
+                }}
+              >
+                <Trash2 size={17} />
+              </button>
+            )}
+            <button className="btn btn-ghost" onClick={() => selectTask(null)} title="Đóng">
+              <X size={18} />
+            </button>
+          </span>
         </div>
 
         <div className="detail-body">
-          <h2 className={`detail-title ${isDone ? 'done' : ''}`}>{task.title}</h2>
+          <h2 className={`detail-title ${isDone ? 'done' : ''}`}>
+            {task.title}
+            {canManage && (
+              <button
+                className="btn btn-ghost title-edit"
+                title="Sửa tên công việc"
+                onClick={() => {
+                  const t = window.prompt('Tên công việc:', task.title)
+                  if (t && t.trim() && t.trim() !== task.title) {
+                    updateTaskField(task.id, { title: t.trim() })
+                  }
+                }}
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+          </h2>
 
           <div className="detail-fields">
             <Field label="Người giao">
@@ -184,7 +216,8 @@ export default function TaskDetailPanel() {
             </Field>
             <Field label="Phòng ban / Dự án">{taskContextLabel(task)}</Field>
             <Field label="Trạng thái">
-              {canStatus ? (
+              {/* Chờ nghiệm thu → khóa đổi tay; chuyển bằng nút Đạt/Trả lại */}
+              {canStatus && task.status !== 'submitted' ? (
                 <StatusSelect value={task.status} onChange={(s) => setStatus(task.id, s)} />
               ) : (
                 <StatusBadge status={task.status} />
@@ -271,6 +304,33 @@ export default function TaskDetailPanel() {
                   {s.assigneeId && usersById[s.assigneeId] && (
                     <Avatar user={usersById[s.assigneeId]} size={20} />
                   )}
+                  {canSubs && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost row-action"
+                      title="Sửa việc con"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        const t = window.prompt('Tên việc con:', s.title)
+                        if (t && t.trim() && t.trim() !== s.title) updateSubtask(s.id, { title: t.trim() })
+                      }}
+                    >
+                      <Pencil size={13} />
+                    </button>
+                  )}
+                  {canManage && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost row-action"
+                      title="Xóa việc con"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        if (window.confirm(`Xóa việc con "${s.title}"?`)) deleteSubtask(s.id)
+                      }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
                 </label>
               ))}
             </div>
@@ -308,14 +368,40 @@ export default function TaskDetailPanel() {
                 {comments.length === 0 && <p className="muted">Chưa có bình luận nào.</p>}
                 {comments.map((c) => {
                   const u = usersById[c.userId]
+                  const own = c.userId === currentUser?.id
                   return (
                     <div key={c.id} className="comment">
                       <Avatar user={u} size={28} />
                       <div className="comment-body">
                         <div className="comment-head">
                           <strong>{u?.displayName}</strong>
-                          <span className="muted" title={formatDateFull(c.createdAt)}>
-                            {timeAgo(c.createdAt)}
+                          <span className="comment-head-right">
+                            <span className="muted" title={formatDateFull(c.createdAt)}>
+                              {c.updatedAt ? 'đã sửa · ' : ''}{timeAgo(c.createdAt)}
+                            </span>
+                            {own && (
+                              <>
+                                <button
+                                  className="btn btn-ghost row-action"
+                                  title="Sửa bình luận"
+                                  onClick={() => {
+                                    const t = window.prompt('Sửa bình luận:', c.content)
+                                    if (t && t.trim() && t.trim() !== c.content) editComment(c.id, t.trim())
+                                  }}
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                                <button
+                                  className="btn btn-ghost row-action"
+                                  title="Xóa bình luận"
+                                  onClick={() => {
+                                    if (window.confirm('Xóa bình luận này?')) deleteComment(c.id)
+                                  }}
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </>
+                            )}
                           </span>
                         </div>
                         <p>{c.content}</p>

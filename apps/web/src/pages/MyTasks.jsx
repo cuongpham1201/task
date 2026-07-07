@@ -9,8 +9,11 @@ const TABS = [
   { key: 'today', label: 'Hôm nay' },
   { key: 'upcoming', label: 'Sắp đến hạn' },
   { key: 'overdue', label: 'Quá hạn' },
+  { key: 'review', label: 'Nghiệm thu' },
   { key: 'done', label: 'Đã hoàn thành' },
 ]
+
+const inReview = (t) => t.status === 'submitted' || t.status === 'returned'
 
 export default function MyTasks() {
   const { myTasks, openCreateModal } = useApp()
@@ -23,6 +26,7 @@ export default function MyTasks() {
         case 'today': return all.filter(isDueToday)
         case 'upcoming': return all.filter((t) => isUpcoming(t))
         case 'overdue': return all.filter(isOverdue)
+        case 'review': return all.filter(inReview)
         case 'done': return all.filter((t) => t.status === 'done')
         default: return all
       }
@@ -41,6 +45,7 @@ export default function MyTasks() {
     today: all.filter(isDueToday).length,
     upcoming: all.filter((t) => isUpcoming(t)).length,
     overdue: all.filter(isOverdue).length,
+    review: all.filter(inReview).length,
     done: all.filter((t) => t.status === 'done').length,
   }
 

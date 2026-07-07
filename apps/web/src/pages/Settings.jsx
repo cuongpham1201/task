@@ -1,9 +1,12 @@
+import { LogOut } from 'lucide-react'
 import { useApp } from '../store/AppContext'
+import { useAuth } from '../auth/AuthProvider'
 import Avatar from '../components/shared/Avatar'
 import { ROLES } from '../data/constants'
 
 export default function Settings() {
-  const { state, currentUser, usersById, setCurrentUser } = useApp()
+  const { state, currentUser, usersById } = useApp()
+  const { logout } = useAuth()
   const isAdmin = currentUser.role === 'admin'
   const dept = state.departments.find((d) => d.id === currentUser.departmentId)
 
@@ -18,59 +21,41 @@ export default function Settings() {
           <div>
             <p className="settings-name">{currentUser.displayName}</p>
             <p className="muted">{currentUser.email}</p>
-            <p className="muted">{dept?.name} · {ROLES[currentUser.role]}</p>
+            <p className="muted">{dept?.name ? `${dept.name} · ` : ''}{ROLES[currentUser.role]}</p>
           </div>
         </div>
-      </div>
-
-      <div className="card">
-        <div className="card-head"><h2>Đổi người dùng (demo)</h2></div>
-        <p className="muted settings-hint">
-          Chuyển sang tài khoản khác để thử nghiệm phân quyền: Admin xem toàn bộ,
-          Trưởng phòng xem báo cáo phòng mình, Nhân viên chỉ xem việc của mình.
+        <p className="muted settings-hint" style={{ marginTop: 12 }}>
+          Đăng nhập bằng tài khoản Microsoft 365 nội bộ. Thông tin phòng ban/chức danh
+          sẽ đồng bộ từ hệ thống Nhân sự ở giai đoạn sau.
         </p>
-        <div className="settings-users">
-          {state.users.map((u) => {
-            const d = state.departments.find((x) => x.id === u.departmentId)
-            return (
-              <button
-                key={u.id}
-                className={`settings-user ${u.id === currentUser.id ? 'active' : ''}`}
-                onClick={() => setCurrentUser(u.id)}
-              >
-                <Avatar user={u} size={30} />
-                <span className="settings-user-info">
-                  <span>{u.displayName}</span>
-                  <span className="muted">{d?.name} · {ROLES[u.role]}</span>
-                </span>
-                {u.id === currentUser.id && <span className="badge status-done">Đang dùng</span>}
-              </button>
-            )
-          })}
-        </div>
+        <button className="btn" onClick={logout}>
+          <LogOut size={15} /> Đăng xuất
+        </button>
       </div>
 
       {isAdmin && (
         <div className="card">
           <div className="card-head"><h2>Quản trị (Admin)</h2></div>
           <p className="muted settings-hint">
-            Quản lý phòng ban và channel — bản demo hiển thị danh sách, chỉnh sửa sẽ có ở phiên bản sau.
+            Danh sách phòng ban — chỉnh sửa sẽ có ở phiên bản sau (đồng bộ từ HRM).
           </p>
-          <table className="task-table settings-table">
-            <thead>
-              <tr><th>Phòng ban</th><th>Mã</th><th>Trưởng phòng</th><th>Số thành viên</th></tr>
-            </thead>
-            <tbody>
-              {state.departments.map((d) => (
-                <tr key={d.id}>
-                  <td>{d.name}</td>
-                  <td>{d.code}</td>
-                  <td>{usersById[d.managerId]?.displayName}</td>
-                  <td>{state.users.filter((u) => u.departmentId === d.id).length}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-wrap">
+            <table className="task-table settings-table">
+              <thead>
+                <tr><th>Phòng ban</th><th>Mã</th><th>Trưởng phòng</th><th>Số thành viên</th></tr>
+              </thead>
+              <tbody>
+                {state.departments.map((d) => (
+                  <tr key={d.id}>
+                    <td>{d.name}</td>
+                    <td>{d.code}</td>
+                    <td>{usersById[d.managerId]?.displayName}</td>
+                    <td>{state.users.filter((u) => u.departmentId === d.id).length}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

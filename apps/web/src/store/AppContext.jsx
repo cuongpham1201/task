@@ -96,6 +96,15 @@ function reducer(state, action) {
         ...state,
         comments: state.comments.map((c) => (c.id === action.tempId ? action.comment : c)),
       }
+    case 'UPDATE_COMMENT':
+      return {
+        ...state,
+        comments: state.comments.map((c) =>
+          c.id === action.id ? { ...c, content: action.content, updatedAt: action.at } : c
+        ),
+      }
+    case 'REMOVE_COMMENT':
+      return { ...state, comments: state.comments.filter((c) => c.id !== action.id) }
 
     case 'ADD_SUBTASK':
       return { ...state, subtasks: [...state.subtasks, action.subtask] }
@@ -111,11 +120,27 @@ function reducer(state, action) {
           s.id === action.id ? { ...s, done: action.done } : s
         ),
       }
+    case 'UPDATE_SUBTASK':
+      return {
+        ...state,
+        subtasks: state.subtasks.map((s) =>
+          s.id === action.id ? { ...s, ...action.patch } : s
+        ),
+      }
+    case 'REMOVE_SUBTASK':
+      return { ...state, subtasks: state.subtasks.filter((s) => s.id !== action.id) }
 
     case 'MARK_NOTIFS_READ':
       return {
         ...state,
         notifications: state.notifications.map((n) => (n.readAt ? n : { ...n, readAt: action.at })),
+      }
+    case 'MARK_ONE_READ':
+      return {
+        ...state,
+        notifications: state.notifications.map((n) =>
+          n.id === action.id && !n.readAt ? { ...n, readAt: action.at } : n
+        ),
       }
     default:
       return state
@@ -166,6 +191,11 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
       const task = findTask(id)
       if (!task || task.status === status) return
       if (!guard(canUpdateStatus(currentUser, task), 'đổi trạng thái')) return
+      // Đang chờ nghiệm thu → không đổi tay (phải qua Đạt/Trả lại)
+      if (task.status === 'submitted' && !canReview(task)) {
+        alert('Việc đang chờ nghiệm thu — chờ kết quả Đạt/Trả lại.')
+        return
+      }
       const isDone = status === 'done'
       dispatch({
         type: 'SET_STATUS', id, at: now(),
@@ -225,6 +255,10 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
       markInboxRead: () => {
         dispatch({ type: 'MARK_NOTIFS_READ', at: now() })
         persist(post('/notifications/mark-read', {}))
+      },
+      markNotificationRead: (id) => {
+        dispatch({ type: 'MARK_ONE_READ', id, at: now() })
+        persist(post('/notifications/mark-read', { ids: [String(id)] }))
       },
 
       // ── Tạo công việc (map channel→project cho API) ──
@@ -341,6 +375,45 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         const tempId = nextId('s')
         dispatch({ type: 'ADD_SUBTASK', subtask: { id: tempId, taskId, title, done: false, assigneeId: null } })
         persist(post(`/tasks/${taskId}/subtasks`, { title }), (s) => dispatch({ type: 'REPLACE_SUBTASK', id: tempId, subtask: s }))
+      },
+
+      // ── Sửa/xóa (S3.5) ──
+      archiveTask: (id) => {
+        const task = findTask(id)
+        if (!task) return
+        if (!guard(canManageTask(currentUser, task), 'xóa công việc')) return
+        dispatch({ type: 'REMOVE_TASK', id })
+        persist(apiFetch(`/tasks/${id}`, { method: 'DELETE' }))
+      },
+      updateSubtask: (subtaskId, fields) => {
+        const sub = state.subtasks.find((s) => s.id === subtaskId)
+        const task = sub && findTask(sub.taskId)
+        if (!task) return
+        if (!guard(canWorkSubtasks(currentUser, task), 'sửa việc con')) return
+        dispatch({ type: 'UPDATE_SUBTASK', id: subtaskId, patch: fields })
+        persist(patch(`/subtasks/${subtaskId}`, fields), (s) => dispatch({ type: 'REPLACE_SUBTASK', id: subtaskId, subtask: s }))
+      },
+      deleteSubtask: (subtaskId) => {
+        const sub = state.subtasks.find((s) => s.id === subtaskId)
+        const task = sub && findTask(sub.taskId)
+        if (!task) return
+        if (!guard(canManageTask(currentUser, task), 'xóa việc con')) return
+        dispatch({ type: 'REMOVE_SUBTASK', id: subtaskId })
+        persist(apiFetch(`/subtasks/${subtaskId}`, { method: 'DELETE' }))
+      },
+      editComment: (commentId, content) => {
+        const c = state.comments.find((x) => x.id === commentId)
+        if (!c) return
+        if (!guard(c.userId === me || currentUser.role === 'admin', 'sửa bình luận')) return
+        dispatch({ type: 'UPDATE_COMMENT', id: commentId, content, at: now() })
+        persist(patch(`/comments/${commentId}`, { content }))
+      },
+      deleteComment: (commentId) => {
+        const c = state.comments.find((x) => x.id === commentId)
+        if (!c) return
+        if (!guard(c.userId === me || currentUser.role === 'admin', 'xóa bình luận')) return
+        dispatch({ type: 'REMOVE_COMMENT', id: commentId })
+        persist(apiFetch(`/comments/${commentId}`, { method: 'DELETE' }))
       },
     }
   }, [state])
