@@ -87,6 +87,7 @@ enum ActivityAction {
   attachment
   collaborator
   review // nghiệm thu: submitted / passed / returned
+  edit // sửa nội dung task (tên/mô tả/section/ngày bắt đầu)
 
   @@map("activity_action")
 }

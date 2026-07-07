@@ -88,11 +88,13 @@ export class TasksService {
           })),
         })
       }
+      // Báo cho MỌI người liên quan (người phụ trách + người phối hợp), trừ người tạo.
+      // emit tự loại actor; nếu chỉ có mình người tạo thì không ai nhận.
       await this.notifications.emit(tx, {
         task: created,
         actorId: me.id,
         action: 'create',
-        notifyType: created.assigneeId !== me.id ? 'task_assigned' : null,
+        notifyType: 'task_assigned',
       })
       return created
     })
@@ -260,16 +262,22 @@ export class TasksService {
     const onlyDescription = Object.keys(dto).every((k) => k === 'description')
     const allowed = onlyDescription ? this.policy.canUpdateStatus(me, task) : this.policy.canManage(me, task)
     this.policy.assert(allowed, 'Không có quyền sửa công việc')
-    await this.prisma.task.update({
-      where: { id },
-      data: {
-        ...(dto.title !== undefined ? { title: dto.title } : {}),
-        ...(dto.description !== undefined ? { description: dto.description } : {}),
-        ...(dto.section !== undefined ? { section: dto.section as any } : {}),
-        ...(dto.startDate !== undefined
-          ? { startDate: dto.startDate ? new Date(dto.startDate) : null }
-          : {}),
-      },
+    const fields = Object.keys(dto) // vd ['title'] / ['description']
+    await this.prisma.$transaction(async (tx) => {
+      await tx.task.update({
+        where: { id },
+        data: {
+          ...(dto.title !== undefined ? { title: dto.title } : {}),
+          ...(dto.description !== undefined ? { description: dto.description } : {}),
+          ...(dto.section !== undefined ? { section: dto.section as any } : {}),
+          ...(dto.startDate !== undefined
+            ? { startDate: dto.startDate ? new Date(dto.startDate) : null }
+            : {}),
+        },
+      })
+      await this.notifications.emit(tx, {
+        task, actorId: me.id, action: 'edit', metadata: { fields }, notifyType: null,
+      })
     })
     return this.withCollaborators(id)
   }

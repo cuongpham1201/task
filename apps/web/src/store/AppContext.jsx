@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useReducer } from 'react'
+import { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
 import { apiFetch } from '../api/client'
 import {
   canManageTask, canUpdateStatus, canWorkSubtasks, canComment, canCreateTask,
@@ -142,6 +142,8 @@ function reducer(state, action) {
           n.id === action.id && !n.readAt ? { ...n, readAt: action.at } : n
         ),
       }
+    case 'SET_NOTIFS':
+      return { ...state, notifications: action.list }
     default:
       return state
   }
@@ -149,6 +151,23 @@ function reducer(state, action) {
 
 export function AppProvider({ children, bootstrap, currentUserId }) {
   const [state, dispatch] = useReducer(reducer, buildInitialState(currentUserId, bootstrap))
+
+  // Poll thông báo (đỡ phải F5): mỗi 20s + khi tab được focus lại.
+  useEffect(() => {
+    let stop = false
+    const refresh = () =>
+      apiFetch('/notifications')
+        .then((list) => { if (!stop) dispatch({ type: 'SET_NOTIFS', list }) })
+        .catch(() => {})
+    const timer = setInterval(refresh, 20000)
+    const onFocus = () => refresh()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      stop = true
+      clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [])
 
   const api = useMemo(() => {
     const usersById = Object.fromEntries(state.users.map((u) => [u.id, u]))
@@ -345,7 +364,10 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         const needManage = Object.keys(fieldPatch).some((k) => k !== 'description')
         const allowed = needManage ? canManageTask(currentUser, task) : canUpdateStatus(currentUser, task)
         if (!guard(allowed, 'cập nhật thông tin công việc')) return
-        dispatch({ type: 'UPDATE_TASK_FIELD', id, at: now(), patch: fieldPatch })
+        dispatch({
+          type: 'UPDATE_TASK_FIELD', id, at: now(), patch: fieldPatch,
+          activities: [makeActivity(id, me, 'edit', { fields: Object.keys(fieldPatch) })],
+        })
         persist(patch(`/tasks/${id}`, fieldPatch), (t) => dispatch({ type: 'REPLACE_TASK', task: t }))
       },
 

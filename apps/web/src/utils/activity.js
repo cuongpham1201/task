@@ -34,6 +34,13 @@ export function activityText(activity, usersById) {
       if (meta.decision === 'passed') return 'đã nghiệm thu Đạt ✓'
       if (meta.decision === 'returned') return 'đã trả lại công việc'
       return 'đã cập nhật nghiệm thu'
+    case 'edit': {
+      const map = { title: 'tên', description: 'mô tả', section: 'nhóm', startDate: 'ngày bắt đầu' }
+      const names = (meta.fields || []).map((f) => map[f] || f).join(', ')
+      return names ? `đã sửa ${names}` : 'đã sửa thông tin công việc'
+    }
+    case 'subtask':
+      return 'đã cập nhật việc con'
     default:
       return 'đã cập nhật công việc'
   }
