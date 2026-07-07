@@ -2,7 +2,6 @@ import {
   IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min,
 } from 'class-validator'
 
-const SCOPES = ['personal', 'department', 'project']
 const PRIORITIES = ['low', 'normal', 'high', 'urgent']
 const SECTIONS = ['suvu', 'kehoach', 'hangngay', 'phatsinh']
 const MODES = ['self', 'review_required']
@@ -10,9 +9,7 @@ const MODES = ['self', 'review_required']
 export class CreateTaskDto {
   @IsString() @MaxLength(255) title!: string
   @IsOptional() @IsString() description?: string
-  @IsIn(SCOPES) scope!: string
-  @IsOptional() @IsString() departmentId?: string
-  @IsOptional() @IsString() projectId?: string
+  @IsOptional() @IsString() workspaceId?: string | null // null = việc cá nhân
   @IsOptional() @IsIn(SECTIONS) section?: string
   @IsOptional() @IsString() assigneeId?: string
   @IsOptional() @IsIn(PRIORITIES) priority?: string

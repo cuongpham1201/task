@@ -2,7 +2,16 @@
 CREATE TYPE "user_role" AS ENUM ('admin', 'manager', 'member');
 
 -- CreateEnum
-CREATE TYPE "task_scope" AS ENUM ('personal', 'department', 'project');
+CREATE TYPE "org_unit_type" AS ENUM ('company', 'block', 'department');
+
+-- CreateEnum
+CREATE TYPE "org_role" AS ENUM ('ceo', 'block_director', 'department_manager', 'viewer');
+
+-- CreateEnum
+CREATE TYPE "role_scope" AS ENUM ('self_only', 'include_children');
+
+-- CreateEnum
+CREATE TYPE "workspace_type" AS ENUM ('org_unit', 'project');
 
 -- CreateEnum
 CREATE TYPE "task_status" AS ENUM ('todo', 'doing', 'waiting', 'submitted', 'returned', 'done', 'paused');
@@ -20,7 +29,7 @@ CREATE TYPE "task_priority" AS ENUM ('low', 'normal', 'high', 'urgent');
 CREATE TYPE "task_section" AS ENUM ('suvu', 'kehoach', 'hangngay', 'phatsinh');
 
 -- CreateEnum
-CREATE TYPE "activity_action" AS ENUM ('create', 'assign', 'status', 'due', 'priority', 'progress', 'comment', 'complete', 'subtask', 'attachment', 'collaborator', 'review');
+CREATE TYPE "activity_action" AS ENUM ('create', 'assign', 'status', 'due', 'priority', 'progress', 'comment', 'complete', 'subtask', 'attachment', 'collaborator', 'review', 'edit');
 
 -- CreateEnum
 CREATE TYPE "notification_type" AS ENUM ('task_assigned', 'comment_added', 'mentioned', 'due_soon', 'overdue', 'task_returned', 'task_accepted');
@@ -37,7 +46,7 @@ CREATE TABLE "users" (
     "entra_id" TEXT,
     "email" TEXT NOT NULL,
     "display_name" TEXT NOT NULL,
-    "department_id" TEXT,
+    "org_unit_id" TEXT,
     "role" "user_role" NOT NULL DEFAULT 'member',
     "job_title" TEXT,
     "avatar_url" TEXT,
@@ -49,37 +58,59 @@ CREATE TABLE "users" (
 );
 
 -- CreateTable
-CREATE TABLE "departments" (
+CREATE TABLE "org_units" (
     "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
     "code" TEXT NOT NULL,
-    "color" TEXT,
-    "manager_id" TEXT,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "name" TEXT NOT NULL,
+    "type" "org_unit_type" NOT NULL,
+    "parent_id" TEXT,
+    "legal_entity" TEXT,
+    "sort_order" INTEGER NOT NULL DEFAULT 0,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "source" TEXT NOT NULL DEFAULT 'HRM',
+    "external_hrm_id" TEXT,
 
-    CONSTRAINT "departments_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "org_units_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "projects" (
+CREATE TABLE "org_unit_roles" (
     "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "org_unit_id" TEXT NOT NULL,
+    "role" "org_role" NOT NULL,
+    "scope" "role_scope" NOT NULL DEFAULT 'self_only',
+    "source" TEXT NOT NULL DEFAULT 'MANUAL',
+    "active" BOOLEAN NOT NULL DEFAULT true,
+
+    CONSTRAINT "org_unit_roles_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "workspaces" (
+    "id" TEXT NOT NULL,
+    "type" "workspace_type" NOT NULL,
     "name" TEXT NOT NULL,
-    "description" TEXT,
+    "org_unit_id" TEXT,
     "owner_id" TEXT,
+    "description" TEXT,
     "archived" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "projects_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "workspaces_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "project_members" (
-    "project_id" TEXT NOT NULL,
+CREATE TABLE "workspace_members" (
+    "workspace_id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
+    "role" TEXT NOT NULL DEFAULT 'member',
+    "source" TEXT NOT NULL DEFAULT 'MANUAL',
     "added_by" TEXT,
     "added_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "project_members_pkey" PRIMARY KEY ("project_id","user_id")
+    CONSTRAINT "workspace_members_pkey" PRIMARY KEY ("workspace_id","user_id")
 );
 
 -- CreateTable
@@ -87,9 +118,7 @@ CREATE TABLE "tasks" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT NOT NULL DEFAULT '',
-    "scope" "task_scope" NOT NULL,
-    "department_id" TEXT,
-    "project_id" TEXT,
+    "workspace_id" TEXT,
     "section" "task_section",
     "creator_id" TEXT NOT NULL,
     "assignee_id" TEXT NOT NULL,
@@ -219,14 +248,15 @@ CREATE TABLE "external_user_mappings" (
 );
 
 -- CreateTable
-CREATE TABLE "external_department_mappings" (
+CREATE TABLE "external_org_mappings" (
     "id" TEXT NOT NULL,
-    "department_id" TEXT NOT NULL,
-    "hrm_entity_code" TEXT,
+    "org_unit_id" TEXT NOT NULL,
+    "hrm_entity" TEXT,
     "hrm_dept_code" TEXT NOT NULL,
+    "hrm_block" TEXT,
     "synced_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "external_department_mappings_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "external_org_mappings_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -268,16 +298,31 @@ CREATE UNIQUE INDEX "users_entra_id_key" ON "users"("entra_id");
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "departments_code_key" ON "departments"("code");
+CREATE UNIQUE INDEX "org_units_code_key" ON "org_units"("code");
+
+-- CreateIndex
+CREATE INDEX "org_units_parent_id_idx" ON "org_units"("parent_id");
+
+-- CreateIndex
+CREATE INDEX "org_units_type_idx" ON "org_units"("type");
+
+-- CreateIndex
+CREATE INDEX "org_unit_roles_user_id_idx" ON "org_unit_roles"("user_id");
+
+-- CreateIndex
+CREATE INDEX "org_unit_roles_org_unit_id_idx" ON "org_unit_roles"("org_unit_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "workspaces_org_unit_id_key" ON "workspaces"("org_unit_id");
+
+-- CreateIndex
+CREATE INDEX "workspaces_type_idx" ON "workspaces"("type");
 
 -- CreateIndex
 CREATE INDEX "tasks_assignee_id_idx" ON "tasks"("assignee_id");
 
 -- CreateIndex
-CREATE INDEX "tasks_department_id_status_idx" ON "tasks"("department_id", "status");
-
--- CreateIndex
-CREATE INDEX "tasks_project_id_idx" ON "tasks"("project_id");
+CREATE INDEX "tasks_workspace_id_status_idx" ON "tasks"("workspace_id", "status");
 
 -- CreateIndex
 CREATE INDEX "tasks_due_date_idx" ON "tasks"("due_date");
@@ -313,7 +358,7 @@ CREATE UNIQUE INDEX "external_user_mappings_entra_object_id_key" ON "external_us
 CREATE UNIQUE INDEX "external_user_mappings_emp_code_key" ON "external_user_mappings"("emp_code");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "external_department_mappings_department_id_key" ON "external_department_mappings"("department_id");
+CREATE UNIQUE INDEX "external_org_mappings_org_unit_id_key" ON "external_org_mappings"("org_unit_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "task_kpi_results_idempotency_key_key" ON "task_kpi_results"("idempotency_key");
@@ -322,28 +367,34 @@ CREATE UNIQUE INDEX "task_kpi_results_idempotency_key_key" ON "task_kpi_results"
 CREATE INDEX "task_kpi_results_push_status_idx" ON "task_kpi_results"("push_status");
 
 -- AddForeignKey
-ALTER TABLE "users" ADD CONSTRAINT "users_department_id_fkey" FOREIGN KEY ("department_id") REFERENCES "departments"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "users" ADD CONSTRAINT "users_org_unit_id_fkey" FOREIGN KEY ("org_unit_id") REFERENCES "org_units"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "departments" ADD CONSTRAINT "departments_manager_id_fkey" FOREIGN KEY ("manager_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "org_units" ADD CONSTRAINT "org_units_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "org_units"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "projects" ADD CONSTRAINT "projects_owner_id_fkey" FOREIGN KEY ("owner_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "org_unit_roles" ADD CONSTRAINT "org_unit_roles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "project_members" ADD CONSTRAINT "project_members_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "org_unit_roles" ADD CONSTRAINT "org_unit_roles_org_unit_id_fkey" FOREIGN KEY ("org_unit_id") REFERENCES "org_units"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "project_members" ADD CONSTRAINT "project_members_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "workspaces" ADD CONSTRAINT "workspaces_org_unit_id_fkey" FOREIGN KEY ("org_unit_id") REFERENCES "org_units"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "project_members" ADD CONSTRAINT "project_members_added_by_fkey" FOREIGN KEY ("added_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "workspaces" ADD CONSTRAINT "workspaces_owner_id_fkey" FOREIGN KEY ("owner_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "tasks" ADD CONSTRAINT "tasks_department_id_fkey" FOREIGN KEY ("department_id") REFERENCES "departments"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "workspace_members" ADD CONSTRAINT "workspace_members_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "tasks" ADD CONSTRAINT "tasks_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "workspace_members" ADD CONSTRAINT "workspace_members_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "workspace_members" ADD CONSTRAINT "workspace_members_added_by_fkey" FOREIGN KEY ("added_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "tasks" ADD CONSTRAINT "tasks_creator_id_fkey" FOREIGN KEY ("creator_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -404,13 +455,3 @@ ALTER TABLE "attachments" ADD CONSTRAINT "attachments_uploaded_by_fkey" FOREIGN 
 
 -- AddForeignKey
 ALTER TABLE "external_user_mappings" ADD CONSTRAINT "external_user_mappings_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "external_department_mappings" ADD CONSTRAINT "external_department_mappings_department_id_fkey" FOREIGN KEY ("department_id") REFERENCES "departments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- Ràng buộc nhất quán scope ↔ cột (Prisma không biểu diễn được CHECK)
-ALTER TABLE "tasks" ADD CONSTRAINT "chk_scope" CHECK (
-  (scope = 'personal'   AND department_id IS NULL     AND project_id IS NULL) OR
-  (scope = 'department' AND department_id IS NOT NULL  AND project_id IS NULL) OR
-  (scope = 'project'    AND project_id IS NOT NULL     AND department_id IS NULL)
-);

@@ -1,8 +1,7 @@
-// Schema — App Giao việc (task execution system). Scope reset S1.
-// Xem docs/task-app-scope-reset.md. PK dùng String(UUID); Activity/Notification BigInt.
-// KPI & Rubric thuộc HRM — App chỉ ghi nhận nghiệm thu (TaskReview) và đẩy
-// task đã nghiệm thu sang HRM (task_kpi_results).
-// CHECK constraint theo scope được thêm thủ công trong migration SQL.
+// Schema — App Giao việc. Phase ORG-1: cây tổ chức + workspace + visibility.
+// HRM là nguồn master cơ cấu tổ chức (org_units source=HRM). Xem
+// docs/org-workspace-visibility-design.md và docs/bhl-org-structure-analysis.md.
+// Task luôn thuộc đúng 1 workspace (ORG_UNIT hoặc PROJECT); personal = workspace_id null.
 
 generator client {
   provider = "prisma-client-js"
@@ -14,19 +13,44 @@ datasource db {
 }
 
 enum UserRole {
-  admin
+  admin // system admin (thấy tất cả — kỹ thuật)
   manager
   member
 
   @@map("user_role")
 }
 
-enum TaskScope {
-  personal
-  department
-  project
+// Cây tổ chức: Công ty → Khối → Phòng/Ban (lấy tới cấp DEPARTMENT theo HRM)
+enum OrgUnitType {
+  company
+  block // khối chức năng (theo Giám đốc) / BDH
+  department // phòng/ban/kênh/trung tâm/phân xưởng
 
-  @@map("task_scope")
+  @@map("org_unit_type")
+}
+
+// Quyền theo tổ chức
+enum OrgRole {
+  ceo // TGĐ / Ban Điều Hành
+  block_director // Giám đốc khối
+  department_manager // Trưởng phòng/ban
+  viewer
+
+  @@map("org_role")
+}
+
+enum RoleScope {
+  self_only
+  include_children
+
+  @@map("role_scope")
+}
+
+enum WorkspaceType {
+  org_unit // việc nội bộ phòng/ban (member suy từ org tree)
+  project // dự án kiểu Asana (member thủ công)
+
+  @@map("workspace_type")
 }
 
 enum TaskStatus {
@@ -41,7 +65,6 @@ enum TaskStatus {
   @@map("task_status")
 }
 
-// Task tự hoàn thành (SELF) hay bắt buộc nghiệm thu (REVIEW_REQUIRED)
 enum CompletionMode {
   self
   review_required
@@ -86,8 +109,8 @@ enum ActivityAction {
   subtask
   attachment
   collaborator
-  review // nghiệm thu: submitted / passed / returned
-  edit // sửa nội dung task (tên/mô tả/section/ngày bắt đầu)
+  review
+  edit
 
   @@map("activity_action")
 }
@@ -105,8 +128,8 @@ enum NotificationType {
 }
 
 enum SyncDirection {
-  inbound // đọc master data từ HRM
-  outbound // đẩy kết quả nghiệm thu sang HRM
+  inbound
+  outbound
 
   @@map("sync_direction")
 }
@@ -121,91 +144,122 @@ enum PushStatus {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  entraId      String?  @unique @map("entra_id")
-  email        String   @unique
-  displayName  String   @map("display_name")
-  departmentId String?  @map("department_id")
-  role         UserRole @default(member)
-  jobTitle     String?  @map("job_title")
-  avatarUrl    String?  @map("avatar_url")
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(uuid())
+  entraId     String?  @unique @map("entra_id")
+  email       String   @unique
+  displayName String   @map("display_name")
+  orgUnitId   String?  @map("org_unit_id") // phòng/ban chính (từ HRM)
+  role        UserRole @default(member)
+  jobTitle    String?  @map("job_title")
+  avatarUrl   String?  @map("avatar_url")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  department          Department?          @relation("DeptMembers", fields: [departmentId], references: [id])
-  managedDepartments  Department[]         @relation("DeptManager")
-  ownedProjects       Project[]            @relation("ProjectOwner")
-  projectMemberships  ProjectMember[]      @relation("ProjectMemberships")
-  projectMembersAdded ProjectMember[]      @relation("ProjectMemberAddedBy")
-  createdTasks        Task[]               @relation("TaskCreator")
-  assignedTasks       Task[]               @relation("TaskAssignee")
-  completedTasks      Task[]               @relation("TaskCompletedBy")
-  reviews             TaskReview[]         @relation("TaskReviewer")
-  collaborations      TaskCollaborator[]
-  watching            TaskWatcher[]
-  subtasks            Subtask[]
-  comments            Comment[]
-  activities          Activity[]
-  notifications       Notification[]
-  attachments         Attachment[]
-  externalMapping     ExternalUserMapping?
+  orgUnit               OrgUnit?             @relation("OrgUnitMembers", fields: [orgUnitId], references: [id])
+  orgUnitRoles          OrgUnitRole[]
+  ownedWorkspaces       Workspace[]          @relation("WorkspaceOwner")
+  workspaceMemberships  WorkspaceMember[]    @relation("WorkspaceMemberships")
+  workspaceMembersAdded WorkspaceMember[]    @relation("WorkspaceMemberAddedBy")
+  createdTasks          Task[]               @relation("TaskCreator")
+  assignedTasks         Task[]               @relation("TaskAssignee")
+  completedTasks        Task[]               @relation("TaskCompletedBy")
+  reviews               TaskReview[]         @relation("TaskReviewer")
+  collaborations        TaskCollaborator[]
+  watching              TaskWatcher[]
+  subtasks              Subtask[]
+  comments              Comment[]
+  activities            Activity[]
+  notifications         Notification[]
+  attachments           Attachment[]
+  externalMapping       ExternalUserMapping?
 
   @@map("users")
 }
 
-model Department {
-  id        String   @id @default(uuid())
-  name      String
-  code      String   @unique
-  color     String?
-  managerId String?  @map("manager_id")
-  createdAt DateTime @default(now()) @map("created_at")
+// ── Cây tổ chức (master = HRM) ───────────────────────────────────────
+model OrgUnit {
+  id            String      @id @default(uuid())
+  code          String      @unique
+  name          String
+  type          OrgUnitType
+  parentId      String?     @map("parent_id")
+  legalEntity   String?     @map("legal_entity") // HALONG / DONGMAI / GROUP (theo HRM)
+  sortOrder     Int         @default(0) @map("sort_order")
+  active        Boolean     @default(true)
+  source        String      @default("HRM")
+  externalHrmId String?     @map("external_hrm_id")
 
-  manager         User?                      @relation("DeptManager", fields: [managerId], references: [id])
-  members         User[]                     @relation("DeptMembers")
-  tasks           Task[]
-  externalMapping ExternalDepartmentMapping?
+  parent    OrgUnit?      @relation("OrgTree", fields: [parentId], references: [id])
+  children  OrgUnit[]     @relation("OrgTree")
+  members   User[]        @relation("OrgUnitMembers")
+  roles     OrgUnitRole[]
+  workspace Workspace? // workspace ORG_UNIT tương ứng (1-1)
 
-  @@map("departments")
+  @@index([parentId])
+  @@index([type])
+  @@map("org_units")
 }
 
-model Project {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  ownerId     String?  @map("owner_id")
-  archived    Boolean  @default(false)
-  createdAt   DateTime @default(now()) @map("created_at")
+model OrgUnitRole {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  orgUnitId String    @map("org_unit_id")
+  role      OrgRole
+  scope     RoleScope @default(self_only)
+  source    String    @default("MANUAL")
+  active    Boolean   @default(true)
 
-  owner   User?           @relation("ProjectOwner", fields: [ownerId], references: [id])
-  members ProjectMember[]
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgUnit OrgUnit @relation(fields: [orgUnitId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([orgUnitId])
+  @@map("org_unit_roles")
+}
+
+// ── Workspace = ranh giới visibility của task ────────────────────────
+model Workspace {
+  id          String        @id @default(uuid())
+  type        WorkspaceType
+  name        String
+  orgUnitId   String?       @unique @map("org_unit_id") // set khi type=org_unit
+  ownerId     String?       @map("owner_id") // set khi type=project
+  description String?
+  archived    Boolean       @default(false)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  orgUnit OrgUnit?          @relation(fields: [orgUnitId], references: [id])
+  owner   User?             @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  members WorkspaceMember[]
   tasks   Task[]
 
-  @@map("projects")
+  @@index([type])
+  @@map("workspaces")
 }
 
-model ProjectMember {
-  projectId String   @map("project_id")
-  userId    String   @map("user_id")
-  addedById String?  @map("added_by")
-  addedAt   DateTime @default(now()) @map("added_at")
+model WorkspaceMember {
+  workspaceId String   @map("workspace_id")
+  userId      String   @map("user_id")
+  role        String   @default("member") // owner / manager / member / viewer
+  source      String   @default("MANUAL")
+  addedById   String?  @map("added_by")
+  addedAt     DateTime @default(now()) @map("added_at")
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user    User    @relation("ProjectMemberships", fields: [userId], references: [id], onDelete: Cascade)
-  addedBy User?   @relation("ProjectMemberAddedBy", fields: [addedById], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation("WorkspaceMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  addedBy   User?     @relation("WorkspaceMemberAddedBy", fields: [addedById], references: [id])
 
-  @@id([projectId, userId])
-  @@map("project_members")
+  @@id([workspaceId, userId])
+  @@map("workspace_members")
 }
 
 model Task {
   id             String         @id @default(uuid())
   title          String
   description    String         @default("")
-  scope          TaskScope
-  departmentId   String?        @map("department_id")
-  projectId      String?        @map("project_id")
+  workspaceId    String?        @map("workspace_id") // null = việc cá nhân
   section        TaskSection?
   creatorId      String         @map("creator_id")
   assigneeId     String         @map("assignee_id")
@@ -222,11 +276,10 @@ model Task {
   completedAt    DateTime?      @map("completed_at")
   completedById  String?        @map("completed_by")
 
-  department  Department? @relation(fields: [departmentId], references: [id])
-  project     Project?    @relation(fields: [projectId], references: [id])
-  creator     User        @relation("TaskCreator", fields: [creatorId], references: [id])
-  assignee    User        @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  completedBy User?       @relation("TaskCompletedBy", fields: [completedById], references: [id])
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  creator     User       @relation("TaskCreator", fields: [creatorId], references: [id])
+  assignee    User       @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  completedBy User?      @relation("TaskCompletedBy", fields: [completedById], references: [id])
   review      TaskReview?
 
   collaborators TaskCollaborator[]
@@ -237,14 +290,12 @@ model Task {
   attachments   Attachment[]
 
   @@index([assigneeId])
-  @@index([departmentId, status])
-  @@index([projectId])
+  @@index([workspaceId, status])
   @@index([dueDate])
   @@index([status])
   @@map("tasks")
 }
 
-// Nghiệm thu — CHỈ ghi nhận Đạt/Trả lại (KPI & rubric thuộc HRM, không chấm điểm ở đây)
 model TaskReview {
   id         String         @id @default(uuid())
   taskId     String         @unique @map("task_id")
@@ -335,7 +386,7 @@ model Notification {
   userId     String           @map("user_id")
   type       NotificationType
   activityId BigInt?          @map("activity_id")
-  taskId     String?          @map("task_id") // deep-link (due_soon/overdue không có activity)
+  taskId     String?          @map("task_id")
   readAt     DateTime?        @map("read_at")
   createdAt  DateTime         @default(now()) @map("created_at")
 
@@ -366,15 +417,12 @@ model Attachment {
   @@map("attachments")
 }
 
-// ── Tích hợp HRM (tối thiểu) ─────────────────────────────────────────
-// App đọc user/department từ HRM (inbound) và đẩy task đã nghiệm thu (outbound).
-// Không có external_project_mappings: Project là master của App.
-
+// ── Tích hợp HRM (tối thiểu, CHƯA sync thật) ─────────────────────────
 model ExternalUserMapping {
   id            String   @id @default(uuid())
   userId        String   @unique @map("user_id")
-  entraObjectId String   @unique @map("entra_object_id") // == HRM UserProfile.ms_oid
-  empCode       String?  @unique @map("emp_code") // khóa nghiệp vụ HRM
+  entraObjectId String   @unique @map("entra_object_id")
+  empCode       String?  @unique @map("emp_code")
   hrmEmployeeId String?  @map("hrm_employee_id")
   syncedAt      DateTime @default(now()) @map("synced_at")
 
@@ -383,19 +431,18 @@ model ExternalUserMapping {
   @@map("external_user_mappings")
 }
 
-model ExternalDepartmentMapping {
-  id            String   @id @default(uuid())
-  departmentId  String   @unique @map("department_id")
-  hrmEntityCode String?  @map("hrm_entity_code")
-  hrmDeptCode   String   @map("hrm_dept_code")
-  syncedAt      DateTime @default(now()) @map("synced_at")
+// Ánh xạ org_unit ↔ đơn vị HRM (khối/phòng ban)
+model ExternalOrgMapping {
+  id          String   @id @default(uuid())
+  orgUnitId   String   @unique @map("org_unit_id")
+  hrmEntity   String?  @map("hrm_entity") // pháp nhân HRM
+  hrmDeptCode String   @map("hrm_dept_code")
+  hrmBlock    String?  @map("hrm_block")
+  syncedAt    DateTime @default(now()) @map("synced_at")
 
-  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-
-  @@map("external_department_mappings")
+  @@map("external_org_mappings")
 }
 
-// Feed task đã nghiệm thu để HRM tính KPI (HRM tự chấm rubric/điểm/trọng số)
 model TaskKpiResult {
   id              String     @id @default(uuid())
   taskId          String     @map("task_id")

@@ -1,21 +1,16 @@
-// Ma trận phân quyền client-side (tạm thời cho demo).
-// Phase 3: các rule này PHẢI được kiểm tra lại ở server — client chỉ ẩn/disable UI.
+// Phân quyền client-side = CHỈ để ẩn/disable UI. Server (PolicyService) là nguồn
+// enforce thật + đã scope visibility (departments/channels/tasks trả về đã lọc theo quyền).
+// Vì vậy các hàm "visible*" chỉ trả về nguyên danh sách server đã lọc.
 //
-// Rule:
-// - Admin: toàn quyền
-// - Creator: quản lý task mình tạo
-// - Manager: quản lý task thuộc phòng ban mình
-// - Assignee: cập nhật trạng thái / tiến độ / mô tả / subtask / comment
-// - Collaborator: cập nhật subtask + comment
-// - Thành viên channel: comment trong task của channel
-// - Member thường: không đụng được task không liên quan
+// user.orgUnitId = phòng/ban chính. task.departmentId (trong shape FE) = org_unit của
+// workspace ORG_UNIT; task.channelId = id workspace PROJECT.
 
 export function canManageTask(user, task) {
+  if (!user) return false
   if (user.role === 'admin') return true
   if (task.creatorId === user.id) return true
-  if (user.role === 'manager' && task.departmentId && task.departmentId === user.departmentId) {
-    return true
-  }
+  // Quản lý phòng: manager & task thuộc phòng mình (gợi ý UI; server kiểm chính xác theo org role)
+  if (user.role === 'manager' && task.departmentId && task.departmentId === user.orgUnitId) return true
   return false
 }
 
@@ -27,45 +22,38 @@ export function canWorkSubtasks(user, task) {
   return canUpdateStatus(user, task) || task.collaboratorIds.includes(user.id)
 }
 
-export function canComment(user, task, channels = []) {
+// Task đã được server scope → nếu thấy task nghĩa là được xem; cho phép comment.
+export function canComment(user, task) {
   if (canWorkSubtasks(user, task)) return true
-  if (task.channelId) {
-    const channel = channels.find((c) => c.id === task.channelId)
-    return !!channel?.members.includes(user.id)
-  }
-  return false
+  return true
 }
 
 // input: { scope, departmentId, channelId }
 export function canCreateTask(user, input, channels = []) {
-  if (input.scope === 'department') {
-    return user.role === 'admin' ||
-      (user.role === 'manager' && input.departmentId === user.departmentId)
-  }
   if (input.scope === 'channel') {
     if (user.role === 'admin') return true
     const channel = channels.find((c) => c.id === input.channelId)
     return !!channel?.members.includes(user.id)
   }
-  return true // personal: ai cũng tạo được
+  // personal & department: server kiểm (thuộc phòng / quản lý phòng); FE cho hiển thị
+  return true
 }
 
-export function canCreateDeptTask(user, departmentId) {
-  return user.role === 'admin' ||
-    (user.role === 'manager' && user.departmentId === departmentId)
+export function canCreateDeptTask(user, departmentId, visibleDepartments = []) {
+  if (user.role === 'admin') return true
+  // Được tạo nếu là phòng mình hoặc phòng nằm trong phạm vi quản lý (đang thấy)
+  return user.orgUnitId === departmentId || visibleDepartments.some((d) => d.id === departmentId)
 }
 
 export function canCreateChannelTask(user, channel) {
   return user.role === 'admin' || channel.members.includes(user.id)
 }
 
-// Sidebar / Dashboard: member & manager chỉ thấy phòng ban / channel liên quan
-export function visibleDepartmentsFor(user, departments) {
-  if (user.role === 'admin') return departments
-  return departments.filter((d) => d.id === user.departmentId)
+// Server ĐÃ scope → trả nguyên danh sách nhận được.
+export function visibleDepartmentsFor(_user, departments) {
+  return departments
 }
 
-export function visibleChannelsFor(user, channels) {
-  if (user.role === 'admin') return channels
-  return channels.filter((c) => c.members.includes(user.id))
+export function visibleChannelsFor(_user, channels) {
+  return channels
 }

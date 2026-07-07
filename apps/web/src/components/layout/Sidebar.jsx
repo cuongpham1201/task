@@ -8,7 +8,12 @@ import BrandLogo from '../shared/BrandLogo'
 import { ROLES } from '../../data/constants'
 
 export default function Sidebar() {
-  const { currentUser, unreadCount: unread, visibleDepartments, visibleChannels } = useApp()
+  const { currentUser, unreadCount: unread, blocks, visibleDepartments, visibleChannels } = useApp()
+  // Nhóm phòng ban theo khối (chỉ khối có phòng đang thấy)
+  const deptGroups = (blocks || [])
+    .map((b) => ({ block: b, depts: visibleDepartments.filter((d) => d.blockId === b.id) }))
+    .filter((g) => g.depts.length > 0)
+  const ungrouped = visibleDepartments.filter((d) => !blocks?.some((b) => b.id === d.blockId))
 
   const linkClass = ({ isActive }) => `side-link ${isActive ? 'active' : ''}`
 
@@ -34,15 +39,28 @@ export default function Sidebar() {
           <BarChart3 size={17} /> Báo cáo
         </NavLink>
 
-        <div className="side-section">
-          <span className="side-section-title"><Building2 size={13} /> Phòng ban</span>
-          {visibleDepartments.map((d) => (
-            <NavLink key={d.id} to={`/departments/${d.id}`} className={linkClass}>
-              <span className="side-dot" data-code={d.code} />
-              <span className="side-link-text">{d.name}</span>
-            </NavLink>
-          ))}
-        </div>
+        {deptGroups.map((g) => (
+          <div className="side-section" key={g.block.id}>
+            <span className="side-section-title"><Building2 size={13} /> {g.block.name}</span>
+            {g.depts.map((d) => (
+              <NavLink key={d.id} to={`/departments/${d.id}`} className={linkClass}>
+                <span className="side-dot" data-code={d.code} />
+                <span className="side-link-text">{d.name}</span>
+              </NavLink>
+            ))}
+          </div>
+        ))}
+        {ungrouped.length > 0 && (
+          <div className="side-section">
+            <span className="side-section-title"><Building2 size={13} /> Phòng ban</span>
+            {ungrouped.map((d) => (
+              <NavLink key={d.id} to={`/departments/${d.id}`} className={linkClass}>
+                <span className="side-dot" data-code={d.code} />
+                <span className="side-link-text">{d.name}</span>
+              </NavLink>
+            ))}
+          </div>
+        )}
 
         <div className="side-section">
           <span className="side-section-title"><Hash size={13} /> Dự án</span>

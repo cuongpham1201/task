@@ -23,8 +23,8 @@ export class TasksController {
   }
 
   @Get()
-  findAll() {
-    return this.tasks.findAll()
+  async findAll(@AuthUser() c: AuthClaims) {
+    return this.tasks.findAll(await this.me(c))
   }
 
   @Post()

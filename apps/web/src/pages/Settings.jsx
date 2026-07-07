@@ -8,7 +8,7 @@ export default function Settings() {
   const { state, currentUser, usersById } = useApp()
   const { logout } = useAuth()
   const isAdmin = currentUser.role === 'admin'
-  const dept = state.departments.find((d) => d.id === currentUser.departmentId)
+  const dept = state.departments.find((d) => d.id === currentUser.orgUnitId)
 
   return (
     <div className="page page-narrow">
@@ -50,7 +50,7 @@ export default function Settings() {
                     <td>{d.name}</td>
                     <td>{d.code}</td>
                     <td>{usersById[d.managerId]?.displayName}</td>
-                    <td>{state.users.filter((u) => u.departmentId === d.id).length}</td>
+                    <td>{state.users.filter((u) => u.orgUnitId === d.id).length}</td>
                   </tr>
                 ))}
               </tbody>

@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { PolicyService } from '../common/policy.service'
 import { NotificationsService } from '../notifications/notifications.service'
 
-type Me = { id: string; role: string; departmentId: string | null }
+type Me = { id: string; role: string; orgUnitId: string | null }
 
 @Injectable()
 export class SubtasksService {
@@ -14,14 +14,14 @@ export class SubtasksService {
   ) {}
 
   private async task(taskId: string) {
-    const t = await this.prisma.task.findUnique({ where: { id: taskId } })
+    const t = await this.prisma.task.findUnique({ where: { id: taskId }, include: { workspace: true } })
     if (!t || t.archived) throw new NotFoundException('Không tìm thấy công việc')
     return t
   }
 
   async create(me: Me, taskId: string, title: string, assigneeId?: string) {
     const task = await this.task(taskId)
-    this.policy.assert(this.policy.canUpdateStatus(me, task), 'Không có quyền thêm việc con')
+    this.policy.assert(await this.policy.canUpdateStatus(me, task, task.workspace), 'Không có quyền thêm việc con')
     const count = await this.prisma.subtask.count({ where: { taskId } })
     const sub = await this.prisma.$transaction(async (tx) => {
       const s = await tx.subtask.create({
@@ -37,7 +37,7 @@ export class SubtasksService {
     const sub = await this.prisma.subtask.findUnique({ where: { id } })
     if (!sub) throw new NotFoundException('Không tìm thấy việc con')
     const task = await this.task(sub.taskId)
-    this.policy.assert(this.policy.canUpdateStatus(me, task), 'Không có quyền cập nhật việc con')
+    this.policy.assert(await this.policy.canUpdateStatus(me, task, task.workspace), 'Không có quyền cập nhật việc con')
     return this.prisma.subtask.update({
       where: { id },
       data: {
@@ -51,7 +51,7 @@ export class SubtasksService {
     const sub = await this.prisma.subtask.findUnique({ where: { id } })
     if (!sub) throw new NotFoundException('Không tìm thấy việc con')
     const task = await this.task(sub.taskId)
-    this.policy.assert(this.policy.canManage(me, task), 'Không có quyền xóa việc con')
+    this.policy.assert(await this.policy.canManage(me, task, task.workspace), 'Không có quyền xóa việc con')
     await this.prisma.subtask.delete({ where: { id } })
     return { deleted: true }
   }

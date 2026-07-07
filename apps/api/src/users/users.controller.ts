@@ -24,7 +24,7 @@ export class UsersController {
       email: u.email,
       displayName: u.displayName,
       role: u.role,
-      departmentId: u.departmentId,
+      orgUnitId: u.orgUnitId,
       jobTitle: u.jobTitle,
       avatarUrl: u.avatarUrl,
     }

@@ -1,83 +1,82 @@
 import { ForbiddenException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { VisibilityService, type Me } from './visibility.service'
 
-// Kiểu tối giản cho user hiện tại (từ DB) và task (từ DB) dùng trong kiểm quyền.
-type Actor = { id: string; role: string; departmentId: string | null }
-type TaskLike = {
-  creatorId: string
-  assigneeId: string
-  scope: string
-  departmentId: string | null
-  projectId: string | null
-}
+type TaskLike = { creatorId: string; assigneeId: string; workspaceId: string | null }
+type WorkspaceLike = { id: string; type: string; orgUnitId: string | null } | null
 
 /**
- * Ủy quyền server-side (port từ frontend permissions.js).
- * admin: toàn quyền · manager: quản lý việc phòng mình / mình tạo · member: việc của mình.
- * Reviewer nghiệm thu: admin / người giao (creator) / manager phòng liên quan.
+ * Ủy quyền server-side theo mô hình org_units + workspace.
+ * admin: toàn quyền · quản lý workspace: người quản lý org_unit phủ workspace (org role
+ * != viewer) hoặc owner/manager của PROJECT · assignee/creator: quyền trên việc của mình.
  */
 @Injectable()
 export class PolicyService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly vis: VisibilityService,
+  ) {}
 
-  private isManagerOfDept(user: Actor, departmentId: string | null): boolean {
-    return user.role === 'manager' && !!departmentId && user.departmentId === departmentId
-  }
-
-  private involved(user: Actor, task: TaskLike): boolean {
-    return task.creatorId === user.id || task.assigneeId === user.id
-  }
-
-  /** Quản lý task (đổi assignee/deadline/ưu tiên/xóa): admin, người tạo, hoặc manager phòng. */
-  canManage(user: Actor, task: TaskLike): boolean {
-    return (
-      user.role === 'admin' ||
-      task.creatorId === user.id ||
-      this.isManagerOfDept(user, task.departmentId)
-    )
-  }
-
-  /** Cập nhật trạng thái/tiến độ: người quản lý + người được giao. */
-  canUpdateStatus(user: Actor, task: TaskLike): boolean {
-    return this.canManage(user, task) || task.assigneeId === user.id
-  }
-
-  /** Bình luận: admin, người liên quan, hoặc manager phòng. */
-  canComment(user: Actor, task: TaskLike): boolean {
-    return (
-      user.role === 'admin' ||
-      this.involved(user, task) ||
-      this.isManagerOfDept(user, task.departmentId)
-    )
-  }
-
-  /** Nghiệm thu: admin, người giao (creator), hoặc manager phòng liên quan. KHÔNG cho tự nghiệm thu việc mình làm trừ khi là creator/admin. */
-  canReview(user: Actor, task: TaskLike): boolean {
-    return (
-      user.role === 'admin' ||
-      task.creatorId === user.id ||
-      this.isManagerOfDept(user, task.departmentId)
-    )
-  }
-
-  /** Tạo task theo scope. */
-  canCreate(user: Actor, scope: string, departmentId: string | null): boolean {
-    if (user.role === 'admin') return true
-    if (scope === 'personal') return true
-    if (scope === 'department') {
-      return this.isManagerOfDept(user, departmentId) || user.departmentId === departmentId
+  /** Người dùng có quản lý workspace chứa task không? */
+  async managesWorkspace(me: Me, ws: WorkspaceLike): Promise<boolean> {
+    if (me.role === 'admin') return true
+    if (!ws) return false
+    if (ws.type === 'project') {
+      const m = await this.prisma.workspaceMember.findUnique({
+        where: { workspaceId_userId: { workspaceId: ws.id, userId: me.id } },
+      })
+      return !!m && (m.role === 'owner' || m.role === 'manager')
     }
-    // project: cho phép mọi user nội bộ (thành viên project kiểm ở tầng cao hơn nếu cần)
-    return true
+    if (!ws.orgUnitId) return false
+    const managed = await this.vis.managedOrgUnitIds(me)
+    return managed.includes(ws.orgUnitId)
   }
 
-  /** Lấy task + kiểm tồn tại. */
-  async getTaskOrThrow(taskId: string): Promise<any> {
-    const task = await this.prisma.task.findUnique({ where: { id: taskId } })
-    if (!task || task.archived) {
-      throw new ForbiddenException('Không tìm thấy công việc')
+  async canManage(me: Me, task: TaskLike, ws: WorkspaceLike): Promise<boolean> {
+    return me.role === 'admin' || task.creatorId === me.id || this.managesWorkspace(me, ws)
+  }
+
+  async canUpdateStatus(me: Me, task: TaskLike, ws: WorkspaceLike): Promise<boolean> {
+    return task.assigneeId === me.id || this.canManage(me, task, ws)
+  }
+
+  async canReview(me: Me, task: TaskLike, ws: WorkspaceLike): Promise<boolean> {
+    return me.role === 'admin' || task.creatorId === me.id || this.managesWorkspace(me, ws)
+  }
+
+  async canComment(me: Me, task: TaskLike, ws: WorkspaceLike): Promise<boolean> {
+    return this.canView(me, task, ws)
+  }
+
+  async canView(me: Me, task: TaskLike, ws: WorkspaceLike): Promise<boolean> {
+    if (me.role === 'admin') return true
+    if (task.creatorId === me.id || task.assigneeId === me.id) return true
+    if (task.workspaceId) {
+      const wsIds = await this.vis.visibleWorkspaceIds(me)
+      if (wsIds.includes(task.workspaceId)) return true
     }
-    return task
+    const inv = await this.prisma.taskCollaborator.findFirst({
+      where: { taskId: (task as any).id, userId: me.id },
+    })
+    return !!inv
+  }
+
+  /** Có được tạo task trong workspace này không? */
+  async canCreate(me: Me, workspaceId: string | null): Promise<boolean> {
+    if (me.role === 'admin') return true
+    if (!workspaceId) return true // personal
+    const ws = await this.prisma.workspace.findUnique({ where: { id: workspaceId } })
+    if (!ws) return false
+    if (ws.type === 'project') {
+      const m = await this.prisma.workspaceMember.findUnique({
+        where: { workspaceId_userId: { workspaceId, userId: me.id } },
+      })
+      return !!m
+    }
+    // org_unit: thuộc phòng đó hoặc quản lý nó
+    if (me.orgUnitId && me.orgUnitId === ws.orgUnitId) return true
+    const managed = await this.vis.managedOrgUnitIds(me)
+    return ws.orgUnitId ? managed.includes(ws.orgUnitId) : false
   }
 
   assert(cond: boolean, msg = 'Bạn không có quyền thực hiện thao tác này'): void {

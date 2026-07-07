@@ -21,6 +21,7 @@ function buildInitialState(currentUserId, bootstrap) {
   return {
     currentUserId,
     users: bootstrap.users || [],
+    blocks: bootstrap.blocks || [], // khối (để nhóm menu phòng ban theo cây)
     departments: bootstrap.departments || [],
     channels: bootstrap.channels || [],
     tasks: bootstrap.tasks || [],
@@ -188,7 +189,7 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
       !!currentUser &&
       (currentUser.role === 'admin' ||
         task.creatorId === me ||
-        (currentUser.role === 'manager' && task.departmentId === currentUser.departmentId))
+        (currentUser.role === 'manager' && task.departmentId === currentUser.orgUnitId))
 
     // Gọi API; lỗi → báo + không làm vỡ optimistic (reload để đồng bộ nếu cần).
     const persist = async (promise, onOk) => {
@@ -235,11 +236,12 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         manage: (task) => canManageTask(currentUser, task),
         updateStatus: (task) => canUpdateStatus(currentUser, task),
         subtasks: (task) => canWorkSubtasks(currentUser, task),
-        comment: (task) => canComment(currentUser, task, state.channels),
+        comment: (task) => canComment(currentUser, task),
         review: (task) => canReview(task),
-        createDeptTask: (departmentId) => canCreateDeptTask(currentUser, departmentId),
+        createDeptTask: (departmentId) => canCreateDeptTask(currentUser, departmentId, state.departments),
         createChannelTask: (channel) => canCreateChannelTask(currentUser, channel),
       },
+      blocks: state.blocks,
       visibleDepartments: visibleDepartmentsFor(currentUser, state.departments),
       visibleChannels: visibleChannelsFor(currentUser, state.channels),
 
@@ -280,21 +282,23 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         persist(post('/notifications/mark-read', { ids: [String(id)] }))
       },
 
-      // ── Tạo công việc (map channel→project cho API) ──
+      // ── Tạo công việc (map scope FE → workspaceId cho API) ──
       createTask: (input, subtaskTitles = []) => {
         if (!guard(canCreateTask(currentUser, input, state.channels), 'tạo công việc loại này')) return
         const scope = input.scope || 'personal'
+        // department → workspace ORG_UNIT của phòng; channel → id workspace PROJECT; personal → null
+        let workspaceId = null
+        if (scope === 'department') workspaceId = departmentsById[input.departmentId]?.workspaceId || null
+        else if (scope === 'channel') workspaceId = input.channelId || null
         const dto = {
           title: input.title || '(Chưa đặt tên)',
           description: input.description || '',
-          scope: scope === 'channel' ? 'project' : scope,
-          section: input.section || undefined,
+          workspaceId,
+          section: scope === 'department' ? input.section || undefined : undefined,
           assigneeId: input.assigneeId || me,
           priority: input.priority || 'normal',
           completionMode: input.completionMode || 'self',
         }
-        if (scope === 'department') dto.departmentId = input.departmentId
-        if (scope === 'channel') dto.projectId = input.channelId
         if (input.startDate) dto.startDate = input.startDate
         if (input.dueDate) dto.dueDate = input.dueDate
         if (input.collaboratorIds?.length) dto.collaboratorIds = input.collaboratorIds

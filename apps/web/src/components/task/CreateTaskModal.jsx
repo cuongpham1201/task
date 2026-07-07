@@ -6,17 +6,12 @@ import { PRIORITY, PRIORITY_ORDER, SECTIONS, SECTION_ORDER, SCOPES } from '../..
 import { fromInputDate } from '../../utils/date'
 
 export default function CreateTaskModal() {
-  const { state, currentUser, closeCreateModal, createTask, visibleChannels } = useApp()
+  const { state, currentUser, closeCreateModal, createTask, visibleDepartments, visibleChannels } = useApp()
   const defaults = state.createModal?.defaults || {}
 
-  // Phân quyền tạo task:
-  // - department: admin (mọi phòng) / manager (phòng mình)
-  // - channel: admin hoặc thành viên channel
-  // - personal: ai cũng được
-  const canDeptScope = currentUser.role !== 'member'
-  const deptOptions = currentUser.role === 'admin'
-    ? state.departments
-    : state.departments.filter((d) => d.id === currentUser.departmentId)
+  // Phòng ban chọn được = các phòng user đang thấy (server đã scope theo quyền).
+  const deptOptions = visibleDepartments
+  const canDeptScope = deptOptions.length > 0
   const channelOptions = visibleChannels
 
   const scopeAllowed = (s) =>
@@ -34,7 +29,7 @@ export default function CreateTaskModal() {
       departmentId:
         deptOptions.some((d) => d.id === defaults.departmentId)
           ? defaults.departmentId
-          : (deptOptions[0]?.id || null),
+          : (deptOptions.find((d) => d.id === currentUser.orgUnitId)?.id || deptOptions[0]?.id || null),
       channelId:
         channelOptions.some((c) => c.id === defaults.channelId)
           ? defaults.channelId
@@ -57,7 +52,7 @@ export default function CreateTaskModal() {
   // Người phụ trách giới hạn theo phạm vi đã chọn
   const assigneePool = useMemo(() => {
     if (form.scope === 'department') {
-      return state.users.filter((u) => u.departmentId === form.departmentId)
+      return state.users.filter((u) => u.orgUnitId === form.departmentId)
     }
     if (form.scope === 'channel') {
       const channel = state.channels.find((c) => c.id === form.channelId)

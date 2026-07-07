@@ -18,7 +18,7 @@ export default function Reports() {
   const isManager = currentUser.role === 'manager'
 
   // Phân quyền: admin xem tất cả, trưởng phòng xem phòng mình, nhân viên xem việc của mình
-  const [deptFilter, setDeptFilter] = useState(isManager ? currentUser.departmentId : 'all')
+  const [deptFilter, setDeptFilter] = useState(isManager ? currentUser.orgUnitId : 'all')
   const [userFilter, setUserFilter] = useState('all')
   const [timeFilter, setTimeFilter] = useState('all')
 
@@ -28,13 +28,13 @@ export default function Reports() {
       list = list.filter((t) => t.assigneeId === currentUser.id)
     } else if (isManager) {
       list = list.filter((t) =>
-        t.departmentId === currentUser.departmentId ||
-        usersById[t.assigneeId]?.departmentId === currentUser.departmentId
+        t.departmentId === currentUser.orgUnitId ||
+        usersById[t.assigneeId]?.orgUnitId === currentUser.orgUnitId
       )
     } else if (deptFilter !== 'all') {
       list = list.filter((t) =>
         t.departmentId === deptFilter ||
-        usersById[t.assigneeId]?.departmentId === deptFilter
+        usersById[t.assigneeId]?.orgUnitId === deptFilter
       )
     }
     if (userFilter !== 'all') list = list.filter((t) => t.assigneeId === userFilter)
@@ -74,7 +74,7 @@ export default function Reports() {
 
   const userOptions = deptFilter === 'all'
     ? state.users
-    : state.users.filter((u) => u.departmentId === deptFilter)
+    : state.users.filter((u) => u.orgUnitId === deptFilter)
 
   return (
     <div className="page">
@@ -95,7 +95,7 @@ export default function Reports() {
           <select value={userFilter} onChange={(e) => setUserFilter(e.target.value)}>
             <option value="all">Nhân sự: Tất cả</option>
             {(isManager
-              ? state.users.filter((u) => u.departmentId === currentUser.departmentId)
+              ? state.users.filter((u) => u.orgUnitId === currentUser.orgUnitId)
               : userOptions
             ).map((u) => (
               <option key={u.id} value={u.id}>{u.displayName}</option>

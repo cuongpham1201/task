@@ -23,7 +23,7 @@ export default function DepartmentPage() {
   if (!dept) return <div className="page"><p>Không tìm thấy phòng ban.</p></div>
 
   const tasks = departmentTasks(dept.id)
-  const members = state.users.filter((u) => u.departmentId === dept.id)
+  const members = state.users.filter((u) => u.orgUnitId === dept.id)
   const manager = usersById[dept.managerId]
   const openCount = tasks.filter((t) => t.status !== 'done').length
   const overdueCount = tasks.filter(isOverdue).length
