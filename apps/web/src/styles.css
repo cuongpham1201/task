@@ -630,12 +630,26 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 
 /* ── Mobile ≤640px: layout chính ── */
 @media (max-width: 640px) {
+  /* Chặn tràn ngang toàn trang — nguồn gây "xộc xệch" khi kéo dọc
+     (thanh tab/nội dung rộng hơn viewport làm body trượt ngang) */
+  html, body { overflow-x: hidden; }
+  .app-content { overflow-x: hidden; }
+
+  /* Thanh tab dài (5 tab) → cuộn ngang trong chính nó, không đẩy trang */
+  .tabs, .mini-tabs {
+    flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar, .mini-tabs::-webkit-scrollbar { display: none; }
+  .tab { white-space: nowrap; flex-shrink: 0; }
+
   /* iOS không auto-zoom khi focus input */
   input, select, textarea { font-size: 16px; }
   .btn { min-height: 44px; }
   .btn-ghost { min-height: 40px; }
   .tab { min-height: 44px; }
   .dropdown-item { min-height: 44px; }
+  .task-card { min-width: 0; }
 
   /* Header: gọn — logo + hamburger + tạo việc + avatar (search ẩn, tìm ở từng trang) */
   .search-box { display: none; }
