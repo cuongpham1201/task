@@ -101,7 +101,7 @@ export default function Dashboard() {
         </div>
 
         <div className="card">
-          <div className="card-head"><h2>Phòng ban / Channel</h2></div>
+          <div className="card-head"><h2>Phòng ban / Dự án</h2></div>
           <div className="dash-dept-list">
             {visibleDepartments.map((d) => {
               const ts = departmentTasks(d.id)

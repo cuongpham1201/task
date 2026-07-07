@@ -1,6 +1,7 @@
-// Schema theo docs/phase3-backend-plan.md
-// Lưu ý: PK dùng String (text) chứa UUID thay vì kiểu uuid thuần —
-// cho phép seed giữ nguyên id dễ đọc từ mock ('u1', 't1'…) để demo liền mạch.
+// Schema — App Giao việc (task execution system). Scope reset S1.
+// Xem docs/task-app-scope-reset.md. PK dùng String(UUID); Activity/Notification BigInt.
+// KPI & Rubric thuộc HRM — App chỉ ghi nhận nghiệm thu (TaskReview) và đẩy
+// task đã nghiệm thu sang HRM (task_kpi_results).
 // CHECK constraint theo scope được thêm thủ công trong migration SQL.
 
 generator client {
@@ -23,7 +24,7 @@ enum UserRole {
 enum TaskScope {
   personal
   department
-  channel
+  project
 
   @@map("task_scope")
 }
@@ -32,10 +33,27 @@ enum TaskStatus {
   todo
   doing
   waiting
+  submitted // chờ nghiệm thu
+  returned // bị trả lại
   done
   paused
 
   @@map("task_status")
+}
+
+// Task tự hoàn thành (SELF) hay bắt buộc nghiệm thu (REVIEW_REQUIRED)
+enum CompletionMode {
+  self
+  review_required
+
+  @@map("completion_mode")
+}
+
+enum ReviewDecision {
+  passed
+  returned
+
+  @@map("review_decision")
 }
 
 enum TaskPriority {
@@ -68,8 +86,37 @@ enum ActivityAction {
   subtask
   attachment
   collaborator
+  review // nghiệm thu: submitted / passed / returned
 
   @@map("activity_action")
+}
+
+enum NotificationType {
+  task_assigned
+  comment_added
+  mentioned
+  due_soon
+  overdue
+  task_returned
+  task_accepted
+
+  @@map("notification_type")
+}
+
+enum SyncDirection {
+  inbound // đọc master data từ HRM
+  outbound // đẩy kết quả nghiệm thu sang HRM
+
+  @@map("sync_direction")
+}
+
+enum PushStatus {
+  pending
+  sent
+  ack
+  error
+
+  @@map("push_status")
 }
 
 model User {
@@ -85,14 +132,15 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  department          Department?        @relation("DeptMembers", fields: [departmentId], references: [id])
-  managedDepartments  Department[]       @relation("DeptManager")
-  ownedChannels       Channel[]          @relation("ChannelOwner")
-  channelMemberships  ChannelMember[]    @relation("ChannelMemberships")
-  channelMembersAdded ChannelMember[]    @relation("ChannelMemberAddedBy")
-  createdTasks        Task[]             @relation("TaskCreator")
-  assignedTasks       Task[]             @relation("TaskAssignee")
-  completedTasks      Task[]             @relation("TaskCompletedBy")
+  department          Department?          @relation("DeptMembers", fields: [departmentId], references: [id])
+  managedDepartments  Department[]         @relation("DeptManager")
+  ownedProjects       Project[]            @relation("ProjectOwner")
+  projectMemberships  ProjectMember[]      @relation("ProjectMemberships")
+  projectMembersAdded ProjectMember[]      @relation("ProjectMemberAddedBy")
+  createdTasks        Task[]               @relation("TaskCreator")
+  assignedTasks       Task[]               @relation("TaskAssignee")
+  completedTasks      Task[]               @relation("TaskCompletedBy")
+  reviews             TaskReview[]         @relation("TaskReviewer")
   collaborations      TaskCollaborator[]
   watching            TaskWatcher[]
   subtasks            Subtask[]
@@ -100,6 +148,7 @@ model User {
   activities          Activity[]
   notifications       Notification[]
   attachments         Attachment[]
+  externalMapping     ExternalUserMapping?
 
   @@map("users")
 }
@@ -112,14 +161,15 @@ model Department {
   managerId String?  @map("manager_id")
   createdAt DateTime @default(now()) @map("created_at")
 
-  manager User?  @relation("DeptManager", fields: [managerId], references: [id])
-  members User[] @relation("DeptMembers")
-  tasks   Task[]
+  manager         User?                      @relation("DeptManager", fields: [managerId], references: [id])
+  members         User[]                     @relation("DeptMembers")
+  tasks           Task[]
+  externalMapping ExternalDepartmentMapping?
 
   @@map("departments")
 }
 
-model Channel {
+model Project {
   id          String   @id @default(uuid())
   name        String
   description String?
@@ -127,54 +177,56 @@ model Channel {
   archived    Boolean  @default(false)
   createdAt   DateTime @default(now()) @map("created_at")
 
-  owner   User?           @relation("ChannelOwner", fields: [ownerId], references: [id])
-  members ChannelMember[]
+  owner   User?           @relation("ProjectOwner", fields: [ownerId], references: [id])
+  members ProjectMember[]
   tasks   Task[]
 
-  @@map("channels")
+  @@map("projects")
 }
 
-model ChannelMember {
-  channelId String   @map("channel_id")
+model ProjectMember {
+  projectId String   @map("project_id")
   userId    String   @map("user_id")
   addedById String?  @map("added_by")
   addedAt   DateTime @default(now()) @map("added_at")
 
-  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  user    User    @relation("ChannelMemberships", fields: [userId], references: [id], onDelete: Cascade)
-  addedBy User?   @relation("ChannelMemberAddedBy", fields: [addedById], references: [id])
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation("ProjectMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  addedBy User?   @relation("ProjectMemberAddedBy", fields: [addedById], references: [id])
 
-  @@id([channelId, userId])
-  @@map("channel_members")
+  @@id([projectId, userId])
+  @@map("project_members")
 }
 
 model Task {
-  id            String       @id @default(uuid())
-  title         String
-  description   String       @default("")
-  scope         TaskScope
-  departmentId  String?      @map("department_id")
-  channelId     String?      @map("channel_id")
-  section       TaskSection?
-  creatorId     String       @map("creator_id")
-  assigneeId    String       @map("assignee_id")
-  status        TaskStatus   @default(todo)
-  priority      TaskPriority @default(normal)
-  startDate     DateTime?    @map("start_date") @db.Date
-  dueDate       DateTime?    @map("due_date") @db.Date
-  progress      Int          @default(0) @db.SmallInt
-  sortOrder     Float        @default(0) @map("sort_order")
-  archived      Boolean      @default(false)
-  createdAt     DateTime     @default(now()) @map("created_at")
-  updatedAt     DateTime     @updatedAt @map("updated_at")
-  completedAt   DateTime?    @map("completed_at")
-  completedById String?      @map("completed_by")
+  id             String         @id @default(uuid())
+  title          String
+  description    String         @default("")
+  scope          TaskScope
+  departmentId   String?        @map("department_id")
+  projectId      String?        @map("project_id")
+  section        TaskSection?
+  creatorId      String         @map("creator_id")
+  assigneeId     String         @map("assignee_id")
+  status         TaskStatus     @default(todo)
+  completionMode CompletionMode @default(self) @map("completion_mode")
+  priority       TaskPriority   @default(normal)
+  startDate      DateTime?      @map("start_date") @db.Date
+  dueDate        DateTime?      @map("due_date") @db.Date
+  progress       Int            @default(0) @db.SmallInt
+  sortOrder      Float          @default(0) @map("sort_order")
+  archived       Boolean        @default(false)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  completedAt    DateTime?      @map("completed_at")
+  completedById  String?        @map("completed_by")
 
   department  Department? @relation(fields: [departmentId], references: [id])
-  channel     Channel?    @relation(fields: [channelId], references: [id])
+  project     Project?    @relation(fields: [projectId], references: [id])
   creator     User        @relation("TaskCreator", fields: [creatorId], references: [id])
   assignee    User        @relation("TaskAssignee", fields: [assigneeId], references: [id])
   completedBy User?       @relation("TaskCompletedBy", fields: [completedById], references: [id])
+  review      TaskReview?
 
   collaborators TaskCollaborator[]
   watchers      TaskWatcher[]
@@ -185,9 +237,26 @@ model Task {
 
   @@index([assigneeId])
   @@index([departmentId, status])
-  @@index([channelId])
+  @@index([projectId])
   @@index([dueDate])
+  @@index([status])
   @@map("tasks")
+}
+
+// Nghiệm thu — CHỈ ghi nhận Đạt/Trả lại (KPI & rubric thuộc HRM, không chấm điểm ở đây)
+model TaskReview {
+  id         String         @id @default(uuid())
+  taskId     String         @unique @map("task_id")
+  reviewerId String         @map("reviewer_id")
+  decision   ReviewDecision
+  note       String         @default("")
+  reviewedAt DateTime       @default(now()) @map("reviewed_at")
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  reviewer User @relation("TaskReviewer", fields: [reviewerId], references: [id])
+
+  @@map("task_reviews")
 }
 
 model TaskCollaborator {
@@ -261,14 +330,16 @@ model Activity {
 }
 
 model Notification {
-  id         BigInt    @id @default(autoincrement())
-  userId     String    @map("user_id")
-  activityId BigInt    @map("activity_id")
-  readAt     DateTime? @map("read_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
+  id         BigInt           @id @default(autoincrement())
+  userId     String           @map("user_id")
+  type       NotificationType
+  activityId BigInt?          @map("activity_id")
+  taskId     String?          @map("task_id") // deep-link (due_soon/overdue không có activity)
+  readAt     DateTime?        @map("read_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
 
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activity Activity? @relation(fields: [activityId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt])
   @@map("notifications")
@@ -292,4 +363,65 @@ model Attachment {
 
   @@index([taskId])
   @@map("attachments")
+}
+
+// ── Tích hợp HRM (tối thiểu) ─────────────────────────────────────────
+// App đọc user/department từ HRM (inbound) và đẩy task đã nghiệm thu (outbound).
+// Không có external_project_mappings: Project là master của App.
+
+model ExternalUserMapping {
+  id            String   @id @default(uuid())
+  userId        String   @unique @map("user_id")
+  entraObjectId String   @unique @map("entra_object_id") // == HRM UserProfile.ms_oid
+  empCode       String?  @unique @map("emp_code") // khóa nghiệp vụ HRM
+  hrmEmployeeId String?  @map("hrm_employee_id")
+  syncedAt      DateTime @default(now()) @map("synced_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("external_user_mappings")
+}
+
+model ExternalDepartmentMapping {
+  id            String   @id @default(uuid())
+  departmentId  String   @unique @map("department_id")
+  hrmEntityCode String?  @map("hrm_entity_code")
+  hrmDeptCode   String   @map("hrm_dept_code")
+  syncedAt      DateTime @default(now()) @map("synced_at")
+
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@map("external_department_mappings")
+}
+
+// Feed task đã nghiệm thu để HRM tính KPI (HRM tự chấm rubric/điểm/trọng số)
+model TaskKpiResult {
+  id              String     @id @default(uuid())
+  taskId          String     @map("task_id")
+  entraObjectId   String     @map("entra_object_id")
+  empCode         String?    @map("emp_code")
+  dueDate         DateTime?  @map("due_date") @db.Date
+  completedAt     DateTime?  @map("completed_at")
+  acceptedAt      DateTime   @map("accepted_at")
+  reviewerEntraId String?    @map("reviewer_entra_id")
+  idempotencyKey  String     @unique @map("idempotency_key")
+  pushStatus      PushStatus @default(pending) @map("push_status")
+  createdAt       DateTime   @default(now()) @map("created_at")
+
+  @@index([pushStatus])
+  @@map("task_kpi_results")
+}
+
+model SyncLog {
+  id         String        @id @default(uuid())
+  direction  SyncDirection
+  entity     String
+  count      Int           @default(0)
+  status     String
+  error      String?
+  startedAt  DateTime      @map("started_at")
+  finishedAt DateTime?     @map("finished_at")
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  @@map("sync_logs")
 }

@@ -45,6 +45,7 @@ export default function CreateTaskModal() {
       startDate: '',
       dueDate: '',
       priority: 'normal',
+      completionMode: 'self', // 'review_required' = phải nộp nghiệm thu mới đóng được
     }
   })
   const [subtaskTitles, setSubtaskTitles] = useState([])
@@ -107,6 +108,7 @@ export default function CreateTaskModal() {
         startDate: fromInputDate(form.startDate),
         dueDate: fromInputDate(form.dueDate),
         priority: form.priority,
+        completionMode: form.completionMode,
       },
       subtaskTitles
     )
@@ -191,7 +193,7 @@ export default function CreateTaskModal() {
 
           {form.scope === 'channel' && (
             <label className="form-field">
-              <span>Channel / Dự án</span>
+              <span>Dự án</span>
               <select value={form.channelId || ''} onChange={(e) => set({ channelId: e.target.value })}>
                 {channelOptions.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
@@ -241,6 +243,20 @@ export default function CreateTaskModal() {
               )}
             </div>
           </div>
+
+          <label className="review-toggle">
+            <input
+              type="checkbox"
+              checked={form.completionMode === 'review_required'}
+              onChange={(e) =>
+                set({ completionMode: e.target.checked ? 'review_required' : 'self' })
+              }
+            />
+            <span>
+              <strong>Cần nghiệm thu khi hoàn thành</strong>
+              <small>Người nhận phải "Nộp nghiệm thu"; người giao duyệt Đạt/Trả lại trước khi đóng việc.</small>
+            </span>
+          </label>
 
           <div className="form-row">
             <label className="form-field">

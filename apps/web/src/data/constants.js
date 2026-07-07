@@ -4,9 +4,12 @@ export const STATUS = {
   todo: { label: 'Chưa bắt đầu' },
   doing: { label: 'Đang làm' },
   waiting: { label: 'Chờ phản hồi' },
+  submitted: { label: 'Chờ nghiệm thu' }, // chỉ hiển thị — vào bằng nút "Nộp nghiệm thu"
+  returned: { label: 'Bị trả lại' },      // chỉ hiển thị — do người nghiệm thu trả lại
   done: { label: 'Hoàn thành' },
   paused: { label: 'Tạm dừng' },
 }
+// Trạng thái chọn tay (submitted/returned đi qua luồng nghiệm thu, không chọn trực tiếp)
 export const STATUS_ORDER = ['todo', 'doing', 'waiting', 'done', 'paused']
 export const KANBAN_COLUMNS = ['todo', 'doing', 'waiting', 'done']
 
@@ -35,5 +38,5 @@ export const ROLES = {
 export const SCOPES = {
   personal: 'Cá nhân',
   department: 'Phòng ban',
-  channel: 'Channel',
+  channel: 'Dự án', // key nội bộ giữ 'channel' (API map → project), nhãn hiển thị = Dự án
 }

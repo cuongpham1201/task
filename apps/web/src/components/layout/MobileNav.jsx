@@ -24,14 +24,10 @@ function MobileActionSheet({ title, onClose, children }) {
 
 /** Bottom navigation cố định cho mobile. */
 export default function MobileNav() {
-  const { state, inboxItems, visibleDepartments, visibleChannels } = useApp()
+  const { unreadCount: unread, visibleDepartments, visibleChannels } = useApp()
   const { logout } = useAuth()
   const navigate = useNavigate()
   const [sheet, setSheet] = useState(null) // null | 'projects' | 'more'
-
-  const unread = inboxItems().filter(
-    (a) => new Date(a.createdAt) > new Date(state.inboxReadAt)
-  ).length
 
   const itemClass = ({ isActive }) => `mnav-item ${isActive ? 'active' : ''}`
 
@@ -66,7 +62,7 @@ export default function MobileNav() {
       </nav>
 
       {sheet === 'projects' && (
-        <MobileActionSheet title="Dự án / Channel" onClose={() => setSheet(null)}>
+        <MobileActionSheet title="Dự án" onClose={() => setSheet(null)}>
           {visibleChannels.length === 0 && <p className="muted sheet-empty">Chưa có dự án nào.</p>}
           {visibleChannels.map((c) => (
             <Link key={c.id} to={`/channels/${c.id}`} className="sheet-item">

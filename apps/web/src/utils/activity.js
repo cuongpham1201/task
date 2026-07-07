@@ -29,6 +29,11 @@ export function activityText(activity, usersById) {
       return 'đã bình luận'
     case 'complete':
       return 'đã hoàn thành công việc'
+    case 'review':
+      if (meta.to === 'submitted') return 'đã nộp nghiệm thu'
+      if (meta.decision === 'passed') return 'đã nghiệm thu Đạt ✓'
+      if (meta.decision === 'returned') return 'đã trả lại công việc'
+      return 'đã cập nhật nghiệm thu'
     default:
       return 'đã cập nhật công việc'
   }

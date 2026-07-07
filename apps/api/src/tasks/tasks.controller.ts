@@ -1,12 +1,79 @@
-import { Controller, Get } from '@nestjs/common'
+import {
+  Body, Controller, Delete, Get, Param, Patch, Post, UseGuards,
+} from '@nestjs/common'
+import { AuthGuard } from '../auth/auth.guard'
+import { AuthUser } from '../auth/current-user.decorator'
+import type { AuthClaims } from '../auth/auth.types'
+import { UsersService } from '../users/users.service'
 import { TasksService } from './tasks.service'
+import {
+  AssigneeDto, CreateTaskDto, DueDateDto, PriorityDto, ProgressDto, ReviewDto, StatusDto, UpdateTaskDto,
+} from './task.dto'
 
 @Controller('tasks')
+@UseGuards(AuthGuard)
 export class TasksController {
-  constructor(private readonly tasksService: TasksService) {}
+  constructor(
+    private readonly tasks: TasksService,
+    private readonly users: UsersService,
+  ) {}
+
+  private me(claims: AuthClaims) {
+    return this.users.resolveFromClaims(claims)
+  }
 
   @Get()
   findAll() {
-    return this.tasksService.findAll()
+    return this.tasks.findAll()
+  }
+
+  @Post()
+  async create(@AuthUser() c: AuthClaims, @Body() dto: CreateTaskDto) {
+    return this.tasks.create(await this.me(c), dto)
+  }
+
+  @Patch(':id/status')
+  async status(@AuthUser() c: AuthClaims, @Param('id') id: string, @Body() dto: StatusDto) {
+    return this.tasks.setStatus(await this.me(c), id, dto.status)
+  }
+
+  @Post(':id/submit')
+  async submit(@AuthUser() c: AuthClaims, @Param('id') id: string) {
+    return this.tasks.submit(await this.me(c), id)
+  }
+
+  @Post(':id/review')
+  async review(@AuthUser() c: AuthClaims, @Param('id') id: string, @Body() dto: ReviewDto) {
+    return this.tasks.review(await this.me(c), id, dto)
+  }
+
+  @Patch(':id/assignee')
+  async assignee(@AuthUser() c: AuthClaims, @Param('id') id: string, @Body() dto: AssigneeDto) {
+    return this.tasks.setAssignee(await this.me(c), id, dto)
+  }
+
+  @Patch(':id/due-date')
+  async dueDate(@AuthUser() c: AuthClaims, @Param('id') id: string, @Body() dto: DueDateDto) {
+    return this.tasks.setDueDate(await this.me(c), id, dto)
+  }
+
+  @Patch(':id/priority')
+  async priority(@AuthUser() c: AuthClaims, @Param('id') id: string, @Body() dto: PriorityDto) {
+    return this.tasks.setPriority(await this.me(c), id, dto)
+  }
+
+  @Patch(':id/progress')
+  async progress(@AuthUser() c: AuthClaims, @Param('id') id: string, @Body() dto: ProgressDto) {
+    return this.tasks.setProgress(await this.me(c), id, dto)
+  }
+
+  @Patch(':id')
+  async update(@AuthUser() c: AuthClaims, @Param('id') id: string, @Body() dto: UpdateTaskDto) {
+    return this.tasks.updateFields(await this.me(c), id, dto)
+  }
+
+  @Delete(':id')
+  async remove(@AuthUser() c: AuthClaims, @Param('id') id: string) {
+    return this.tasks.archive(await this.me(c), id)
   }
 }

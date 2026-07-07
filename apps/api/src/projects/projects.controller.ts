@@ -1,20 +1,20 @@
 import { Controller, Get } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 
-@Controller('channels')
-export class ChannelsController {
+@Controller('projects')
+export class ProjectsController {
   constructor(private readonly prisma: PrismaService) {}
 
   // Shape khớp mock frontend: members là mảng userId
   @Get()
   async findAll() {
-    const channels = await this.prisma.channel.findMany({
+    const projects = await this.prisma.project.findMany({
       where: { archived: false },
       include: { members: { select: { userId: true } } },
       orderBy: { createdAt: 'asc' },
     })
-    return channels.map(({ members, ...c }) => ({
-      ...c,
+    return projects.map(({ members, ...p }) => ({
+      ...p,
       members: members.map((m) => m.userId),
     }))
   }

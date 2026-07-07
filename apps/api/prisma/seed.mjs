@@ -39,10 +39,10 @@ const departments = [
   { id: 'd4', name: 'Ban Tài chính & Quản trị', code: 'TCQT', color: '#2fbf9a', managerId: 'u5' },
 ]
 
-const channels = [
-  { id: 'c1', name: 'Quy trình phê duyệt', description: 'Chuẩn hóa quy trình phê duyệt liên phòng ban', ownerId: 'u5', members: ['u1', 'u2', 'u3', 'u5'] },
-  { id: 'c2', name: 'Triển khai ứng dụng nội bộ', description: 'Triển khai app Giao việc và các ứng dụng nội bộ khác', ownerId: 'u1', members: ['u1', 'u4', 'u7', 'u9'] },
-  { id: 'c3', name: 'Audit nội bộ', description: 'Kiểm toán nội bộ định kỳ quý II/2026', ownerId: 'u5', members: ['u1', 'u3', 'u5', 'u6', 'u10'] },
+const projects = [
+  { id: 'p1', name: 'Quy trình phê duyệt', description: 'Chuẩn hóa quy trình phê duyệt liên phòng ban', ownerId: 'u5', members: ['u1', 'u2', 'u3', 'u5'] },
+  { id: 'p2', name: 'Triển khai ứng dụng nội bộ', description: 'Triển khai app Giao việc và các ứng dụng nội bộ khác', ownerId: 'u1', members: ['u1', 'u4', 'u7', 'u9'] },
+  { id: 'p3', name: 'Audit nội bộ', description: 'Kiểm toán nội bộ định kỳ quý II/2026', ownerId: 'u5', members: ['u1', 'u3', 'u5', 'u6', 'u10'] },
 ]
 
 const T = (id, over) => ({
@@ -50,7 +50,7 @@ const T = (id, over) => ({
   description: '',
   scope: 'department',
   departmentId: null,
-  channelId: null,
+  projectId: null,
   section: 'suvu',
   creatorId: 'u2',
   assigneeId: 'u1',
@@ -157,6 +157,7 @@ const tasks = [
     description: 'Lập kế hoạch ngân sách chi tiết cho từng phòng ban 6 tháng cuối năm, trình Ban Giám đốc phê duyệt trước ngày 15/7.',
     departmentId: 'd4', section: 'kehoach', creatorId: 'u5', assigneeId: 'u1', collaboratorIds: ['u3', 'u9'],
     status: 'doing', priority: 'urgent', startDate: day(-6), dueDate: day(3), progress: 40,
+    completionMode: 'review_required',
   }),
   T(17, {
     title: 'Rà soát định mức chi phí các phòng ban',
@@ -180,42 +181,43 @@ const tasks = [
     status: 'done', priority: 'normal', dueDate: day(-4), progress: 100, completedAt: ts(-4, 17),
   }),
 
-  // ── Channels
+  // ── Projects
   T(21, {
     title: 'Chuẩn hóa quy trình phê duyệt thanh toán',
     description: 'Thống nhất luồng phê duyệt thanh toán 3 cấp: người đề nghị → trưởng phòng → tài chính. Áp dụng từ tháng 8/2026.',
-    scope: 'channel', departmentId: null, channelId: 'c1', section: null,
+    scope: 'project', departmentId: null, projectId: 'p1', section: null,
     creatorId: 'u5', assigneeId: 'u1', collaboratorIds: ['u2', 'u3'],
     status: 'doing', priority: 'high', startDate: day(-8), dueDate: day(5), progress: 35,
+    completionMode: 'review_required',
   }),
   T(22, {
     title: 'Soạn thảo mẫu tờ trình phê duyệt chung',
-    scope: 'channel', departmentId: null, channelId: 'c1', section: null,
+    scope: 'project', departmentId: null, projectId: 'p1', section: null,
     creatorId: 'u5', assigneeId: 'u2',
     status: 'todo', priority: 'normal', dueDate: day(8),
   }),
   T(23, {
     title: 'Pilot app Giao việc tại Phòng Kế toán',
     description: 'Chạy thử nghiệm ứng dụng giao việc trong 2 tuần tại Phòng Kế toán, thu thập phản hồi người dùng.',
-    scope: 'channel', departmentId: null, channelId: 'c2', section: null,
+    scope: 'project', departmentId: null, projectId: 'p2', section: null,
     creatorId: 'u1', assigneeId: 'u7', collaboratorIds: ['u9'],
     status: 'doing', priority: 'high', startDate: day(-4), dueDate: day(6), progress: 25,
   }),
   T(24, {
     title: 'Đào tạo sử dụng hệ thống giao việc cho các phòng ban',
-    scope: 'channel', departmentId: null, channelId: 'c2', section: null,
+    scope: 'project', departmentId: null, projectId: 'p2', section: null,
     creatorId: 'u1', assigneeId: 'u4',
     status: 'todo', priority: 'normal', dueDate: day(12),
   }),
   T(25, {
     title: 'Kiểm tra chứng từ chi phí quý II',
-    scope: 'channel', departmentId: null, channelId: 'c3', section: null,
+    scope: 'project', departmentId: null, projectId: 'p3', section: null,
     creatorId: 'u3', assigneeId: 'u10', collaboratorIds: ['u6'],
     status: 'doing', priority: 'high', dueDate: day(-1), progress: 60,
   }),
   T(26, {
     title: 'Tổng hợp phát hiện audit và khuyến nghị',
-    scope: 'channel', departmentId: null, channelId: 'c3', section: null,
+    scope: 'project', departmentId: null, projectId: 'p3', section: null,
     creatorId: 'u5', assigneeId: 'u1',
     status: 'todo', priority: 'high', dueDate: day(9),
   }),
@@ -291,16 +293,21 @@ const activities = [
 
 async function main() {
   // Xóa theo thứ tự FK để seed idempotent
+  await prisma.syncLog.deleteMany()
+  await prisma.taskKpiResult.deleteMany()
+  await prisma.externalUserMapping.deleteMany()
+  await prisma.externalDepartmentMapping.deleteMany()
   await prisma.notification.deleteMany()
   await prisma.activity.deleteMany()
   await prisma.comment.deleteMany()
   await prisma.subtask.deleteMany()
   await prisma.attachment.deleteMany()
+  await prisma.taskReview.deleteMany()
   await prisma.taskCollaborator.deleteMany()
   await prisma.taskWatcher.deleteMany()
   await prisma.task.deleteMany()
-  await prisma.channelMember.deleteMany()
-  await prisma.channel.deleteMany()
+  await prisma.projectMember.deleteMany()
+  await prisma.project.deleteMany()
   await prisma.user.deleteMany()
   await prisma.department.deleteMany()
 
@@ -313,11 +320,11 @@ async function main() {
     await prisma.department.update({ where: { id: d.id }, data: { managerId: d.managerId } })
   }
 
-  await prisma.channel.createMany({
-    data: channels.map(({ members, ...c }) => c),
+  await prisma.project.createMany({
+    data: projects.map(({ members, ...p }) => p),
   })
-  await prisma.channelMember.createMany({
-    data: channels.flatMap((c) => c.members.map((userId) => ({ channelId: c.id, userId }))),
+  await prisma.projectMember.createMany({
+    data: projects.flatMap((p) => p.members.map((userId) => ({ projectId: p.id, userId }))),
   })
 
   await prisma.task.createMany({
@@ -334,7 +341,7 @@ async function main() {
   const counts = {
     users: await prisma.user.count(),
     departments: await prisma.department.count(),
-    channels: await prisma.channel.count(),
+    projects: await prisma.project.count(),
     tasks: await prisma.task.count(),
     subtasks: await prisma.subtask.count(),
     comments: await prisma.comment.count(),

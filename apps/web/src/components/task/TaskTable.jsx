@@ -78,7 +78,7 @@ function TableHead({ showContext }) {
       <tr>
         <th className="col-title">Tên công việc</th>
         <th>Người giao</th>
-        {showContext && <th>Phòng ban / Channel</th>}
+        {showContext && <th>Phòng ban / Dự án</th>}
         <th>Trạng thái</th>
         <th>Ưu tiên</th>
         <th>Hạn hoàn thành</th>

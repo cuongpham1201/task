@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, CheckCircle2, Circle, Plus, Send, CalendarDays } from 'lucide-react'
+import { X, CheckCircle2, Circle, Plus, Send, CalendarDays, ThumbsUp, Undo2 } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
 import { StatusBadge, PriorityBadge, StatusSelect, PrioritySelect } from '../shared/badges'
@@ -44,9 +44,9 @@ function AssigneeSelect({ value, onChange }) {
 
 export default function TaskDetailPanel() {
   const {
-    state, usersById, perms, getTask, getSubtasks, getComments, getActivities,
+    state, usersById, currentUser, perms, getTask, getSubtasks, getComments, getActivities,
     selectTask, updateTaskField, setStatus, setProgress, toggleComplete,
-    assignTask, setDueDate, setPriority,
+    assignTask, setDueDate, setPriority, submitTask, reviewTask,
     addComment, toggleSubtask, addSubtask, taskContextLabel,
   } = useApp()
 
@@ -89,6 +89,8 @@ export default function TaskDetailPanel() {
   const canManage = perms.manage(task)
   const canSubs = perms.subtasks(task)
   const canCmt = perms.comment(task)
+  const reviewRequired = task.completionMode === 'review_required'
+  const canReview = perms.review(task)
 
   const submitComment = () => {
     const text = commentText.trim()
@@ -109,15 +111,35 @@ export default function TaskDetailPanel() {
       <div className="panel-overlay" onClick={() => selectTask(null)} />
       <aside className="detail-panel">
         <div className="detail-head">
-          <button
-            className={`btn btn-complete ${isDone ? 'is-done' : ''}`}
-            disabled={!canStatus}
-            title={canStatus ? '' : 'Bạn không có quyền cập nhật task này'}
-            onClick={() => toggleComplete(task)}
-          >
-            {isDone ? <CheckCircle2 size={15} /> : <Circle size={15} />}
-            {isDone ? 'Đã hoàn thành' : 'Đánh dấu hoàn thành'}
-          </button>
+          {reviewRequired && task.status === 'submitted' && canReview ? (
+            <div className="review-actions">
+              <button className="btn btn-primary btn-complete" onClick={() => reviewTask(task.id, 'passed')}>
+                <ThumbsUp size={15} /> Nghiệm thu Đạt
+              </button>
+              <button
+                className="btn btn-complete"
+                onClick={() => reviewTask(task.id, 'returned', window.prompt('Lý do trả lại (tuỳ chọn):') || '')}
+              >
+                <Undo2 size={15} /> Trả lại
+              </button>
+            </div>
+          ) : reviewRequired && task.status === 'submitted' ? (
+            <span className="review-pending">⏳ Chờ nghiệm thu</span>
+          ) : reviewRequired && !isDone && task.assigneeId === currentUser?.id ? (
+            <button className="btn btn-primary btn-complete" onClick={() => submitTask(task.id)}>
+              <Send size={15} /> Nộp nghiệm thu
+            </button>
+          ) : (
+            <button
+              className={`btn btn-complete ${isDone ? 'is-done' : ''}`}
+              disabled={!canStatus}
+              title={canStatus ? '' : 'Bạn không có quyền cập nhật task này'}
+              onClick={() => toggleComplete(task)}
+            >
+              {isDone ? <CheckCircle2 size={15} /> : <Circle size={15} />}
+              {isDone ? 'Đã hoàn thành' : 'Đánh dấu hoàn thành'}
+            </button>
+          )}
           <button className="btn btn-ghost" onClick={() => selectTask(null)} title="Đóng">
             <X size={18} />
           </button>
@@ -160,7 +182,7 @@ export default function TaskDetailPanel() {
                 </span>
               )}
             </Field>
-            <Field label="Phòng ban / Channel">{taskContextLabel(task)}</Field>
+            <Field label="Phòng ban / Dự án">{taskContextLabel(task)}</Field>
             <Field label="Trạng thái">
               {canStatus ? (
                 <StatusSelect value={task.status} onChange={(s) => setStatus(task.id, s)} />

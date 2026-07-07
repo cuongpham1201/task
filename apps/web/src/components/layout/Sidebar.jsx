@@ -8,10 +8,7 @@ import BrandLogo from '../shared/BrandLogo'
 import { ROLES } from '../../data/constants'
 
 export default function Sidebar() {
-  const { state, currentUser, inboxItems, visibleDepartments, visibleChannels } = useApp()
-  const unread = inboxItems().filter(
-    (a) => new Date(a.createdAt) > new Date(state.inboxReadAt)
-  ).length
+  const { currentUser, unreadCount: unread, visibleDepartments, visibleChannels } = useApp()
 
   const linkClass = ({ isActive }) => `side-link ${isActive ? 'active' : ''}`
 
@@ -48,7 +45,7 @@ export default function Sidebar() {
         </div>
 
         <div className="side-section">
-          <span className="side-section-title"><Hash size={13} /> Channel / Dự án</span>
+          <span className="side-section-title"><Hash size={13} /> Dự án</span>
           {visibleChannels.map((c) => (
             <NavLink key={c.id} to={`/channels/${c.id}`} className={linkClass}>
               <Hash size={15} className="side-hash" />

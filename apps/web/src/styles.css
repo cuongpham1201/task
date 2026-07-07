@@ -201,6 +201,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .status-waiting { background: var(--amber-soft); color: var(--amber); }
 .status-done { background: var(--green-soft); color: var(--green); }
 .status-paused { background: var(--purple-soft); color: #8a7bc8; }
+.status-submitted { background: var(--purple-soft); color: var(--accent); }
+.status-returned { background: var(--red-soft); color: var(--red); }
 .priority-low { background: var(--gray-soft); color: var(--text-muted); }
 .priority-normal { background: var(--blue-soft); color: var(--blue); }
 .priority-high { background: var(--orange-soft); color: var(--orange); }
@@ -807,3 +809,12 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 /* Nghiệm thu trong panel chi tiết */
 .review-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .review-pending { font-size: 13px; font-weight: 600; color: var(--text-soft); }
+
+/* Toggle "Cần nghiệm thu" trong modal tạo việc */
+.review-toggle {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg);
+}
+.review-toggle input[type="checkbox"] { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--accent); }
+.review-toggle span { display: flex; flex-direction: column; gap: 2px; }
+.review-toggle small { color: var(--text-muted); font-size: 12.5px; line-height: 1.4; }
