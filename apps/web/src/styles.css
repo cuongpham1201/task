@@ -646,11 +646,32 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
   .page-head { flex-direction: column; align-items: stretch; gap: 10px; }
   .page-head-actions { flex-wrap: wrap; }
 
-  /* Dashboard: stat 2 cột, card gọn */
-  .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .stat-value { font-size: 22px; }
-  .card { padding: 14px; }
-  .dash-greeting h1 { font-size: 20px; }
+  /* Dashboard: stat 2 cột dạng compact (icon trái, số + nhãn phải) */
+  .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
+  .stat-card {
+    display: grid; grid-template-columns: auto 1fr; column-gap: 10px;
+    align-items: center; padding: 10px 12px; gap: 0 10px;
+  }
+  .stat-icon { grid-row: 1 / 3; width: 30px; height: 30px; margin-bottom: 0; }
+  .stat-value { font-size: 20px; }
+  .stat-label { font-size: 11.5px; line-height: 1.25; }
+  .card { padding: 12px 14px; margin-bottom: 12px; }
+  .card-head { margin-bottom: 8px; }
+  .dash-greeting { margin-bottom: 14px; }
+  .dash-greeting h1 { font-size: 19px; }
+  .dash-grid { gap: 12px; }
+  .mini-tabs { margin-bottom: 10px; }
+  .mini-tabs .tab { padding: 8px 10px; font-size: 13px; }
+
+  /* Hàng "Việc của tôi": tên 1 dòng riêng, badge + hạn xuống dòng dưới */
+  .dash-task { flex-wrap: wrap; gap: 5px 10px; padding: 11px 2px; }
+  .dash-task-title { flex: 1 1 100%; white-space: normal; line-height: 1.35; }
+  .dash-task-due { min-width: 0; text-align: left; }
+
+  /* Hàng Phòng ban/Channel: tên rộng, số liệu tự xuống dòng khi chật */
+  .dash-dept { flex-wrap: wrap; gap: 3px 10px; padding: 11px 2px; }
+  .dash-dept-name { flex: 1 1 auto; min-width: 56%; white-space: normal; line-height: 1.35; }
+  .dash-dept-stat { font-size: 12px; }
 
   /* Panel chi tiết: full-screen sheet */
   .detail-panel { width: 100vw; max-width: 100vw; }
