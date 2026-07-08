@@ -31,6 +31,7 @@ function buildInitialState(currentUserId, bootstrap) {
     notifications: bootstrap.notifications || [], // thông báo thật từ server
     selectedTaskId: null,
     createModal: null,
+    toasts: [],
   }
 }
 
@@ -145,6 +146,12 @@ function reducer(state, action) {
       }
     case 'SET_NOTIFS':
       return { ...state, notifications: action.list }
+    case 'UPDATE_CHANNEL':
+      return { ...state, channels: state.channels.map((c) => (c.id === action.channel.id ? action.channel : c)) }
+    case 'ADD_TOAST':
+      return { ...state, toasts: [...state.toasts, action.toast] }
+    case 'REMOVE_TOAST':
+      return { ...state, toasts: state.toasts.filter((t) => t.id !== action.id) }
     default:
       return state
   }
@@ -191,14 +198,22 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         task.creatorId === me ||
         (currentUser.role === 'manager' && task.departmentId === currentUser.orgUnitId))
 
-    // Gọi API; lỗi → báo + không làm vỡ optimistic (reload để đồng bộ nếu cần).
+    // Toast nhẹ thay alert
+    const toast = (message, type = 'error') => {
+      const id = nextId('toast')
+      dispatch({ type: 'ADD_TOAST', toast: { id, message, type } })
+      setTimeout(() => dispatch({ type: 'REMOVE_TOAST', id }), 3600)
+    }
+
+    // Gọi API; lỗi → toast + không làm vỡ optimistic (reload để đồng bộ nếu cần).
     const persist = async (promise, onOk) => {
       try {
         const r = await promise
         if (onOk) onOk(r)
       } catch (e) {
         console.error('[API]', e)
-        alert('Lưu thất bại: ' + e.message)
+        const msg = e.status === 403 ? 'Bạn không có quyền thực hiện thao tác này' : 'Lưu thất bại: ' + e.message
+        toast(msg)
       }
     }
     const patch = (path, body) =>
@@ -213,7 +228,7 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
       if (!guard(canUpdateStatus(currentUser, task), 'đổi trạng thái')) return
       // Đang chờ nghiệm thu → không đổi tay (phải qua Đạt/Trả lại)
       if (task.status === 'submitted' && !canReview(task)) {
-        alert('Việc đang chờ nghiệm thu — chờ kết quả Đạt/Trả lại.')
+        toast('Việc đang chờ nghiệm thu — chờ kết quả Đạt/Trả lại.', 'warn')
         return
       }
       const isDone = status === 'done'
@@ -267,6 +282,9 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
       // Thông báo thật từ server (fan-out khi giao việc/comment/nghiệm thu…)
       notifications: state.notifications,
       unreadCount: state.notifications.filter((n) => !n.readAt).length,
+      toasts: state.toasts,
+      toast,
+      dismissToast: (id) => dispatch({ type: 'REMOVE_TOAST', id }),
 
       // UI actions
       selectTask: (id) => dispatch({ type: 'SELECT_TASK', id }),
@@ -324,8 +342,9 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         const task = findTask(id)
         if (!task) return
         if (!guard(canReview(task), 'nghiệm thu công việc')) return
-        const status = decision === 'passed' ? 'done' : 'returned'
-        dispatch({ type: 'SET_STATUS', id, at: now(), patch: { status, completedAt: decision === 'passed' ? now() : null }, activities: [makeActivity(id, me, 'review', { decision })] })
+        const passed = decision === 'passed'
+        const status = passed ? 'done' : 'returned'
+        dispatch({ type: 'SET_STATUS', id, at: now(), patch: { status, completedAt: passed ? now() : null, ...(passed ? { progress: 100 } : {}) }, activities: [makeActivity(id, me, 'review', { decision })] })
         persist(post(`/tasks/${id}/review`, { decision, note }), (t) => dispatch({ type: 'REPLACE_TASK', task: t }))
       },
 
@@ -440,6 +459,20 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         if (!guard(c.userId === me || currentUser.role === 'admin', 'xóa bình luận')) return
         dispatch({ type: 'REMOVE_COMMENT', id: commentId })
         persist(apiFetch(`/comments/${commentId}`, { method: 'DELETE' }))
+      },
+
+      // ── Quản lý thành viên dự án (owner) ──
+      addProjectMember: (projectId, userId) => {
+        persist(post(`/projects/${projectId}/members`, { userId }), (ch) => {
+          dispatch({ type: 'UPDATE_CHANNEL', channel: ch })
+          toast('Đã thêm thành viên', 'success')
+        })
+      },
+      removeProjectMember: (projectId, userId) => {
+        persist(apiFetch(`/projects/${projectId}/members/${userId}`, { method: 'DELETE' }), (ch) => {
+          dispatch({ type: 'UPDATE_CHANNEL', channel: ch })
+          toast('Đã xóa thành viên', 'success')
+        })
       },
     }
   }, [state])

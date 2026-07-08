@@ -825,3 +825,46 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .review-toggle input[type="checkbox"] { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--accent); }
 .review-toggle span { display: flex; flex-direction: column; gap: 2px; }
 .review-toggle small { color: var(--text-muted); font-size: 12.5px; line-height: 1.4; }
+
+/* ── UAT polish: toaster ── */
+.toaster { position: fixed; right: 16px; bottom: 16px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
+@media (max-width: 640px) { .toaster { right: 10px; left: 10px; bottom: calc(64px + env(safe-area-inset-bottom)); } }
+.toast {
+  display: flex; align-items: center; gap: 12px; min-width: 240px; max-width: 380px;
+  padding: 11px 12px 11px 14px; border-radius: 10px; color: #fff; font-size: 13.5px; font-weight: 500;
+  box-shadow: var(--shadow-lg); animation: sheet-in 0.18s ease-out;
+}
+.toast-error { background: #d0463f; }
+.toast-warn { background: #d9902a; }
+.toast-success { background: #1f9d63; }
+.toast span { flex: 1; }
+.toast-close { border: none; background: none; color: #fff; opacity: 0.85; padding: 2px; cursor: pointer; }
+
+/* ── Dashboard buckets ── */
+.dash-bucket { margin-bottom: 12px; }
+.dash-bucket:last-child { margin-bottom: 0; }
+.dash-bucket-head { display: flex; align-items: center; gap: 8px; margin: 4px 2px 4px; }
+.dash-bucket-title { font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-soft); }
+.dash-bucket-title.t-red { color: var(--red); }
+.dash-bucket-title.t-green { color: var(--green); }
+.dash-bucket-title.t-amber { color: var(--amber); }
+.dash-bucket-count { font-size: 11.5px; font-weight: 700; color: var(--text-soft); background: var(--gray-soft); border-radius: 10px; padding: 0 7px; }
+.dash-dept-col { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.dash-dept-sub { font-size: 12px; }
+.dash-dept-progress { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ── Project members ── */
+.member-list { display: flex; flex-direction: column; }
+.member-row { display: flex; align-items: center; gap: 12px; padding: 9px 4px; border-bottom: 1px solid var(--border); }
+.member-row:last-child { border-bottom: none; }
+.member-row .cell-user { flex: 1; }
+.member-role { font-size: 12.5px; color: var(--text-muted); }
+.member-add { align-items: center; }
+
+/* ── Search groups + view toggle ── */
+.search-group { padding: 8px 14px 3px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em; }
+.search-result-static { cursor: default; }
+.search-result-static:hover { background: none; }
+.search-result-title { display: inline-flex; align-items: center; gap: 6px; }
+.view-toggle { display: inline-flex; gap: 4px; }
+.view-toggle .btn { padding: 7px 10px; }

@@ -65,6 +65,61 @@
 - [ ] Tạo task full màn hình, nút Hủy/Tạo bấm được ở footer.
 - [ ] "Thêm vào màn hình chính" (Add to Home Screen) → mở như app riêng (standalone, có icon sao đỏ).
 
+---
+
+# Phần B — Kiểm thử theo VAI TRÒ
+
+> Mục tiêu: mỗi vai trò đăng nhập bằng 1 tài khoản thật, kiểm tra **thấy đúng phạm vi** và **làm được đúng quyền**.
+> Nguyên tắc chung: phạm vi nhìn (visibility) do **server** quyết định — không bao giờ dựa vào ẩn/hiện ở giao diện.
+
+## B1. Admin
+- [ ] Sidebar thấy **tất cả** khối / phòng ban / dự án.
+- [ ] Dashboard: mở được mọi phòng ban trong "Tổng quan quản lý".
+- [ ] Search ra được task/dự án/phòng ban/người của bất kỳ đơn vị nào.
+- [ ] Vào bất kỳ dự án nào cũng thêm/xóa được thành viên (kể cả dự án không phải mình tạo).
+- [ ] Nghiệm thu / trả lại được task của bất kỳ ai.
+- [ ] Xóa được comment của người khác.
+
+## B2. Tổng giám đốc (TGĐ)
+- [ ] Thấy **toàn bộ 4 khối** và các phòng/ban/phân xưởng trực thuộc.
+- [ ] Dashboard "Tổng quan quản lý" liệt kê các phòng thuộc phạm vi (mở/quá hạn/chờ nghiệm thu/tiến độ).
+- [ ] Mở 1 phòng bất kỳ → thấy task của phòng đó.
+- [ ] KHÔNG thấy task cá nhân riêng tư ngoài phạm vi tổ chức (task cá nhân của người khác không liên quan).
+- [ ] Không phải chủ dự án → không thêm/xóa được thành viên dự án đó (trừ khi là admin).
+
+## B3. Giám đốc khối
+- [ ] Chỉ thấy **khối của mình** + các phòng/ban/phân xưởng con (include_children), KHÔNG thấy khối khác.
+- [ ] Dashboard "Tổng quan quản lý" chỉ gồm phòng thuộc khối mình.
+- [ ] Mở phòng thuộc khối khác qua URL trực tiếp (`/departments/:id`) → không có dữ liệu / không lọt task.
+- [ ] Nghiệm thu được task ở phòng thuộc khối mình (nếu là người giao/trưởng phòng liên quan).
+
+## B4. Trưởng phòng
+- [ ] Thấy **phòng mình** (và phòng con nếu có cấu hình include_children), không thấy phòng ngang cấp khác.
+- [ ] Tạo được task Phòng ban cho **phòng mình**; KHÔNG tạo được cho phòng khác (nút/thao tác bị chặn + server chặn).
+- [ ] Nghiệm thu / trả lại task của nhân viên trong phòng.
+- [ ] Đổi được deadline / người phụ trách task thuộc phòng mình.
+- [ ] Dashboard hiện phòng mình trong "Tổng quan quản lý".
+
+## B5. Nhân viên
+- [ ] Dashboard hiện đúng các nhóm "Việc của tôi": Quá hạn / Hôm nay / Tuần này / Bị trả lại / Chờ nghiệm thu / Hoàn thành gần đây.
+- [ ] Chỉ đổi được trạng thái/tiến độ **việc mình nhận**; KHÔNG đổi được deadline/người phụ trách task người khác tạo.
+- [ ] KHÔNG tạo được task cho phòng khác; KHÔNG thấy task riêng tư của người ngoài phạm vi.
+- [ ] Nhận thông báo khi được giao việc / bị nhắc / có bình luận / kết quả nghiệm thu; bấm mở đúng task.
+- [ ] Không có nút xóa task của người khác.
+
+## B6. Project Owner (chủ dự án)
+- [ ] Trong dự án mình sở hữu: tab **Thành viên** có ô "+ Chọn người để thêm…" và nút Thêm.
+- [ ] Thêm 1 người → người đó xuất hiện ngay trong danh sách + toast "Đã thêm thành viên"; refresh vẫn còn.
+- [ ] Xóa 1 thành viên → biến mất + toast "Đã xóa thành viên"; **không** xóa được chính chủ dự án (không có nút X ở dòng "Chủ dự án").
+- [ ] Người vừa được thêm đăng nhập → thấy dự án đó trong sidebar và task của dự án.
+- [ ] Tạo được công việc trong dự án; đổi qua lại chế độ Danh sách / Bảng (Kanban).
+
+## B7. Project Member (thành viên dự án)
+- [ ] Thấy dự án được thêm vào trong sidebar; mở được tab Tổng quan/Công việc/Thành viên/Hoạt động.
+- [ ] Tab Thành viên: **không** có ô thêm/nút xóa (chỉ chủ dự án/admin mới có).
+- [ ] Tạo/cập nhật được công việc trong dự án theo quyền; nhận thông báo liên quan.
+- [ ] Bị chủ dự án xóa khỏi dự án → sau khi đồng bộ (refresh) không còn thấy dự án đó.
+
 ## Ghi chú lỗi phát hiện
 | # | Bước | Kết quả mong đợi | Kết quả thực tế | Mức |
 |---|---|---|---|---|

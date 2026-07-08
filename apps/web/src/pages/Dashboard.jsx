@@ -1,14 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ClipboardList, CheckCircle2, AlertTriangle, MessageCircleQuestion, Hash,
+  ClipboardList, CheckCircle2, AlertTriangle, ClipboardCheck, ChevronRight,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { deptColor } from '../utils/color'
 import { StatusBadge } from '../components/shared/badges'
-import EmptyState from '../components/shared/EmptyState'
 import {
-  greetingByHour, todayLabel, isOverdue, isUpcoming, dueLabel,
+  greetingByHour, todayLabel, isOverdue, isDueToday, isUpcoming, dueLabel,
 } from '../utils/date'
 
 function StatCard({ icon: Icon, label, value, tone }) {
@@ -21,50 +20,98 @@ function StatCard({ icon: Icon, label, value, tone }) {
   )
 }
 
-const MY_TABS = [
-  { key: 'upcoming', label: 'Sắp đến hạn' },
-  { key: 'overdue', label: 'Quá hạn' },
-  { key: 'done', label: 'Đã hoàn thành' },
-]
+function Bucket({ title, tasks, tone, selectTask }) {
+  if (tasks.length === 0) return null
+  return (
+    <div className="dash-bucket">
+      <div className="dash-bucket-head">
+        <span className={`dash-bucket-title ${tone || ''}`}>{title}</span>
+        <span className="dash-bucket-count">{tasks.length}</span>
+      </div>
+      <div className="dash-task-list">
+        {tasks.map((t) => {
+          const due = dueLabel(t)
+          return (
+            <button key={t.id} className="dash-task" onClick={() => selectTask(t.id)}>
+              <span className="dash-task-title">{t.title}</span>
+              <StatusBadge status={t.status} />
+              <span className={`dash-task-due due-${due.tone}`}>{due.text}</span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 export default function Dashboard() {
-  const {
-    currentUser, myTasks, departmentTasks, channelTasks, selectTask,
-    visibleDepartments, visibleChannels,
-  } = useApp()
-  const [tab, setTab] = useState('upcoming')
+  const { currentUser, myTasks, perms, selectTask, visibleDepartments, state } = useApp()
+  const me = currentUser?.id
 
   const mine = myTasks()
-  const stats = useMemo(() => ({
+  const buckets = useMemo(() => {
+    const returned = mine.filter((t) => t.status === 'returned')
+    // Bucket theo thời gian chỉ tính việc mình còn xử lý được:
+    // loại 'done' (đã xong), 'returned' (đã có bucket riêng), 'submitted' (đang chờ nghiệm thu, ngoài tầm tay)
+    // → mỗi task chỉ xuất hiện ở đúng một nhóm.
+    const active = mine.filter(
+      (t) => t.status !== 'done' && t.status !== 'returned' && t.status !== 'submitted'
+    )
+    const overdue = active.filter(isOverdue)
+    const today = active.filter((t) => isDueToday(t) && !isOverdue(t))
+    const week = active.filter((t) => isUpcoming(t, 7) && !isDueToday(t) && !isOverdue(t))
+    const toReview = state.tasks.filter(
+      (t) => t.status === 'submitted' && (t.creatorId === me || perms.review(t))
+    )
+    const recentDone = mine
+      .filter((t) => t.status === 'done')
+      .sort((a, b) => new Date(b.completedAt || b.updatedAt) - new Date(a.completedAt || a.updatedAt))
+      .slice(0, 5)
+    return { overdue, today, week, returned, toReview, recentDone }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mine, state.tasks, me])
+
+  const stats = {
     total: mine.length,
     done: mine.filter((t) => t.status === 'done').length,
-    overdue: mine.filter(isOverdue).length,
-    waiting: mine.filter((t) => t.status === 'waiting').length,
-  }), [mine])
+    overdue: buckets.overdue.length,
+    review: buckets.toReview.length,
+  }
 
-  const tabTasks = useMemo(() => {
-    if (tab === 'upcoming') {
-      return mine
-        .filter((t) => isUpcoming(t))
-        .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
-    }
-    if (tab === 'overdue') return mine.filter(isOverdue)
-    return mine.filter((t) => t.status === 'done').slice(0, 6)
-  }, [tab, mine])
+  // Quản lý: các task mình thấy nhưng KHÔNG phải việc cá nhân (qua quyền org/dự án)
+  const managed = state.tasks.filter((t) => t.assigneeId !== me && t.creatorId !== me)
+  const deptOverview = useMemo(() => {
+    if (managed.length === 0) return []
+    return visibleDepartments
+      .map((d) => {
+        const ts = state.tasks.filter((t) => t.departmentId === d.id)
+        if (ts.length === 0) return null
+        const open = ts.filter((t) => t.status !== 'done').length
+        const over = ts.filter(isOverdue).length
+        const submitted = ts.filter((t) => t.status === 'submitted').length
+        const progress = Math.round(ts.reduce((s, t) => s + (t.progress || 0), 0) / ts.length)
+        return { d, open, over, submitted, progress }
+      })
+      .filter(Boolean)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [managed.length, visibleDepartments, state.tasks])
 
+  const nothingPersonal =
+    buckets.overdue.length + buckets.today.length + buckets.week.length +
+    buckets.returned.length + buckets.toReview.length + buckets.recentDone.length === 0
 
   return (
     <div className="page">
       <div className="dash-greeting">
         <p className="dash-date">{todayLabel()}</p>
-        <h1>{greetingByHour()}, {currentUser.displayName.split(' ').pop()}!</h1>
+        <h1>{greetingByHour()}, {currentUser?.displayName?.split(' ').pop()}!</h1>
       </div>
 
       <div className="stat-grid">
-        <StatCard icon={ClipboardList} label="Tổng việc được giao" value={stats.total} tone="blue" />
-        <StatCard icon={CheckCircle2} label="Việc hoàn thành" value={stats.done} tone="green" />
-        <StatCard icon={AlertTriangle} label="Việc quá hạn" value={stats.overdue} tone="red" />
-        <StatCard icon={MessageCircleQuestion} label="Việc chờ phản hồi" value={stats.waiting} tone="amber" />
+        <StatCard icon={ClipboardList} label="Việc của tôi" value={stats.total} tone="blue" />
+        <StatCard icon={AlertTriangle} label="Quá hạn" value={stats.overdue} tone="red" />
+        <StatCard icon={ClipboardCheck} label="Chờ tôi nghiệm thu" value={stats.review} tone="amber" />
+        <StatCard icon={CheckCircle2} label="Đã hoàn thành" value={stats.done} tone="green" />
       </div>
 
       <div className="dash-grid">
@@ -73,69 +120,47 @@ export default function Dashboard() {
             <h2>Việc của tôi</h2>
             <Link to="/my-tasks" className="card-link">Xem tất cả</Link>
           </div>
-          <div className="mini-tabs">
-            {MY_TABS.map((t) => (
-              <button
-                key={t.key}
-                className={`tab ${tab === t.key ? 'active' : ''}`}
-                onClick={() => setTab(t.key)}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-          <div className="dash-task-list">
-            {tabTasks.length === 0 && (
-              <EmptyState title="Không có công việc nào" />
-            )}
-            {tabTasks.map((t) => {
-              const due = dueLabel(t)
-              return (
-                <button key={t.id} className="dash-task" onClick={() => selectTask(t.id)}>
-                  <span className="dash-task-title">{t.title}</span>
-                  <StatusBadge status={t.status} />
-                  <span className={`dash-task-due due-${due.tone}`}>{due.text}</span>
-                </button>
-              )
-            })}
-          </div>
+          {nothingPersonal ? (
+            <p className="muted" style={{ padding: '8px 2px' }}>Không có việc cần xử lý. 🎉</p>
+          ) : (
+            <>
+              <Bucket title="Quá hạn" tone="t-red" tasks={buckets.overdue} selectTask={selectTask} />
+              <Bucket title="Hôm nay" tone="t-green" tasks={buckets.today} selectTask={selectTask} />
+              <Bucket title="Tuần này" tasks={buckets.week} selectTask={selectTask} />
+              <Bucket title="Bị trả lại — chờ tôi xử lý" tone="t-red" tasks={buckets.returned} selectTask={selectTask} />
+              <Bucket title="Chờ tôi nghiệm thu" tone="t-amber" tasks={buckets.toReview} selectTask={selectTask} />
+              <Bucket title="Hoàn thành gần đây" tasks={buckets.recentDone} selectTask={selectTask} />
+            </>
+          )}
         </div>
 
-        <div className="card">
-          <div className="card-head"><h2>Phòng ban / Dự án</h2></div>
-          <div className="dash-dept-list">
-            {visibleDepartments.map((d) => {
-              const ts = departmentTasks(d.id)
-              const open = ts.filter((t) => t.status !== 'done').length
-              const over = ts.filter(isOverdue).length
-              return (
+        {deptOverview.length > 0 && (
+          <div className="card">
+            <div className="card-head"><h2>Tổng quan quản lý</h2></div>
+            <div className="dash-dept-list">
+              {deptOverview.map(({ d, open, over, submitted, progress }) => (
                 <Link key={d.id} to={`/departments/${d.id}`} className="dash-dept">
                   <span className="side-dot" style={{ background: deptColor(d.code) }} />
-                  <span className="dash-dept-name">{d.name}</span>
-                  <span className="dash-dept-stat">{open} đang mở</span>
-                  <span className={`dash-dept-stat ${over > 0 ? 'overdue' : ''}`}>
-                    {over} quá hạn
+                  <span className="dash-dept-col">
+                    <span className="dash-dept-name">{d.name}</span>
+                    <span className="dash-dept-sub muted">
+                      {open} đang mở
+                      {submitted > 0 && <> · {submitted} chờ nghiệm thu</>}
+                      {over > 0 && <span className="text-overdue"> · {over} quá hạn</span>}
+                    </span>
                   </span>
-                </Link>
-              )
-            })}
-            {visibleChannels.map((c) => {
-              const ts = channelTasks(c.id)
-              const open = ts.filter((t) => t.status !== 'done').length
-              const over = ts.filter(isOverdue).length
-              return (
-                <Link key={c.id} to={`/channels/${c.id}`} className="dash-dept">
-                  <Hash size={15} className="side-hash" />
-                  <span className="dash-dept-name">{c.name}</span>
-                  <span className="dash-dept-stat">{open} đang mở</span>
-                  <span className={`dash-dept-stat ${over > 0 ? 'overdue' : ''}`}>
-                    {over} quá hạn
+                  <span className="dash-dept-progress">
+                    <span className="progress-track" style={{ width: 54 }}>
+                      <span className={`progress-fill ${progress >= 100 ? 'complete' : ''}`} style={{ width: `${progress}%` }} />
+                    </span>
+                    <span className="muted">{progress}%</span>
                   </span>
+                  <ChevronRight size={16} className="muted" />
                 </Link>
-              )
-            })}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

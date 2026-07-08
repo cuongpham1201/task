@@ -76,7 +76,7 @@ export class BootstrapController {
       include: { members: { select: { userId: true } } },
       orderBy: { createdAt: 'asc' },
     })
-    const channels = projWs.map((w) => ({ id: w.id, name: w.name, description: w.description, members: w.members.map((m) => m.userId) }))
+    const channels = projWs.map((w) => ({ id: w.id, name: w.name, description: w.description, ownerId: w.ownerId, members: w.members.map((m) => m.userId) }))
 
     const users = await this.prisma.user.findMany({
       where: { active: true },

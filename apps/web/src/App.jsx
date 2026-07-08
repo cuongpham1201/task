@@ -7,6 +7,7 @@ import Sidebar from './components/layout/Sidebar'
 import Topbar from './components/layout/Topbar'
 import MobileDrawer from './components/layout/MobileDrawer'
 import MobileNav from './components/layout/MobileNav'
+import Toaster from './components/shared/Toaster'
 import TaskDetailPanel from './components/task/TaskDetailPanel'
 import CreateTaskModal from './components/task/CreateTaskModal'
 import Dashboard from './pages/Dashboard'
@@ -42,6 +43,7 @@ function AppShell() {
       {/* Mount lại mỗi lần mở để form nhận defaults mới */}
       {state.createModal && <CreateTaskModal />}
       <MobileNav />
+      <Toaster />
     </div>
   )
 }
