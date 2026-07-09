@@ -973,3 +973,12 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .attach-name:hover { color: var(--accent); text-decoration: underline; }
 .attach-size { font-size: 12px; flex-shrink: 0; }
 .attach-add { margin-top: 4px; }
+
+/* ── Notification center ── */
+.inbox-group { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin: 14px 2px 6px; }
+.inbox-type-icon { width: 28px; height: 28px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--gray-soft); color: var(--text-soft); }
+.inbox-type-icon.tone-blue { background: var(--blue-soft); color: var(--blue); }
+.inbox-type-icon.tone-green { background: var(--green-soft); color: var(--green); }
+.inbox-type-icon.tone-amber { background: var(--amber-soft); color: #a9760a; }
+.inbox-type-icon.tone-red { background: var(--red-soft); color: var(--red); }
+.inbox-type-icon.tone-purple { background: var(--purple-soft); color: var(--accent); }
