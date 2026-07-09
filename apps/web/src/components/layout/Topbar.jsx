@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Search, Plus, Menu, Hash, Building2 } from 'lucide-react'
+import { Search, Plus, Menu, Hash, Building2, Target } from 'lucide-react'
+import { deaccent } from '../../utils/text'
 import BrandLogo from '../shared/BrandLogo'
 import { useApp } from '../../store/AppContext'
 import { useAuth } from '../../auth/AuthProvider'
@@ -20,19 +21,20 @@ export default function Topbar({ onMenu }) {
 
   // Search nhanh (client, ưu tiên tốc độ): task / dự án / phòng ban / người dùng
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = deaccent(query)
     if (!q) return null
-    const has = (s) => (s || '').toLowerCase().includes(q)
+    const has = (s) => deaccent(s).includes(q)
     return {
       tasks: state.tasks.filter((t) => has(t.title)).slice(0, 6),
+      actions: (state.actions || []).filter((a) => has(a.title)).slice(0, 4),
       projects: visibleChannels.filter((c) => has(c.name)).slice(0, 4),
       departments: visibleDepartments.filter((d) => has(d.name) || has(d.code)).slice(0, 4),
-      users: state.users.filter((u) => has(u.displayName) || has(u.email)).slice(0, 4),
+      users: state.users.filter((u) => has(u.displayName) || has(u.email)).slice(0, 5),
     }
-  }, [query, state.tasks, state.users, visibleChannels, visibleDepartments])
+  }, [query, state.tasks, state.actions, state.users, visibleChannels, visibleDepartments])
 
   const total = results
-    ? results.tasks.length + results.projects.length + results.departments.length + results.users.length
+    ? results.tasks.length + results.actions.length + results.projects.length + results.departments.length + results.users.length
     : 0
   const go = (path) => { navigate(path); setQuery('') }
 
@@ -60,6 +62,12 @@ export default function Topbar({ onMenu }) {
               <button key={t.id} className="search-result" onClick={() => { selectTask(t.id); setQuery('') }}>
                 <span className="search-result-title">{t.title}</span>
                 <span className="search-result-meta">{taskContextLabel(t)} · <StatusBadge status={t.status} /></span>
+              </button>
+            ))}
+            {results.actions.length > 0 && <div className="search-group">Action</div>}
+            {results.actions.map((a) => (
+              <button key={a.id} className="search-result" onClick={() => go(`/actions/${a.id}`)}>
+                <span className="search-result-title"><Target size={13} /> {a.title}</span>
               </button>
             ))}
             {results.projects.length > 0 && <div className="search-group">Dự án</div>}
