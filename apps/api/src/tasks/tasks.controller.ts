@@ -7,7 +7,7 @@ import type { AuthClaims } from '../auth/auth.types'
 import { UsersService } from '../users/users.service'
 import { TasksService } from './tasks.service'
 import {
-  AssigneeDto, CreateTaskDto, DueDateDto, PriorityDto, ProgressDto, ReviewDto, StatusDto, UpdateTaskDto,
+  AssigneeDto, CreateTaskDto, DueDateDto, PriorityDto, ProgressDto, ReviewDto, StatusDto, UpdateTaskDto, WorkLogDto,
 } from './task.dto'
 
 @Controller('tasks')
@@ -40,6 +40,16 @@ export class TasksController {
   @Post(':id/submit')
   async submit(@AuthUser() c: AuthClaims, @Param('id') id: string) {
     return this.tasks.submit(await this.me(c), id)
+  }
+
+  @Get(':id/worklogs')
+  async listWorkLogs(@AuthUser() c: AuthClaims, @Param('id') id: string) {
+    return this.tasks.listWorkLogs(await this.me(c), id)
+  }
+
+  @Post(':id/worklogs')
+  async addWorkLog(@AuthUser() c: AuthClaims, @Param('id') id: string, @Body() dto: WorkLogDto) {
+    return this.tasks.addWorkLog(await this.me(c), id, dto)
   }
 
   @Post(':id/watch')

@@ -313,6 +313,25 @@ export class TasksService {
     return { archived: true }
   }
 
+  // ── Nhật ký thực hiện (work log, append-only) ──
+  async listWorkLogs(me: Me, id: string) {
+    const task = await this.load(id)
+    this.policy.assert(await this.policy.canView(me, task), 'Không có quyền xem nhật ký')
+    const rows = await this.prisma.taskWorkLog.findMany({ where: { taskId: id }, orderBy: { createdAt: 'desc' } })
+    return rows.map((r) => ({ id: r.id, taskId: r.taskId, authorId: r.authorId, content: r.content, progressValue: r.progressValue, createdAt: r.createdAt }))
+  }
+
+  async addWorkLog(me: Me, id: string, dto: { content: string; progressValue?: number }) {
+    const task = await this.load(id)
+    this.policy.assert(await this.policy.canUpdateStatus(me, task), 'Không có quyền ghi nhật ký thực hiện')
+    const row = await this.prisma.$transaction(async (tx) => {
+      const w = await tx.taskWorkLog.create({ data: { taskId: id, authorId: me.id, content: dto.content, progressValue: dto.progressValue ?? null } })
+      if (dto.progressValue != null) await tx.task.update({ where: { id }, data: { progress: dto.progressValue } })
+      return w
+    })
+    return { id: row.id, taskId: row.taskId, authorId: row.authorId, content: row.content, progressValue: row.progressValue, createdAt: row.createdAt }
+  }
+
   // ── Theo dõi (watcher) — ai xem được task đều theo dõi được ──
   async watch(me: Me, id: string) {
     const task = await this.load(id)

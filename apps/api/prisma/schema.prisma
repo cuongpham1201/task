@@ -210,6 +210,7 @@ model User {
   createdActions        Action[]             @relation("ActionCreatedBy")
   actionUpdates         ActionUpdate[]       @relation("ActionUpdateAuthor")
   reviewedKpiResults    TaskKpiResult[]      @relation("KpiResultReviewer")
+  workLogs              TaskWorkLog[]        @relation("WorkLogAuthor")
 
   @@map("users")
 }
@@ -343,6 +344,7 @@ model Task {
   activities    Activity[]
   attachments   Attachment[]
   kpiResults    TaskKpiResult[]
+  workLogs      TaskWorkLog[]
 
   @@index([assigneeId])
   @@index([workspaceId, status])
@@ -532,6 +534,22 @@ model TaskKpiResult {
   @@index([pushStatus])
   @@index([taskId])
   @@map("task_kpi_results")
+}
+
+// Item 12: Nhật ký thực hiện task (append-only) — khác comment (thảo luận) & activity (audit).
+model TaskWorkLog {
+  id            String   @id @default(uuid())
+  taskId        String   @map("task_id")
+  authorId      String   @map("author_id")
+  content       String
+  progressValue Int?     @map("progress_value") @db.SmallInt
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author User @relation("WorkLogAuthor", fields: [authorId], references: [id])
+
+  @@index([taskId, createdAt])
+  @@map("task_work_logs")
 }
 
 model SyncLog {

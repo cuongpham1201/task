@@ -56,6 +56,10 @@ export class ReviewDto {
   @IsIn(['passed', 'returned']) decision!: string
   @IsOptional() @IsString() @MaxLength(2000) note?: string
 }
+export class WorkLogDto {
+  @IsString() @MaxLength(2000) content!: string
+  @IsOptional() @IsInt() @Min(0) @Max(100) progressValue?: number
+}
 export class CreateCommentDto {
   @IsString() @MaxLength(5000) content!: string
   @IsOptional() @IsArray() @IsString({ each: true }) mentionIds?: string[]

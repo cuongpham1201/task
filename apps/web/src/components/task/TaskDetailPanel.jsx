@@ -343,6 +343,8 @@ export default function TaskDetailPanel() {
             />
           </div>
 
+          <WorkLogSection task={task} />
+
           <AttachmentsSection task={task} />
 
           <div className="detail-section">
@@ -560,6 +562,56 @@ function AttachmentsSection({ task }) {
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+function WorkLogSection({ task }) {
+  const { fetchWorkLogs, addWorkLog, usersById, perms, toast } = useApp()
+  const [items, setItems] = useState([])
+  const [content, setContent] = useState('')
+  const [progress, setProgressV] = useState('')
+  const [busy, setBusy] = useState(false)
+  const canWork = perms.updateStatus(task)
+
+  const load = () => fetchWorkLogs(task.id).then(setItems).catch(() => {})
+  useEffect(() => { load() /* eslint-disable-next-line */ }, [task.id])
+
+  const submit = async () => {
+    const c = content.trim()
+    if (!c || busy) return
+    setBusy(true)
+    const dto = { content: c }
+    if (progress !== '') dto.progressValue = Number(progress)
+    try { await addWorkLog(task.id, dto); setContent(''); setProgressV(''); await load() }
+    catch (e) { toast('Ghi nhật ký thất bại: ' + e.message) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <div className="detail-section">
+      <h3>Nhật ký thực hiện ({items.length})</h3>
+      {canWork && (
+        <div className="worklog-add">
+          <input placeholder="VD: Đã khảo sát hiện trường / Đang thi công…" value={content}
+            onChange={(e) => setContent(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
+          <input type="number" min="0" max="100" placeholder="%" value={progress}
+            onChange={(e) => setProgressV(e.target.value)} style={{ width: 64 }} />
+          <button className="btn btn-primary" disabled={busy || !content.trim()} onClick={submit}><Plus size={15} /></button>
+        </div>
+      )}
+      {items.length === 0 && <p className="muted">Chưa có nhật ký thực hiện.</p>}
+      <div className="worklog-list">
+        {items.map((w) => (
+          <div key={w.id} className="worklog-item">
+            <span className="worklog-content">{w.content}</span>
+            <span className="muted worklog-meta">
+              {usersById[w.authorId]?.displayName || 'NV'} · {timeAgo(w.createdAt)}
+              {w.progressValue != null && <> · {w.progressValue}%</>}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

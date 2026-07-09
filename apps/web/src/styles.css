@@ -1025,3 +1025,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .task-row.row-selected { background: var(--accent-soft); }
 .bulk-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; margin-bottom: 10px; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px; }
 .bulk-count { font-weight: 600; color: var(--accent); }
+
+/* ── Task work log ── */
+.worklog-add { display: flex; gap: 6px; margin-bottom: 8px; }
+.worklog-add input[type=text], .worklog-add input:not([type]) { flex: 1; }
+.worklog-list { display: flex; flex-direction: column; gap: 6px; }
+.worklog-item { border-left: 2px solid var(--blue); padding: 4px 0 4px 10px; }
+.worklog-content { display: block; }
+.worklog-meta { font-size: 12px; }

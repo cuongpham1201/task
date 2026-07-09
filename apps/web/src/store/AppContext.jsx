@@ -324,6 +324,10 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
           review: task.reviewRequired ?? (task.completionMode === 'review_required'),
         }
       },
+      // ── Nhật ký thực hiện task (item 12) ──
+      fetchWorkLogs: (taskId) => apiFetch(`/tasks/${taskId}/worklogs`),
+      addWorkLog: (taskId, dto) => post(`/tasks/${taskId}/worklogs`, dto),
+
       // ── Đính kèm tệp (P0-1) ──
       fetchAttachments: (taskId) => apiFetch(`/tasks/${taskId}/attachments`),
       uploadAttachment: (taskId, file) => uploadFile(`/tasks/${taskId}/attachments`, file),
