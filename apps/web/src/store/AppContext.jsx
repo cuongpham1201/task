@@ -29,8 +29,12 @@ function buildInitialState(currentUserId, bootstrap) {
     comments: bootstrap.comments || [],
     activities: bootstrap.activities || [],
     notifications: bootstrap.notifications || [], // thông báo thật từ server
+    actions: bootstrap.actions || [], // Action Log (A3)
+    counts: bootstrap.counts || { pendingReviewCount: 0, myActionCount: 0 },
+    kpiDefinitions: bootstrap.kpiDefinitions || [], // trống tới A4
     selectedTaskId: null,
     createModal: null,
+    createActionModal: null,
     toasts: [],
   }
 }
@@ -148,6 +152,19 @@ function reducer(state, action) {
       return { ...state, notifications: action.list }
     case 'UPDATE_CHANNEL':
       return { ...state, channels: state.channels.map((c) => (c.id === action.channel.id ? action.channel : c)) }
+    case 'OPEN_CREATE_ACTION':
+      return { ...state, createActionModal: { defaults: action.defaults || {} } }
+    case 'CLOSE_CREATE_ACTION':
+      return { ...state, createActionModal: null }
+    case 'UPSERT_ACTION':
+      return {
+        ...state,
+        actions: state.actions.some((a) => a.id === action.action.id)
+          ? state.actions.map((a) => (a.id === action.action.id ? { ...a, ...action.action } : a))
+          : [action.action, ...state.actions],
+      }
+    case 'REMOVE_ACTION':
+      return { ...state, actions: state.actions.filter((a) => a.id !== action.id) }
     case 'ADD_TOAST':
       return { ...state, toasts: [...state.toasts, action.toast] }
     case 'REMOVE_TOAST':
@@ -300,22 +317,28 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         persist(post('/notifications/mark-read', { ids: [String(id)] }))
       },
 
-      // ── Tạo công việc (map scope FE → workspaceId cho API) ──
+      // ── Tạo công việc (chiều tường minh org/project/action + KPI; giữ workspaceId cho compat) ──
       createTask: (input, subtaskTitles = []) => {
         if (!guard(canCreateTask(currentUser, input, state.channels), 'tạo công việc loại này')) return
         const scope = input.scope || 'personal'
-        // department → workspace ORG_UNIT của phòng; channel → id workspace PROJECT; personal → null
         let workspaceId = null
         if (scope === 'department') workspaceId = departmentsById[input.departmentId]?.workspaceId || null
         else if (scope === 'channel') workspaceId = input.channelId || null
+        const isScorable = input.isScorable === true
         const dto = {
           title: input.title || '(Chưa đặt tên)',
           description: input.description || '',
           workspaceId,
+          orgUnitId: input.orgUnitId ?? (scope === 'department' ? input.departmentId : undefined),
+          projectId: input.projectId ?? (scope === 'channel' ? input.channelId : undefined),
+          actionId: input.actionId || undefined,
           section: scope === 'department' ? input.section || undefined : undefined,
           assigneeId: input.assigneeId || me,
           priority: input.priority || 'normal',
-          completionMode: input.completionMode || 'self',
+          reviewRequired: isScorable ? true : (input.completionMode === 'review_required'),
+          isScorable: isScorable || undefined,
+          kpiDefinitionId: isScorable ? input.kpiDefinitionId : undefined,
+          kpiWeight: isScorable ? input.kpiWeight : undefined,
         }
         if (input.startDate) dto.startDate = input.startDate
         if (input.dueDate) dto.dueDate = input.dueDate
@@ -474,6 +497,55 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
           toast('Đã xóa thành viên', 'success')
         })
       },
+
+      // ── Action Log (A3) ──
+      actions: state.actions,
+      actionsById: Object.fromEntries(state.actions.map((a) => [a.id, a])),
+      counts: state.counts,
+      kpiDefinitions: state.kpiDefinitions,
+      myActions: () => state.actions.filter((a) => a.ownerId === me),
+      // Action cho org_unit cụ thể (để lọc trong form Task)
+      actionsForOrg: (orgUnitId) => state.actions.filter((a) => a.orgUnitId === orgUnitId && !a.archived),
+      // Gate UI (server vẫn enforce 403 chính xác theo org)
+      canManageActions: currentUser?.role === 'admin' || currentUser?.role === 'manager',
+      canManageAction: (a) =>
+        !!currentUser && (currentUser.role === 'admin' || a?.ownerId === me || a?.createdById === me || currentUser.role === 'manager'),
+
+      createActionModal: state.createActionModal,
+      openCreateActionModal: (defaults) => dispatch({ type: 'OPEN_CREATE_ACTION', defaults }),
+      closeCreateActionModal: () => dispatch({ type: 'CLOSE_CREATE_ACTION' }),
+
+      createAction: (dto, onOk) =>
+        persist(post('/actions', dto), (a) => {
+          dispatch({ type: 'UPSERT_ACTION', action: a })
+          toast('Đã tạo Action', 'success')
+          onOk?.(a)
+        }),
+      updateAction: (id, dto, onOk) =>
+        persist(patch(`/actions/${id}`, dto), (a) => {
+          dispatch({ type: 'UPSERT_ACTION', action: a })
+          onOk?.(a)
+        }),
+      archiveAction: (id) =>
+        persist(post(`/actions/${id}/archive`, {}), () => {
+          dispatch({ type: 'REMOVE_ACTION', id })
+          toast('Đã lưu trữ Action', 'success')
+        }),
+      // Async fetch (page tự await; không cache trong state để tránh preload nặng)
+      fetchActionDetail: (id) => apiFetch(`/actions/${id}`),
+      fetchActionLog: (params = {}) => {
+        const q = new URLSearchParams()
+        if (params.period) q.set('period', params.period)
+        if (params.orgUnitId) q.set('orgUnitId', params.orgUnitId)
+        const qs = q.toString()
+        return apiFetch(`/reports/action-log${qs ? `?${qs}` : ''}`)
+      },
+      addActionUpdate: (id, dto) =>
+        post(`/actions/${id}/updates`, dto).then((u) => {
+          // cập nhật latestUpdate + progress/status trong list nếu có
+          apiFetch(`/actions/${id}`).then((full) => dispatch({ type: 'UPSERT_ACTION', action: full })).catch(() => {})
+          return u
+        }),
     }
   }, [state])
 

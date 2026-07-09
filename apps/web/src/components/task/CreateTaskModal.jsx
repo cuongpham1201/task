@@ -6,7 +6,10 @@ import { PRIORITY, PRIORITY_ORDER, SECTIONS, SECTION_ORDER, SCOPES } from '../..
 import { fromInputDate } from '../../utils/date'
 
 export default function CreateTaskModal() {
-  const { state, currentUser, closeCreateModal, createTask, visibleDepartments, visibleChannels } = useApp()
+  const {
+    state, currentUser, closeCreateModal, createTask, visibleDepartments, visibleChannels,
+    actionsForOrg, kpiDefinitions,
+  } = useApp()
   const defaults = state.createModal?.defaults || {}
 
   // Phòng ban chọn được = các phòng user đang thấy (server đã scope theo quyền).
@@ -41,6 +44,10 @@ export default function CreateTaskModal() {
       dueDate: '',
       priority: 'normal',
       completionMode: 'self', // 'review_required' = phải nộp nghiệm thu mới đóng được
+      actionId: defaults.actionId || '',
+      isScorable: false,
+      kpiDefinitionId: '',
+      kpiWeight: '',
     }
   })
   const [subtaskTitles, setSubtaskTitles] = useState([])
@@ -69,6 +76,13 @@ export default function CreateTaskModal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assigneePool])
 
+  // Org chịu trách nhiệm để lọc Action: phòng (nếu scope=department) hoặc org của người thực hiện
+  const responsibleOrg = form.scope === 'department'
+    ? form.departmentId
+    : (state.users.find((u) => u.id === form.assigneeId)?.orgUnitId || currentUser.orgUnitId)
+  const actionOptions = responsibleOrg ? actionsForOrg(responsibleOrg) : []
+  const hasKpiDefs = kpiDefinitions.length > 0
+
   if (!state.createModal) return null
 
   const toggleCollaborator = (id) =>
@@ -90,6 +104,11 @@ export default function CreateTaskModal() {
       setError('Vui lòng nhập tên công việc')
       return
     }
+    if (form.isScorable) {
+      if (!hasKpiDefs) { setError('Chưa có KPI definition — không tạo được task tính KPI'); return }
+      if (!form.kpiDefinitionId) { setError('Chọn KPI definition'); return }
+      if (form.kpiWeight === '' || Number.isNaN(Number(form.kpiWeight))) { setError('Nhập trọng số KPI'); return }
+    }
     createTask(
       {
         title: form.title.trim(),
@@ -104,6 +123,10 @@ export default function CreateTaskModal() {
         dueDate: fromInputDate(form.dueDate),
         priority: form.priority,
         completionMode: form.completionMode,
+        actionId: form.actionId || null,
+        isScorable: form.isScorable,
+        kpiDefinitionId: form.isScorable ? form.kpiDefinitionId : null,
+        kpiWeight: form.isScorable ? Number(form.kpiWeight) : null,
       },
       subtaskTitles
     )
@@ -239,10 +262,21 @@ export default function CreateTaskModal() {
             </div>
           </div>
 
+          {actionOptions.length > 0 && (
+            <label className="form-field">
+              <span>Action (tùy chọn)</span>
+              <select value={form.actionId} onChange={(e) => set({ actionId: e.target.value })}>
+                <option value="">— Không thuộc Action —</option>
+                {actionOptions.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
+              </select>
+            </label>
+          )}
+
           <label className="review-toggle">
             <input
               type="checkbox"
-              checked={form.completionMode === 'review_required'}
+              checked={form.isScorable || form.completionMode === 'review_required'}
+              disabled={form.isScorable}
               onChange={(e) =>
                 set({ completionMode: e.target.checked ? 'review_required' : 'self' })
               }
@@ -252,6 +286,39 @@ export default function CreateTaskModal() {
               <small>Người nhận phải "Nộp nghiệm thu"; người giao duyệt Đạt/Trả lại trước khi đóng việc.</small>
             </span>
           </label>
+
+          <label className="review-toggle">
+            <input
+              type="checkbox"
+              checked={form.isScorable}
+              onChange={(e) => set({ isScorable: e.target.checked, ...(e.target.checked ? { completionMode: 'review_required' } : {}) })}
+            />
+            <span>
+              <strong>Tính KPI (sinh evidence cho HRM)</strong>
+              <small>Bật KPI sẽ bắt buộc nghiệm thu, chọn KPI definition và trọng số. App không tính điểm — HRM tính.</small>
+            </span>
+          </label>
+
+          {form.isScorable && (
+            hasKpiDefs ? (
+              <div className="form-row">
+                <label className="form-field">
+                  <span>KPI definition *</span>
+                  <select value={form.kpiDefinitionId} onChange={(e) => { set({ kpiDefinitionId: e.target.value }); setError('') }}>
+                    <option value="">— Chọn —</option>
+                    {kpiDefinitions.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span>Trọng số *</span>
+                  <input type="number" min="0" step="0.5" placeholder="VD: 2" value={form.kpiWeight}
+                    onChange={(e) => { set({ kpiWeight: e.target.value }); setError('') }} />
+                </label>
+              </div>
+            ) : (
+              <p className="form-error">Chưa có KPI definition (sẽ được nạp từ HRM ở phase sau). Tạm thời chưa tạo được task tính KPI.</p>
+            )
+          )}
 
           <div className="form-row">
             <label className="form-field">

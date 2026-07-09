@@ -10,11 +10,14 @@ import MobileNav from './components/layout/MobileNav'
 import Toaster from './components/shared/Toaster'
 import TaskDetailPanel from './components/task/TaskDetailPanel'
 import CreateTaskModal from './components/task/CreateTaskModal'
+import CreateActionModal from './components/action/CreateActionModal'
 import Dashboard from './pages/Dashboard'
 import MyTasks from './pages/MyTasks'
 import Inbox from './pages/Inbox'
 import DepartmentPage from './pages/DepartmentPage'
 import ChannelPage from './pages/ChannelPage'
+import ActionLog from './pages/ActionLog'
+import ActionDetail from './pages/ActionDetail'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 
@@ -34,6 +37,8 @@ function AppShell() {
             <Route path="/inbox" element={<Inbox />} />
             <Route path="/departments/:id" element={<DepartmentPage />} />
             <Route path="/channels/:id" element={<ChannelPage />} />
+            <Route path="/action-log" element={<ActionLog />} />
+            <Route path="/actions/:id" element={<ActionDetail />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
@@ -42,6 +47,7 @@ function AppShell() {
       <TaskDetailPanel />
       {/* Mount lại mỗi lần mở để form nhận defaults mới */}
       {state.createModal && <CreateTaskModal />}
+      {state.createActionModal && <CreateActionModal />}
       <MobileNav />
       <Toaster />
     </div>

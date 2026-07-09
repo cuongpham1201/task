@@ -45,7 +45,7 @@ function Bucket({ title, tasks, tone, selectTask }) {
 }
 
 export default function Dashboard() {
-  const { currentUser, myTasks, perms, selectTask, visibleDepartments, state } = useApp()
+  const { currentUser, myTasks, perms, selectTask, visibleDepartments, state, canManageActions } = useApp()
   const me = currentUser?.id
 
   const mine = myTasks()
@@ -95,6 +95,19 @@ export default function Dashboard() {
       .filter(Boolean)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [managed.length, visibleDepartments, state.tasks])
+
+  // Action buckets (chỉ quản lý)
+  const actionBuckets = useMemo(() => {
+    if (!canManageActions) return null
+    const live = (state.actions || []).filter((a) => !a.archived)
+    const mine = live.filter((a) => a.ownerId === me)
+    const atRisk = live.filter((a) => a.status === 'at_risk')
+    const overdue = live.filter(
+      (a) => a.deadline && a.status !== 'done' && a.status !== 'cancelled' && isOverdue({ dueDate: a.deadline, status: a.status })
+    )
+    return { mine, atRisk, overdue }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canManageActions, state.actions, me])
 
   const nothingPersonal =
     buckets.overdue.length + buckets.today.length + buckets.week.length +
@@ -161,6 +174,38 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {actionBuckets && (actionBuckets.mine.length + actionBuckets.atRisk.length + actionBuckets.overdue.length > 0) && (
+          <div className="card">
+            <div className="card-head">
+              <h2>Action</h2>
+              <Link to="/action-log" className="card-link">Xem Action Log</Link>
+            </div>
+            <ActionMini title="Rủi ro" tone="t-red" items={actionBuckets.atRisk} />
+            <ActionMini title="Quá hạn" tone="t-red" items={actionBuckets.overdue} />
+            <ActionMini title="Action của tôi" items={actionBuckets.mine} />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ActionMini({ title, items, tone }) {
+  if (!items || items.length === 0) return null
+  return (
+    <div className="dash-bucket">
+      <div className="dash-bucket-head">
+        <span className={`dash-bucket-title ${tone || ''}`}>{title}</span>
+        <span className="dash-bucket-count">{items.length}</span>
+      </div>
+      <div className="dash-task-list">
+        {items.slice(0, 5).map((a) => (
+          <Link key={a.id} to={`/actions/${a.id}`} className="dash-task">
+            <span className="dash-task-title">{a.title}</span>
+            <span className="muted">{a.progress}%</span>
+          </Link>
+        ))}
       </div>
     </div>
   )

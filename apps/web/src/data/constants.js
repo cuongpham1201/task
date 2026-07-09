@@ -40,3 +40,25 @@ export const SCOPES = {
   department: 'Phòng ban',
   channel: 'Dự án', // key nội bộ giữ 'channel' (API map → project), nhãn hiển thị = Dự án
 }
+
+// ── Action Log (freeze) ──
+export const ACTION_STATUS = {
+  draft: { label: 'Nháp', tone: 'gray' },
+  in_progress: { label: 'Đang thực hiện', tone: 'blue' },
+  on_hold: { label: 'Tạm dừng', tone: 'amber' },
+  at_risk: { label: 'Rủi ro', tone: 'red' },
+  done: { label: 'Hoàn thành', tone: 'green' },
+  cancelled: { label: 'Đã hủy', tone: 'gray' },
+}
+export const ACTION_STATUS_ORDER = ['draft', 'in_progress', 'on_hold', 'at_risk', 'done', 'cancelled']
+
+export const ACTION_UPDATE_TYPE = {
+  progress: { label: 'Tiến độ', tone: 'blue' },
+  issue: { label: 'Khó khăn', tone: 'amber' },
+  risk: { label: 'Rủi ro', tone: 'red' },
+  recommendation: { label: 'Kiến nghị', tone: 'purple' },
+  decision: { label: 'Quyết định', tone: 'green' },
+  result: { label: 'Kết quả', tone: 'green' },
+  note: { label: 'Ghi chú', tone: 'gray' },
+}
+export const ACTION_UPDATE_TYPE_ORDER = ['progress', 'issue', 'risk', 'recommendation', 'decision', 'result', 'note']

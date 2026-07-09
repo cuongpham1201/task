@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import {
-  Home, CheckSquare, Inbox, BarChart3, Settings, Building2, Hash,
+  Home, CheckSquare, Inbox, BarChart3, Settings, Building2, Hash, Target,
 } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import { deptColor } from '../../utils/color'
@@ -9,7 +9,7 @@ import BrandLogo from '../shared/BrandLogo'
 import { ROLES } from '../../data/constants'
 
 export default function Sidebar() {
-  const { currentUser, unreadCount: unread, blocks, visibleDepartments, visibleChannels } = useApp()
+  const { currentUser, unreadCount: unread, blocks, visibleDepartments, visibleChannels, canManageActions } = useApp()
   // Nhóm phòng ban theo khối (chỉ khối có phòng đang thấy)
   const deptGroups = (blocks || [])
     .map((b) => ({ block: b, depts: visibleDepartments.filter((d) => d.blockId === b.id) }))
@@ -32,12 +32,17 @@ export default function Sidebar() {
         <NavLink to="/my-tasks" className={linkClass}>
           <CheckSquare size={17} /> Việc của tôi
         </NavLink>
+        {canManageActions && (
+          <NavLink to="/action-log" className={linkClass}>
+            <Target size={17} /> Action Log
+          </NavLink>
+        )}
         <NavLink to="/inbox" className={linkClass}>
           <Inbox size={17} /> Thông báo
           {unread > 0 && <span className="side-badge">{unread}</span>}
         </NavLink>
         <NavLink to="/reports" className={linkClass}>
-          <BarChart3 size={17} /> Báo cáo
+          <BarChart3 size={17} /> Thống kê
         </NavLink>
 
         {deptGroups.map((g) => (

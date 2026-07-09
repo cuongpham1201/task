@@ -51,6 +51,7 @@ export default function TaskDetailPanel() {
     assignTask, setDueDate, setPriority, submitTask, reviewTask,
     addComment, toggleSubtask, addSubtask, taskContextLabel,
     archiveTask, updateSubtask, deleteSubtask, editComment, deleteComment,
+    actionsById, channelsById,
   } = useApp()
 
   const task = state.selectedTaskId ? getTask(state.selectedTaskId) : null
@@ -92,7 +93,7 @@ export default function TaskDetailPanel() {
   const canManage = perms.manage(task)
   const canSubs = perms.subtasks(task)
   const canCmt = perms.comment(task)
-  const reviewRequired = task.completionMode === 'review_required'
+  const reviewRequired = task.reviewRequired ?? (task.completionMode === 'review_required')
   const canReview = perms.review(task)
 
   const submitComment = () => {
@@ -214,7 +215,23 @@ export default function TaskDetailPanel() {
                 </span>
               )}
             </Field>
-            <Field label="Phòng ban / Dự án">{taskContextLabel(task)}</Field>
+            <Field label="Đơn vị chịu trách nhiệm">{taskContextLabel(task)}</Field>
+            {task.projectId && (
+              <Field label="Dự án">{channelsById[task.projectId]?.name || '—'}</Field>
+            )}
+            {task.actionId && (
+              <Field label="Action">
+                <a className="link" href={`/actions/${task.actionId}`}>{actionsById[task.actionId]?.title || 'Xem Action'}</a>
+              </Field>
+            )}
+            <Field label="Nghiệm thu">{reviewRequired ? 'Cần nghiệm thu' : 'Tự hoàn thành'}</Field>
+            {task.isScorable && (
+              <Field label="KPI">
+                <span className="badge tone-purple">Tính KPI</span>
+                {task.kpiWeight != null && <span className="muted"> · trọng số {task.kpiWeight}</span>}
+                {task.acceptedAt && <span className="muted"> · đã nghiệm thu {formatDateFull(task.acceptedAt)}</span>}
+              </Field>
+            )}
             <Field label="Trạng thái">
               {/* Chờ nghiệm thu → khóa đổi tay; chuyển bằng nút Đạt/Trả lại */}
               {canStatus && task.status !== 'submitted' ? (

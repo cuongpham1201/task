@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Link, useNavigate } from 'react-router-dom'
 import {
-  Home, CheckSquare, Hash, Inbox, MoreHorizontal, Building2, BarChart3, Settings, LogOut, X,
+  Home, CheckSquare, Hash, Inbox, MoreHorizontal, Building2, BarChart3, Settings, LogOut, X, Target,
 } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import { deptColor } from '../../utils/color'
@@ -25,7 +25,7 @@ function MobileActionSheet({ title, onClose, children }) {
 
 /** Bottom navigation cố định cho mobile. */
 export default function MobileNav() {
-  const { unreadCount: unread, visibleDepartments, visibleChannels } = useApp()
+  const { unreadCount: unread, visibleDepartments, visibleChannels, canManageActions } = useApp()
   const { logout } = useAuth()
   const navigate = useNavigate()
   const [sheet, setSheet] = useState(null) // null | 'projects' | 'more'
@@ -82,7 +82,10 @@ export default function MobileNav() {
             </Link>
           ))}
           <div className="sheet-divider" />
-          <Link to="/reports" className="sheet-item"><BarChart3 size={17} /> Báo cáo</Link>
+          {canManageActions && (
+            <Link to="/action-log" className="sheet-item"><Target size={17} /> Action Log</Link>
+          )}
+          <Link to="/reports" className="sheet-item"><BarChart3 size={17} /> Thống kê</Link>
           <Link to="/settings" className="sheet-item"><Settings size={17} /> Cài đặt</Link>
           <button
             className="sheet-item danger"
