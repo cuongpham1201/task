@@ -1,5 +1,5 @@
 import {
-  IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min,
+  IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min,
 } from 'class-validator'
 
 const PRIORITIES = ['low', 'normal', 'high', 'urgent']
@@ -9,11 +9,20 @@ const MODES = ['self', 'review_required']
 export class CreateTaskDto {
   @IsString() @MaxLength(255) title!: string
   @IsOptional() @IsString() description?: string
-  @IsOptional() @IsString() workspaceId?: string | null // null = việc cá nhân
+  @IsOptional() @IsString() workspaceId?: string | null // DEPRECATED (FE cũ) — null = việc cá nhân
+  // Freeze §5: chiều tường minh (A3 gửi trực tiếp; A2 vẫn suy được từ workspaceId cho FE cũ)
+  @IsOptional() @IsString() orgUnitId?: string | null
+  @IsOptional() @IsString() projectId?: string | null
+  @IsOptional() @IsString() actionId?: string | null
   @IsOptional() @IsIn(SECTIONS) section?: string
   @IsOptional() @IsString() assigneeId?: string
   @IsOptional() @IsIn(PRIORITIES) priority?: string
-  @IsOptional() @IsIn(MODES) completionMode?: string
+  @IsOptional() @IsIn(MODES) completionMode?: string // DEPRECATED — dùng reviewRequired
+  @IsOptional() @IsBoolean() reviewRequired?: boolean
+  // KPI evidence (freeze §8): is_scorable ⇒ reviewRequired + kpiDefinitionId + kpiWeight (validate ở service)
+  @IsOptional() @IsBoolean() isScorable?: boolean
+  @IsOptional() @IsString() kpiDefinitionId?: string | null
+  @IsOptional() @IsNumber() kpiWeight?: number | null
   @IsOptional() @IsDateString() startDate?: string
   @IsOptional() @IsDateString() dueDate?: string
   @IsOptional() @IsArray() @IsString({ each: true }) collaboratorIds?: string[]

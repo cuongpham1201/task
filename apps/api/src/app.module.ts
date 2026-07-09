@@ -10,6 +10,8 @@ import { CommentsModule } from './comments/comments.module'
 import { SubtasksModule } from './subtasks/subtasks.module'
 import { DepartmentsModule } from './departments/departments.module'
 import { ProjectsModule } from './projects/projects.module'
+import { ActionsModule } from './actions/actions.module'
+import { ReportsModule } from './reports/reports.module'
 import { BootstrapModule } from './bootstrap/bootstrap.module'
 
 @Module({
@@ -24,6 +26,8 @@ import { BootstrapModule } from './bootstrap/bootstrap.module'
     SubtasksModule,
     DepartmentsModule,
     ProjectsModule,
+    ActionsModule,
+    ReportsModule,
     BootstrapModule,
   ],
   controllers: [HealthController],

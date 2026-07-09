@@ -143,12 +143,15 @@ enum PushStatus {
   @@map("push_status")
 }
 
-// ── A1: Action Log (cam kết/mục tiêu quản lý, thuộc org_unit) ──
+// ── Action Log (cam kết/mục tiêu quản lý, thuộc org_unit) ──
+// A2 delta (freeze §10): enum status chốt draft/in_progress/on_hold/at_risk/done/cancelled.
 enum ActionStatus {
-  todo
-  doing
+  draft
+  in_progress
+  on_hold
+  at_risk
   done
-  paused
+  cancelled
 
   @@map("action_status")
 }
@@ -158,6 +161,19 @@ enum ProgressMode {
   auto_from_tasks
 
   @@map("progress_mode")
+}
+
+// A2 delta (freeze §8): Action Update = "Nhật ký điều hành" — 7 loại.
+enum ActionUpdateType {
+  progress
+  issue
+  risk
+  recommendation
+  decision
+  result
+  note
+
+  @@map("action_update_type")
 }
 
 model User {
@@ -192,6 +208,7 @@ model User {
   externalMapping       ExternalUserMapping?
   ownedActions          Action[]             @relation("ActionOwner")
   createdActions        Action[]             @relation("ActionCreatedBy")
+  actionUpdates         ActionUpdate[]       @relation("ActionUpdateAuthor")
   reviewedKpiResults    TaskKpiResult[]      @relation("KpiResultReviewer")
 
   @@map("users")
@@ -534,10 +551,11 @@ model Action {
   id           String       @id @default(uuid())
   title        String
   description  String       @default("")
-  orgUnitId    String       @map("org_unit_id")
-  ownerId      String       @map("owner_id")
+  orgUnitId    String       @map("org_unit_id") // đơn vị chịu trách nhiệm (bắt buộc)
+  projectId    String?      @map("project_id") // A2 delta: liên kết 1 project (nullable, KHÔNG phải ACL — freeze §12a)
+  ownerId      String       @map("owner_id") // người chịu trách nhiệm báo cáo (KHÔNG phải assignee)
   deadline     DateTime?    @db.Date
-  status       ActionStatus @default(todo)
+  status       ActionStatus @default(draft)
   priority     TaskPriority @default(normal)
   progressMode ProgressMode @default(manual) @map("progress_mode")
   progress     Int          @default(0) @db.SmallInt
@@ -547,14 +565,35 @@ model Action {
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
 
-  orgUnit   OrgUnit @relation("ActionOrgUnit", fields: [orgUnitId], references: [id])
-  owner     User    @relation("ActionOwner", fields: [ownerId], references: [id])
-  createdBy User    @relation("ActionCreatedBy", fields: [createdById], references: [id])
+  orgUnit   OrgUnit        @relation("ActionOrgUnit", fields: [orgUnitId], references: [id])
+  owner     User           @relation("ActionOwner", fields: [ownerId], references: [id])
+  createdBy User           @relation("ActionCreatedBy", fields: [createdById], references: [id])
   tasks     Task[]
+  updates   ActionUpdate[]
 
   @@index([orgUnitId, period])
+  @@index([projectId])
   @@index([status])
   @@map("actions")
+}
+
+// A2 delta (freeze §8): Nhật ký điều hành — APPEND-ONLY (không update, không delete).
+model ActionUpdate {
+  id            String           @id @default(uuid())
+  actionId      String           @map("action_id")
+  authorId      String           @map("author_id")
+  type          ActionUpdateType @default(progress)
+  content       String
+  progressValue Int?             @map("progress_value") @db.SmallInt // ảnh chụp tiến độ tại thời điểm cập nhật
+  statusFrom    ActionStatus?    @map("status_from")
+  statusTo      ActionStatus?    @map("status_to")
+  createdAt     DateTime         @default(now()) @map("created_at")
+
+  action Action @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  author User   @relation("ActionUpdateAuthor", fields: [authorId], references: [id])
+
+  @@index([actionId, createdAt])
+  @@map("action_updates")
 }
 
 // ── A1: KPI definition = cache read-only từ HRM (source=HRM) hoặc mẫu local (source=local_seed).

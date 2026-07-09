@@ -16,7 +16,7 @@ export class CommentsService {
   async create(me: Me, taskId: string, content: string) {
     const task = await this.prisma.task.findUnique({ where: { id: taskId }, include: { workspace: true } })
     if (!task || task.archived) throw new NotFoundException('Không tìm thấy công việc')
-    this.policy.assert(await this.policy.canComment(me, task, task.workspace), 'Không có quyền bình luận')
+    this.policy.assert(await this.policy.canComment(me, task), 'Không có quyền bình luận')
     const comment = await this.prisma.$transaction(async (tx) => {
       const c = await tx.comment.create({ data: { taskId, userId: me.id, content } })
       await this.notifications.emit(tx, {

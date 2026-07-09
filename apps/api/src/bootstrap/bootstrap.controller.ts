@@ -84,6 +84,31 @@ export class BootstrapController {
       orderBy: { displayName: 'asc' },
     })
 
+    // ── Actions đã scope (kèm latest update — KHÔNG preload toàn bộ history) ──
+    const actionsRaw = await this.prisma.action.findMany({
+      where: { AND: [{ archived: false }, await this.vis.actionWhere(me)] },
+      include: { _count: { select: { tasks: true } }, updates: { orderBy: { createdAt: 'desc' }, take: 1 } },
+      orderBy: [{ deadline: 'asc' }, { createdAt: 'desc' }],
+    })
+    const actions = actionsRaw.map((a) => ({
+      id: a.id, title: a.title, description: a.description, orgUnitId: a.orgUnitId, projectId: a.projectId,
+      ownerId: a.ownerId, deadline: a.deadline, status: a.status, priority: a.priority,
+      progressMode: a.progressMode, progress: a.progress, period: a.period, createdById: a.createdById,
+      archived: a.archived, createdAt: a.createdAt, updatedAt: a.updatedAt, taskCount: a._count.tasks,
+      latestUpdate: a.updates[0]
+        ? { type: a.updates[0].type, content: a.updates[0].content, createdAt: a.updates[0].createdAt }
+        : null,
+    }))
+
+    // Counts tiện dụng (không thay việc scope FE)
+    const managed = await this.vis.managedOrgUnitIds(me)
+    const [pendingReviewCount, myActionCount] = await Promise.all([
+      this.prisma.task.count({
+        where: { archived: false, status: 'submitted', OR: [{ creatorId: me.id }, { orgUnitId: { in: managed } }] },
+      }),
+      this.prisma.action.count({ where: { archived: false, ownerId: me.id } }),
+    ])
+
     return {
       users,
       blocks,
@@ -93,6 +118,8 @@ export class BootstrapController {
       subtasks,
       comments,
       activities,
+      actions,
+      counts: { pendingReviewCount, myActionCount },
       notifications: await this.notifications.listForUser(me),
     }
   }

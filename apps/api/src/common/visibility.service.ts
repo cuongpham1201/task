@@ -4,8 +4,10 @@ import { PrismaService } from '../prisma/prisma.service'
 export type Me = { id: string; role: string; orgUnitId: string | null }
 
 /**
- * Tính phạm vi nhìn thấy theo cây tổ chức + workspace. Dùng cho MỌI query
- * list/search/report/bootstrap — scope ngay ở SQL, không lọc frontend.
+ * Tính phạm vi nhìn thấy theo Architecture Freeze V1 §7.
+ * Task/Action scope NGAY Ở SQL — không lọc frontend.
+ * Task = creator ∨ assignee ∨ collaborator ∨ watcher ∨ org_unit(tree) ∨ project(member).
+ * Action = org_unit(tree) ∨ owner ∨ creator. (project_id KHÔNG phải ACL — freeze §12a.)
  */
 @Injectable()
 export class VisibilityService {
@@ -65,33 +67,40 @@ export class VisibilityService {
     return this.orgUnitIdsFromRoles(me, true).then((s) => [...s])
   }
 
-  /** Workspace ids user được xem (ORG_UNIT theo cây + PROJECT là member). */
-  async visibleWorkspaceIds(me: Me): Promise<string[]> {
-    const orgIds = await this.visibleOrgUnitIds(me)
-    const [orgWs, projWs] = await Promise.all([
-      this.prisma.workspace.findMany({
-        where: { type: 'org_unit', orgUnitId: { in: orgIds } },
-        select: { id: true },
-      }),
-      this.prisma.workspaceMember.findMany({
-        where: { userId: me.id },
-        select: { workspaceId: true },
-      }),
-    ])
-    return [...new Set([...orgWs.map((w) => w.id), ...projWs.map((m) => m.workspaceId)])]
+  /** Project ids (= workspace type=project) user là member. */
+  async myProjectIds(me: Me): Promise<string[]> {
+    const rows = await this.prisma.workspaceMember.findMany({
+      where: { userId: me.id },
+      select: { workspaceId: true },
+    })
+    return rows.map((m) => m.workspaceId)
   }
 
-  /** Prisma where để lọc task theo quyền (dùng cho list/bootstrap/search). */
+  /** Prisma where lọc TASK theo quyền (freeze §7). */
   async taskWhere(me: Me): Promise<any> {
     if (me.role === 'admin') return {}
-    const wsIds = await this.visibleWorkspaceIds(me)
+    const [orgIds, projIds] = await Promise.all([this.visibleOrgUnitIds(me), this.myProjectIds(me)])
     return {
       OR: [
         { creatorId: me.id },
         { assigneeId: me.id },
         { collaborators: { some: { userId: me.id } } },
         { watchers: { some: { userId: me.id } } },
-        { workspaceId: { in: wsIds } },
+        { orgUnitId: { in: orgIds } },
+        { projectId: { in: projIds } },
+      ],
+    }
+  }
+
+  /** Prisma where lọc ACTION theo quyền (freeze §7: org_unit tree ∨ owner ∨ creator). */
+  async actionWhere(me: Me): Promise<any> {
+    if (me.role === 'admin') return {}
+    const orgIds = await this.visibleOrgUnitIds(me)
+    return {
+      OR: [
+        { orgUnitId: { in: orgIds } },
+        { ownerId: me.id },
+        { createdById: me.id },
       ],
     }
   }

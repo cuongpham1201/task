@@ -2,13 +2,14 @@ import { ForbiddenException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { VisibilityService, type Me } from './visibility.service'
 
-type TaskLike = { creatorId: string; assigneeId: string; workspaceId: string | null }
-type WorkspaceLike = { id: string; type: string; orgUnitId: string | null } | null
+// Task chỉ cần các chiều này để xét quyền (freeze §7/§8).
+type TaskLike = { id?: string; creatorId: string; assigneeId: string; orgUnitId: string | null; projectId: string | null }
+type ActionLike = { orgUnitId: string; ownerId: string; createdById: string }
 
 /**
- * Ủy quyền server-side theo mô hình org_units + workspace.
- * admin: toàn quyền · quản lý workspace: người quản lý org_unit phủ workspace (org role
- * != viewer) hoặc owner/manager của PROJECT · assignee/creator: quyền trên việc của mình.
+ * Ủy quyền server-side theo Architecture Freeze V1.
+ * Quản lý = admin ∨ creator/owner ∨ quản lý org_unit chịu trách nhiệm (org role != viewer)
+ *          ∨ owner/manager của project. KHÔNG dùng workspace làm nguồn ACL chính nữa.
  */
 @Injectable()
 export class PolicyService {
@@ -17,66 +18,89 @@ export class PolicyService {
     private readonly vis: VisibilityService,
   ) {}
 
-  /** Người dùng có quản lý workspace chứa task không? */
-  async managesWorkspace(me: Me, ws: WorkspaceLike): Promise<boolean> {
-    if (me.role === 'admin') return true
-    if (!ws) return false
-    if (ws.type === 'project') {
-      const m = await this.prisma.workspaceMember.findUnique({
-        where: { workspaceId_userId: { workspaceId: ws.id, userId: me.id } },
-      })
-      return !!m && (m.role === 'owner' || m.role === 'manager')
-    }
-    if (!ws.orgUnitId) return false
+  /** User có quản lý org_unit này không (org role != viewer, gồm include_children). */
+  private async managesOrgUnit(me: Me, orgUnitId: string | null): Promise<boolean> {
+    if (!orgUnitId) return false
     const managed = await this.vis.managedOrgUnitIds(me)
-    return managed.includes(ws.orgUnitId)
+    return managed.includes(orgUnitId)
   }
 
-  async canManage(me: Me, task: TaskLike, ws: WorkspaceLike): Promise<boolean> {
-    return me.role === 'admin' || task.creatorId === me.id || this.managesWorkspace(me, ws)
+  /** User có là owner/manager của project (workspace type=project) không. */
+  private async managesProject(me: Me, projectId: string | null): Promise<boolean> {
+    if (!projectId) return false
+    const m = await this.prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: projectId, userId: me.id } },
+    })
+    return !!m && (m.role === 'owner' || m.role === 'manager')
   }
 
-  async canUpdateStatus(me: Me, task: TaskLike, ws: WorkspaceLike): Promise<boolean> {
-    return task.assigneeId === me.id || this.canManage(me, task, ws)
+  private async isProjectMember(me: Me, projectId: string | null): Promise<boolean> {
+    if (!projectId) return false
+    const m = await this.prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: projectId, userId: me.id } },
+    })
+    return !!m
   }
 
-  async canReview(me: Me, task: TaskLike, ws: WorkspaceLike): Promise<boolean> {
-    return me.role === 'admin' || task.creatorId === me.id || this.managesWorkspace(me, ws)
+  // ── TASK ──
+  async canManage(me: Me, task: TaskLike): Promise<boolean> {
+    if (me.role === 'admin' || task.creatorId === me.id) return true
+    if (await this.managesOrgUnit(me, task.orgUnitId)) return true
+    return this.managesProject(me, task.projectId)
   }
 
-  async canComment(me: Me, task: TaskLike, ws: WorkspaceLike): Promise<boolean> {
-    return this.canView(me, task, ws)
+  async canUpdateStatus(me: Me, task: TaskLike): Promise<boolean> {
+    return task.assigneeId === me.id || this.canManage(me, task)
   }
 
-  async canView(me: Me, task: TaskLike, ws: WorkspaceLike): Promise<boolean> {
+  async canReview(me: Me, task: TaskLike): Promise<boolean> {
+    if (me.role === 'admin' || task.creatorId === me.id) return true
+    if (await this.managesOrgUnit(me, task.orgUnitId)) return true
+    return this.managesProject(me, task.projectId)
+  }
+
+  async canComment(me: Me, task: TaskLike): Promise<boolean> {
+    return this.canView(me, task)
+  }
+
+  async canView(me: Me, task: TaskLike): Promise<boolean> {
     if (me.role === 'admin') return true
     if (task.creatorId === me.id || task.assigneeId === me.id) return true
-    if (task.workspaceId) {
-      const wsIds = await this.vis.visibleWorkspaceIds(me)
-      if (wsIds.includes(task.workspaceId)) return true
+    if (task.orgUnitId) {
+      const orgIds = await this.vis.visibleOrgUnitIds(me)
+      if (orgIds.includes(task.orgUnitId)) return true
     }
-    const inv = await this.prisma.taskCollaborator.findFirst({
-      where: { taskId: (task as any).id, userId: me.id },
-    })
-    return !!inv
+    if (await this.isProjectMember(me, task.projectId)) return true
+    if (task.id) {
+      const inv = await this.prisma.taskCollaborator.findFirst({ where: { taskId: task.id, userId: me.id } })
+      if (inv) return true
+    }
+    return false
   }
 
-  /** Có được tạo task trong workspace này không? */
-  async canCreate(me: Me, workspaceId: string | null): Promise<boolean> {
+  /** Có được tạo task với org_unit/project này không (freeze §7). */
+  async canCreate(me: Me, dims: { orgUnitId: string | null; projectId: string | null }): Promise<boolean> {
     if (me.role === 'admin') return true
-    if (!workspaceId) return true // personal
-    const ws = await this.prisma.workspace.findUnique({ where: { id: workspaceId } })
-    if (!ws) return false
-    if (ws.type === 'project') {
-      const m = await this.prisma.workspaceMember.findUnique({
-        where: { workspaceId_userId: { workspaceId, userId: me.id } },
-      })
-      return !!m
+    if (dims.projectId) {
+      if (await this.isProjectMember(me, dims.projectId)) return true
     }
-    // org_unit: thuộc phòng đó hoặc quản lý nó
-    if (me.orgUnitId && me.orgUnitId === ws.orgUnitId) return true
-    const managed = await this.vis.managedOrgUnitIds(me)
-    return ws.orgUnitId ? managed.includes(ws.orgUnitId) : false
+    if (dims.orgUnitId) {
+      if (me.orgUnitId === dims.orgUnitId) return true
+      if (await this.managesOrgUnit(me, dims.orgUnitId)) return true
+    }
+    return false
+  }
+
+  // ── ACTION (freeze §6/§7: Action là việc quản lý — chỉ quản lý org_unit/owner/creator/admin) ──
+  async canManageAction(me: Me, action: ActionLike): Promise<boolean> {
+    if (me.role === 'admin' || action.ownerId === me.id || action.createdById === me.id) return true
+    return this.managesOrgUnit(me, action.orgUnitId)
+  }
+
+  /** Có được tạo Action cho org_unit này không (phải quản lý org_unit đó). */
+  async canCreateAction(me: Me, orgUnitId: string): Promise<boolean> {
+    if (me.role === 'admin') return true
+    return this.managesOrgUnit(me, orgUnitId)
   }
 
   assert(cond: boolean, msg = 'Bạn không có quyền thực hiện thao tác này'): void {

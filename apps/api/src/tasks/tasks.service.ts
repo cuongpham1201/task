@@ -16,7 +16,7 @@ export class TasksService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  // ── Đọc (đã scope theo quyền) — shape khớp frontend hiện tại ──
+  // ── Đọc (đã scope theo quyền) — shape khớp frontend hiện tại + chiều mới ──
   async findAll(me: Me) {
     const where = { AND: [{ archived: false }, await this.vis.taskWhere(me)] }
     const tasks = await this.prisma.task.findMany({
@@ -27,7 +27,8 @@ export class TasksService {
     return tasks.map((t) => this.serialize(t, t.collaborators.map((c) => c.userId)))
   }
 
-  // Map workspace → shape FE cũ (scope/departmentId/channelId) + giữ workspaceId
+  // Map → shape FE cũ (scope/departmentId/channelId, suy từ workspace để tương thích)
+  // + phơi chiều tường minh mới (orgUnitId/projectId/actionId + KPI) cho A3.
   private serialize(task: any, collaboratorIds: string[]) {
     const { collaborators, workspace, ...rest } = task
     let scope = 'personal'
@@ -39,7 +40,7 @@ export class TasksService {
   }
 
   private async load(id: string) {
-    const task = await this.prisma.task.findUnique({ where: { id }, include: { workspace: true } })
+    const task = await this.prisma.task.findUnique({ where: { id } })
     if (!task || task.archived) throw new NotFoundException('Không tìm thấy công việc')
     return task
   }
@@ -52,22 +53,81 @@ export class TasksService {
     return this.serialize(task, task!.collaborators.map((c) => c.userId))
   }
 
+  // Suy chiều tường minh + workspaceId (giữ để serialize FE cũ) từ DTO.
+  // Ưu tiên chiều mới; nếu FE cũ chỉ gửi workspaceId thì suy ngược.
+  private async resolveDims(me: Me, dto: CreateTaskDto) {
+    const assigneeId = dto.assigneeId ?? me.id
+    let orgUnitId = dto.orgUnitId ?? null
+    let projectId = dto.projectId ?? null
+    let workspaceId = dto.workspaceId ?? null
+    const actionId = dto.actionId ?? null
+
+    if (workspaceId) {
+      // FE cũ: suy org/project từ workspace
+      const ws = await this.prisma.workspace.findUnique({ where: { id: workspaceId } })
+      if (!ws) throw new BadRequestException('Workspace không tồn tại')
+      if (ws.type === 'org_unit') { orgUnitId = orgUnitId ?? ws.orgUnitId; projectId = null }
+      else if (ws.type === 'project') { projectId = projectId ?? ws.id }
+    } else if (projectId) {
+      // A3: gửi projectId trực tiếp → workspaceId = projectId (P1: project = workspace)
+      workspaceId = projectId
+    } else if (orgUnitId) {
+      // A3: task phòng ban → workspaceId = workspace org_unit tương ứng (FE compat)
+      const ws = await this.prisma.workspace.findFirst({ where: { type: 'org_unit', orgUnitId } })
+      workspaceId = ws?.id ?? null
+    }
+
+    // org_unit BẮT BUỘC ở tầng nghiệp vụ: personal/project lấy org của assignee→creator (freeze §Q1/Q3)
+    if (!orgUnitId) {
+      const [a, c] = await Promise.all([
+        this.prisma.user.findUnique({ where: { id: assigneeId }, select: { orgUnitId: true } }),
+        this.prisma.user.findUnique({ where: { id: me.id }, select: { orgUnitId: true } }),
+      ])
+      orgUnitId = a?.orgUnitId ?? c?.orgUnitId ?? null
+    }
+
+    return { orgUnitId, projectId, actionId, workspaceId, assigneeId }
+  }
+
   // ── Tạo ──
   async create(me: Me, dto: CreateTaskDto) {
-    const workspaceId = dto.workspaceId ?? null
-    this.policy.assert(await this.policy.canCreate(me, workspaceId), 'Không có quyền tạo việc trong workspace này')
+    const dims = await this.resolveDims(me, dto)
+
+    // Rule KPI (freeze §8): is_scorable ⇒ review_required + kpi_definition + kpi_weight
+    const isScorable = dto.isScorable === true
+    const reviewRequired = isScorable ? true : (dto.reviewRequired ?? dto.completionMode === 'review_required')
+    if (isScorable) {
+      if (!dto.kpiDefinitionId) throw new BadRequestException('Task tính KPI phải chọn KPI definition')
+      if (dto.kpiWeight == null) throw new BadRequestException('Task tính KPI phải có trọng số (kpi_weight)')
+    }
+    if (dto.actionId) {
+      const act = await this.prisma.action.findUnique({ where: { id: dto.actionId } })
+      if (!act || act.archived) throw new BadRequestException('Action không tồn tại')
+    }
+
+    this.policy.assert(
+      await this.policy.canCreate(me, { orgUnitId: dims.orgUnitId, projectId: dims.projectId }),
+      'Không có quyền tạo việc trong phạm vi này',
+    )
 
     const task = await this.prisma.$transaction(async (tx) => {
       const created = await tx.task.create({
         data: {
           title: dto.title,
           description: dto.description ?? '',
-          workspaceId,
+          workspaceId: dims.workspaceId,
+          orgUnitId: dims.orgUnitId,
+          projectId: dims.projectId,
+          actionId: dims.actionId,
           section: (dto.section as any) ?? null,
           creatorId: me.id,
-          assigneeId: dto.assigneeId ?? me.id,
+          assigneeId: dims.assigneeId,
           priority: (dto.priority as any) ?? 'normal',
-          completionMode: (dto.completionMode as any) ?? 'self',
+          completionMode: (reviewRequired ? 'review_required' : 'self') as any,
+          reviewRequired,
+          isScorable,
+          kpiDefinitionId: isScorable ? dto.kpiDefinitionId : null,
+          kpiWeight: isScorable ? dto.kpiWeight : null,
           startDate: dto.startDate ? new Date(dto.startDate) : null,
           dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
         },
@@ -94,11 +154,11 @@ export class TasksService {
   // ── Trạng thái ──
   async setStatus(me: Me, id: string, status: string) {
     const task = await this.load(id)
-    this.policy.assert(await this.policy.canUpdateStatus(me, task, task.workspace), 'Không có quyền đổi trạng thái')
-    if (task.status === 'submitted' && !(await this.policy.canReview(me, task, task.workspace))) {
+    this.policy.assert(await this.policy.canUpdateStatus(me, task), 'Không có quyền đổi trạng thái')
+    if (task.status === 'submitted' && !(await this.policy.canReview(me, task))) {
       throw new BadRequestException('Việc đang chờ nghiệm thu — chờ kết quả Đạt/Trả lại.')
     }
-    if (status === 'done' && task.completionMode === 'review_required' && !(await this.policy.canReview(me, task, task.workspace))) {
+    if (status === 'done' && task.reviewRequired && !(await this.policy.canReview(me, task))) {
       throw new BadRequestException('Việc này cần nghiệm thu — hãy "Nộp nghiệm thu" thay vì tự đóng.')
     }
     const isDone = status === 'done'
@@ -117,7 +177,7 @@ export class TasksService {
 
   async submit(me: Me, id: string) {
     const task = await this.load(id)
-    this.policy.assert(task.assigneeId === me.id || (await this.policy.canManage(me, task, task.workspace)), 'Chỉ người được giao mới nộp nghiệm thu')
+    this.policy.assert(task.assigneeId === me.id || (await this.policy.canManage(me, task)), 'Chỉ người được giao mới nộp nghiệm thu')
     await this.prisma.$transaction(async (tx) => {
       await tx.task.update({ where: { id }, data: { status: 'submitted' as any } })
       await this.notifications.emit(tx, { task, actorId: me.id, action: 'review', metadata: { to: 'submitted' }, notifyType: 'task_assigned', extraRecipients: [task.creatorId] })
@@ -127,34 +187,50 @@ export class TasksService {
 
   async review(me: Me, id: string, dto: ReviewDto) {
     const task = await this.load(id)
-    this.policy.assert(await this.policy.canReview(me, task, task.workspace), 'Không có quyền nghiệm thu công việc này')
+    this.policy.assert(await this.policy.canReview(me, task), 'Không có quyền nghiệm thu công việc này')
     const passed = dto.decision === 'passed'
+    const now = new Date()
     await this.prisma.$transaction(async (tx) => {
       await tx.taskReview.upsert({
         where: { taskId: id },
         create: { taskId: id, reviewerId: me.id, decision: dto.decision as any, note: dto.note ?? '' },
-        update: { reviewerId: me.id, decision: dto.decision as any, note: dto.note ?? '', reviewedAt: new Date() },
+        update: { reviewerId: me.id, decision: dto.decision as any, note: dto.note ?? '', reviewedAt: now },
       })
       await tx.task.update({
         where: { id },
         data: passed
-          ? { status: 'done' as any, completedAt: new Date(), completedById: task.assigneeId, progress: 100 }
-          : { status: 'returned' as any, completedAt: null, completedById: null },
+          ? { status: 'done' as any, completedAt: now, acceptedAt: now, completedById: task.assigneeId, progress: 100 }
+          : { status: 'returned' as any, completedAt: null, acceptedAt: null, completedById: null },
       })
-      if (passed) {
-        const assignee = await tx.user.findUnique({ where: { id: task.assigneeId }, select: { entraId: true } })
-        const reviewer = await tx.user.findUnique({ where: { id: me.id }, select: { entraId: true } })
-        if (assignee?.entraId) {
-          await tx.taskKpiResult.upsert({
-            where: { idempotencyKey: `taskhub:${id}:review` },
-            create: {
-              taskId: id, entraObjectId: assignee.entraId, dueDate: task.dueDate, completedAt: new Date(),
-              acceptedAt: new Date(), reviewerEntraId: reviewer?.entraId ?? null,
-              idempotencyKey: `taskhub:${id}:review`, pushStatus: 'pending' as any,
-            },
-            update: { acceptedAt: new Date(), pushStatus: 'pending' as any },
-          })
-        }
+      // KPI evidence (freeze §8): CHỈ sinh khi is_scorable=true (sửa bug: trước đây sinh cho mọi task).
+      if (passed && task.isScorable) {
+        const [assignee, reviewer] = await Promise.all([
+          tx.user.findUnique({ where: { id: task.assigneeId }, select: { entraId: true, orgUnitId: true } }),
+          tx.user.findUnique({ where: { id: me.id }, select: { entraId: true } }),
+        ])
+        const onTime = task.dueDate ? now.getTime() <= new Date(task.dueDate).getTime() + 86_399_999 : null
+        await tx.taskKpiResult.upsert({
+          where: { idempotencyKey: `taskhub:${id}:review` },
+          create: {
+            taskId: id,
+            entraObjectId: assignee?.entraId ?? '',
+            orgUnitId: task.orgUnitId,
+            kpiDefinitionId: task.kpiDefinitionId,
+            kpiWeight: task.kpiWeight,
+            dueDate: task.dueDate,
+            completedAt: now,
+            acceptedAt: now,
+            onTime,
+            reviewResult: 'accepted',
+            evidenceNote: dto.note ?? null,
+            reviewedById: me.id,
+            reviewedAt: now,
+            reviewerEntraId: reviewer?.entraId ?? null,
+            idempotencyKey: `taskhub:${id}:review`,
+            pushStatus: 'pending' as any,
+          },
+          update: { acceptedAt: now, reviewedAt: now, onTime, reviewResult: 'accepted', pushStatus: 'pending' as any },
+        })
       }
       await this.notifications.emit(tx, { task, actorId: me.id, action: 'review', metadata: { decision: dto.decision }, notifyType: passed ? 'task_accepted' : 'task_returned' })
     })
@@ -163,7 +239,7 @@ export class TasksService {
 
   async setAssignee(me: Me, id: string, dto: AssigneeDto) {
     const task = await this.load(id)
-    this.policy.assert(await this.policy.canManage(me, task, task.workspace), 'Không có quyền đổi người phụ trách')
+    this.policy.assert(await this.policy.canManage(me, task), 'Không có quyền đổi người phụ trách')
     await this.prisma.$transaction(async (tx) => {
       await tx.task.update({ where: { id }, data: { assigneeId: dto.assigneeId } })
       await this.notifications.emit(tx, { task: { ...task, assigneeId: dto.assigneeId }, actorId: me.id, action: 'assign', metadata: { from: task.assigneeId, to: dto.assigneeId }, notifyType: 'task_assigned', extraRecipients: [dto.assigneeId] })
@@ -173,7 +249,7 @@ export class TasksService {
 
   async setDueDate(me: Me, id: string, dto: DueDateDto) {
     const task = await this.load(id)
-    this.policy.assert(await this.policy.canManage(me, task, task.workspace), 'Không có quyền đổi deadline')
+    this.policy.assert(await this.policy.canManage(me, task), 'Không có quyền đổi deadline')
     await this.prisma.$transaction(async (tx) => {
       await tx.task.update({ where: { id }, data: { dueDate: dto.dueDate ? new Date(dto.dueDate) : null } })
       await this.notifications.emit(tx, { task, actorId: me.id, action: 'due', metadata: { to: dto.dueDate ?? null }, notifyType: null })
@@ -183,7 +259,7 @@ export class TasksService {
 
   async setPriority(me: Me, id: string, dto: PriorityDto) {
     const task = await this.load(id)
-    this.policy.assert(await this.policy.canManage(me, task, task.workspace), 'Không có quyền đổi ưu tiên')
+    this.policy.assert(await this.policy.canManage(me, task), 'Không có quyền đổi ưu tiên')
     await this.prisma.$transaction(async (tx) => {
       await tx.task.update({ where: { id }, data: { priority: dto.priority as any } })
       await this.notifications.emit(tx, { task, actorId: me.id, action: 'priority', metadata: { from: task.priority, to: dto.priority }, notifyType: null })
@@ -193,7 +269,7 @@ export class TasksService {
 
   async setProgress(me: Me, id: string, dto: ProgressDto) {
     const task = await this.load(id)
-    this.policy.assert(await this.policy.canUpdateStatus(me, task, task.workspace), 'Không có quyền cập nhật tiến độ')
+    this.policy.assert(await this.policy.canUpdateStatus(me, task), 'Không có quyền cập nhật tiến độ')
     await this.prisma.$transaction(async (tx) => {
       await tx.task.update({ where: { id }, data: { progress: dto.progress } })
       await this.notifications.emit(tx, { task, actorId: me.id, action: 'progress', metadata: { to: dto.progress }, notifyType: null })
@@ -205,8 +281,8 @@ export class TasksService {
     const task = await this.load(id)
     const onlyDescription = Object.keys(dto).every((k) => k === 'description')
     const allowed = onlyDescription
-      ? await this.policy.canUpdateStatus(me, task, task.workspace)
-      : await this.policy.canManage(me, task, task.workspace)
+      ? await this.policy.canUpdateStatus(me, task)
+      : await this.policy.canManage(me, task)
     this.policy.assert(allowed, 'Không có quyền sửa công việc')
     const fields = Object.keys(dto)
     await this.prisma.$transaction(async (tx) => {
@@ -226,7 +302,7 @@ export class TasksService {
 
   async archive(me: Me, id: string) {
     const task = await this.load(id)
-    this.policy.assert(await this.policy.canManage(me, task, task.workspace), 'Không có quyền xóa công việc')
+    this.policy.assert(await this.policy.canManage(me, task), 'Không có quyền xóa công việc')
     await this.prisma.task.update({ where: { id }, data: { archived: true } })
     return { archived: true }
   }
