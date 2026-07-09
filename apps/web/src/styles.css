@@ -1019,3 +1019,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 /* ── Activity timeline polish (item 19) ── */
 .activity-item { border-left: 2px solid var(--border); padding-left: 12px; margin-left: 6px; }
 .activity-item:hover { border-left-color: var(--accent); }
+
+/* ── Bulk edit ── */
+.col-check { width: 32px; text-align: center; }
+.task-row.row-selected { background: var(--accent-soft); }
+.bulk-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; margin-bottom: 10px; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px; }
+.bulk-count { font-weight: 600; color: var(--accent); }

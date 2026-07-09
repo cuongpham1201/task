@@ -1,4 +1,5 @@
-import { CheckCircle2, Circle, MessageSquare, GitBranch } from 'lucide-react'
+import { useState } from 'react'
+import { CheckCircle2, Circle, MessageSquare, GitBranch, Trash2, X } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
 import { StatusBadge, StatusSelect, PriorityBadge } from '../shared/badges'
@@ -7,9 +8,9 @@ import EmptyState from '../shared/EmptyState'
 import TaskCardMobile from './TaskCardMobile'
 import useIsMobile from '../../utils/useIsMobile'
 import { dueLabel } from '../../utils/date'
-import { SECTIONS, SECTION_ORDER } from '../../data/constants'
+import { SECTIONS, SECTION_ORDER, STATUS, STATUS_ORDER, PRIORITY, PRIORITY_ORDER } from '../../data/constants'
 
-function TaskRow({ task, showContext }) {
+function TaskRow({ task, showContext, selectable, selected, onToggleSel }) {
   const {
     usersById, perms, selectTask, toggleComplete, setStatus,
     getSubtasks, getComments, taskContextLabel, taskContextFull,
@@ -23,7 +24,12 @@ function TaskRow({ task, showContext }) {
   const ctx = taskContextFull(task)
 
   return (
-    <tr className={`task-row ${isDone ? 'done' : ''}`} onClick={() => selectTask(task.id)}>
+    <tr className={`task-row ${isDone ? 'done' : ''} ${selected ? 'row-selected' : ''}`} onClick={() => selectTask(task.id)}>
+      {selectable && (
+        <td className="col-check" onClick={(e) => e.stopPropagation()}>
+          <input type="checkbox" checked={!!selected} onChange={() => onToggleSel(task.id)} />
+        </td>
+      )}
       <td className="col-title">
         <button
           className={`tick ${isDone ? 'ticked' : ''}`}
@@ -80,10 +86,11 @@ function TaskRow({ task, showContext }) {
   )
 }
 
-function TableHead({ showContext }) {
+function TableHead({ showContext, selectable, allChecked, onToggleAll }) {
   return (
     <thead>
       <tr>
+        {selectable && <th className="col-check"><input type="checkbox" checked={allChecked} onChange={onToggleAll} /></th>}
         <th className="col-title">Tên công việc</th>
         <th>Người giao</th>
         {showContext && <th>Phòng ban / Dự án</th>}
@@ -130,16 +137,7 @@ export default function TaskTable({ tasks, showContext = true, groupBySection = 
   }
 
   if (!groupBySection) {
-    return (
-      <div className="table-wrap">
-        <table className="task-table">
-          <TableHead showContext={showContext} />
-          <tbody>
-            {tasks.map((t) => <TaskRow key={t.id} task={t} showContext={showContext} />)}
-          </tbody>
-        </table>
-      </div>
-    )
+    return <FlatSelectableTable tasks={tasks} showContext={showContext} />
   }
 
   // Nhóm theo section kiểu Asana (dùng cho trang Phòng ban)
@@ -158,6 +156,50 @@ export default function TaskTable({ tasks, showContext = true, groupBySection = 
         </tbody>
       </table>
     </div>
+  )
+}
+
+function FlatSelectableTable({ tasks, showContext }) {
+  const { setStatus, setPriority, archiveTask } = useApp()
+  const [sel, setSel] = useState(() => new Set())
+  const visibleIds = tasks.map((t) => t.id)
+  const toggle = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const allChecked = visibleIds.length > 0 && visibleIds.every((id) => sel.has(id))
+  const toggleAll = () => setSel(allChecked ? new Set() : new Set(visibleIds))
+  const clear = () => setSel(new Set())
+  const ids = [...sel].filter((id) => visibleIds.includes(id))
+  const bulkStatus = (s) => { ids.forEach((id) => setStatus(id, s)); clear() }
+  const bulkPriority = (p) => { ids.forEach((id) => setPriority(id, p)); clear() }
+  const bulkDelete = () => { if (window.confirm(`Xóa ${ids.length} công việc đã chọn?`)) { ids.forEach((id) => archiveTask(id)); clear() } }
+
+  return (
+    <>
+      {ids.length > 0 && (
+        <div className="bulk-bar">
+          <span className="bulk-count">{ids.length} đã chọn</span>
+          <select defaultValue="" onChange={(e) => { if (e.target.value) { bulkStatus(e.target.value); e.target.value = '' } }}>
+            <option value="">Đổi trạng thái…</option>
+            {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUS[s].label}</option>)}
+          </select>
+          <select defaultValue="" onChange={(e) => { if (e.target.value) { bulkPriority(e.target.value); e.target.value = '' } }}>
+            <option value="">Đổi ưu tiên…</option>
+            {PRIORITY_ORDER.map((p) => <option key={p} value={p}>{PRIORITY[p].label}</option>)}
+          </select>
+          <button className="btn btn-ghost" onClick={bulkDelete}><Trash2 size={14} /> Xóa</button>
+          <button className="btn btn-ghost" onClick={clear}><X size={14} /> Bỏ chọn</button>
+        </div>
+      )}
+      <div className="table-wrap">
+        <table className="task-table">
+          <TableHead showContext={showContext} selectable allChecked={allChecked} onToggleAll={toggleAll} />
+          <tbody>
+            {tasks.map((t) => (
+              <TaskRow key={t.id} task={t} showContext={showContext} selectable selected={sel.has(t.id)} onToggleSel={toggle} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }
 
