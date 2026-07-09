@@ -11,6 +11,7 @@ import Toaster from './components/shared/Toaster'
 import TaskDetailPanel from './components/task/TaskDetailPanel'
 import CreateTaskModal from './components/task/CreateTaskModal'
 import CreateActionModal from './components/action/CreateActionModal'
+import CreateProjectModal from './components/project/CreateProjectModal'
 import Dashboard from './pages/Dashboard'
 import MyTasks from './pages/MyTasks'
 import Inbox from './pages/Inbox'
@@ -48,6 +49,7 @@ function AppShell() {
       {/* Mount lại mỗi lần mở để form nhận defaults mới */}
       {state.createModal && <CreateTaskModal />}
       {state.createActionModal && <CreateActionModal />}
+      {state.createProjectModal && <CreateProjectModal />}
       <MobileNav />
       <Toaster />
     </div>

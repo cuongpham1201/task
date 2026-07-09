@@ -982,3 +982,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .inbox-type-icon.tone-amber { background: var(--amber-soft); color: #a9760a; }
 .inbox-type-icon.tone-red { background: var(--red-soft); color: var(--red); }
 .inbox-type-icon.tone-purple { background: var(--purple-soft); color: var(--accent); }
+
+/* ── Sidebar add button ── */
+.side-section-title { position: relative; }
+.side-add { margin-left: auto; border: none; background: none; color: #7d8089; padding: 2px; border-radius: 4px; cursor: pointer; display: inline-flex; }
+.side-add:hover { background: var(--sidebar-hover); color: #fff; }

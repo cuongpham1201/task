@@ -36,6 +36,7 @@ function buildInitialState(currentUserId, bootstrap) {
     selectedTaskId: null,
     createModal: null,
     createActionModal: null,
+    createProjectModal: false,
     toasts: [],
   }
 }
@@ -153,6 +154,14 @@ function reducer(state, action) {
       return { ...state, notifications: action.list }
     case 'UPDATE_CHANNEL':
       return { ...state, channels: state.channels.map((c) => (c.id === action.channel.id ? action.channel : c)) }
+    case 'ADD_CHANNEL':
+      return { ...state, channels: [...state.channels.filter((c) => c.id !== action.channel.id), action.channel] }
+    case 'REMOVE_CHANNEL':
+      return { ...state, channels: state.channels.filter((c) => c.id !== action.id) }
+    case 'OPEN_CREATE_PROJECT':
+      return { ...state, createProjectModal: true }
+    case 'CLOSE_CREATE_PROJECT':
+      return { ...state, createProjectModal: false }
     case 'OPEN_CREATE_ACTION':
       return { ...state, createActionModal: { defaults: action.defaults || {} } }
     case 'CLOSE_CREATE_ACTION':
@@ -517,6 +526,21 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         dispatch({ type: 'REMOVE_COMMENT', id: commentId })
         persist(apiFetch(`/comments/${commentId}`, { method: 'DELETE' }))
       },
+
+      // ── Project CRUD (P0-3) ──
+      createProjectModal: state.createProjectModal,
+      openCreateProjectModal: () => dispatch({ type: 'OPEN_CREATE_PROJECT' }),
+      closeCreateProjectModal: () => dispatch({ type: 'CLOSE_CREATE_PROJECT' }),
+      createProject: (dto, onOk) =>
+        persist(post('/projects', dto), (ch) => {
+          dispatch({ type: 'ADD_CHANNEL', channel: ch })
+          toast('Đã tạo dự án', 'success')
+          onOk?.(ch)
+        }),
+      updateProject: (id, dto) =>
+        persist(patch(`/projects/${id}`, dto), (ch) => { dispatch({ type: 'UPDATE_CHANNEL', channel: ch }); toast('Đã cập nhật dự án', 'success') }),
+      archiveProject: (id, onOk) =>
+        persist(post(`/projects/${id}/archive`, {}), () => { dispatch({ type: 'REMOVE_CHANNEL', id }); toast('Đã lưu trữ dự án', 'success'); onOk?.() }),
 
       // ── Quản lý thành viên dự án (owner) ──
       addProjectMember: (projectId, userId) => {

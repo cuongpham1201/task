@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import {
-  Home, CheckSquare, Inbox, BarChart3, Settings, Building2, Hash, Target,
+  Home, CheckSquare, Inbox, BarChart3, Settings, Building2, Hash, Target, Plus,
 } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import { deptColor } from '../../utils/color'
@@ -9,7 +9,7 @@ import BrandLogo from '../shared/BrandLogo'
 import { ROLES } from '../../data/constants'
 
 export default function Sidebar() {
-  const { currentUser, unreadCount: unread, blocks, visibleDepartments, visibleChannels, canManageActions } = useApp()
+  const { currentUser, unreadCount: unread, blocks, visibleDepartments, visibleChannels, canManageActions, openCreateProjectModal } = useApp()
   // Nhóm phòng ban theo khối (chỉ khối có phòng đang thấy)
   const deptGroups = (blocks || [])
     .map((b) => ({ block: b, depts: visibleDepartments.filter((d) => d.blockId === b.id) }))
@@ -69,7 +69,10 @@ export default function Sidebar() {
         )}
 
         <div className="side-section">
-          <span className="side-section-title"><Hash size={13} /> Dự án</span>
+          <span className="side-section-title">
+            <Hash size={13} /> Dự án
+            <button className="side-add" title="Tạo dự án" onClick={openCreateProjectModal}><Plus size={13} /></button>
+          </span>
           {visibleChannels.map((c) => (
             <NavLink key={c.id} to={`/channels/${c.id}`} className={linkClass}>
               <Hash size={15} className="side-hash" />

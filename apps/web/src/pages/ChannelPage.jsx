@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
-  LayoutGrid, List, Kanban, Users, Activity, Plus, Hash, UserPlus, X,
+  LayoutGrid, List, Kanban, Users, Activity, Plus, Hash, UserPlus, X, Pencil, Archive,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import TaskTable from '../components/task/TaskTable'
@@ -24,8 +24,9 @@ export default function ChannelPage() {
   const { id } = useParams()
   const {
     state, currentUser, usersById, perms, channelTasks, openCreateModal, getTask, selectTask,
-    addProjectMember, removeProjectMember,
+    addProjectMember, removeProjectMember, updateProject, archiveProject,
   } = useApp()
+  const navigate = useNavigate()
   const [tab, setTab] = useState('overview')
   const [view, setView] = useState('list')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -68,6 +69,19 @@ export default function ChannelPage() {
           <p className="page-sub">{channel.description}</p>
         </div>
         <div className="page-head-actions">
+          {canManageMembers && (
+            <>
+              <button className="btn btn-ghost" title="Sửa dự án" onClick={() => {
+                const name = window.prompt('Tên dự án:', channel.name)
+                if (name === null) return
+                const description = window.prompt('Mô tả:', channel.description || '')
+                updateProject(channel.id, { name: name.trim() || channel.name, description: description ?? channel.description })
+              }}><Pencil size={16} /></button>
+              <button className="btn btn-ghost" title="Lưu trữ dự án" onClick={() => {
+                if (window.confirm(`Lưu trữ dự án "${channel.name}"?`)) archiveProject(channel.id, () => navigate('/'))
+              }}><Archive size={16} /></button>
+            </>
+          )}
           <AvatarGroup users={members} />
           {perms.createChannelTask(channel) && (
             <button className="btn btn-primary" onClick={() => openCreateModal({ scope: 'channel', channelId: channel.id })}>

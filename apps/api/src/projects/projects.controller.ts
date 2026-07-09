@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Post, UseGuards } from '@nestjs/common'
-import { IsString } from 'class-validator'
+import { Body, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Patch, Post, UseGuards } from '@nestjs/common'
+import { IsOptional, IsString, MaxLength } from 'class-validator'
 import { AuthGuard } from '../auth/auth.guard'
 import { AuthUser } from '../auth/current-user.decorator'
 import type { AuthClaims } from '../auth/auth.types'
@@ -8,6 +8,14 @@ import { UsersService } from '../users/users.service'
 
 class AddMemberDto {
   @IsString() userId!: string
+}
+class CreateProjectDto {
+  @IsString() @MaxLength(255) name!: string
+  @IsOptional() @IsString() @MaxLength(2000) description?: string
+}
+class UpdateProjectDto {
+  @IsOptional() @IsString() @MaxLength(255) name?: string
+  @IsOptional() @IsString() @MaxLength(2000) description?: string
 }
 
 // Dự án = PROJECT workspace user là member (shape "channel" khớp FE).
@@ -43,6 +51,43 @@ export class ProjectsController {
     const m = await this.prisma.workspaceMember.findUnique({ where: { workspaceId_userId: { workspaceId: projectId, userId: me.id } } })
     if (m?.role === 'owner') return ws
     throw new ForbiddenException('Chỉ chủ dự án được quản lý thành viên')
+  }
+
+  // Tạo dự án — người tạo là owner, tự thêm làm member.
+  @Post()
+  async create(@AuthUser() claims: AuthClaims, @Body() dto: CreateProjectDto) {
+    const me = await this.users.resolveFromClaims(claims)
+    const ws = await this.prisma.workspace.create({
+      data: {
+        type: 'project', name: dto.name.trim(), description: dto.description ?? '', ownerId: me.id,
+        members: { create: { userId: me.id, role: 'owner', addedById: me.id } },
+      },
+      include: { members: { select: { userId: true } } },
+    })
+    return this.map(ws)
+  }
+
+  @Patch(':id')
+  async update(@AuthUser() claims: AuthClaims, @Param('id') id: string, @Body() dto: UpdateProjectDto) {
+    const me = await this.users.resolveFromClaims(claims)
+    await this.assertOwner(me, id)
+    await this.prisma.workspace.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+      },
+    })
+    const ws = await this.prisma.workspace.findUnique({ where: { id }, include: { members: { select: { userId: true } } } })
+    return this.map(ws)
+  }
+
+  @Post(':id/archive')
+  async archive(@AuthUser() claims: AuthClaims, @Param('id') id: string) {
+    const me = await this.users.resolveFromClaims(claims)
+    await this.assertOwner(me, id)
+    await this.prisma.workspace.update({ where: { id }, data: { archived: true } })
+    return { archived: true }
   }
 
   @Post(':id/members')
