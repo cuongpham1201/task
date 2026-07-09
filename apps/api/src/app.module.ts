@@ -11,6 +11,7 @@ import { SubtasksModule } from './subtasks/subtasks.module'
 import { DepartmentsModule } from './departments/departments.module'
 import { ProjectsModule } from './projects/projects.module'
 import { ActionsModule } from './actions/actions.module'
+import { AttachmentsModule } from './attachments/attachments.module'
 import { ReportsModule } from './reports/reports.module'
 import { BootstrapModule } from './bootstrap/bootstrap.module'
 
@@ -27,6 +28,7 @@ import { BootstrapModule } from './bootstrap/bootstrap.module'
     DepartmentsModule,
     ProjectsModule,
     ActionsModule,
+    AttachmentsModule,
     ReportsModule,
     BootstrapModule,
   ],

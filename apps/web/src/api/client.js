@@ -25,3 +25,15 @@ export async function apiFetch(path, options = {}) {
   }
   return res.status === 204 ? null : res.json()
 }
+
+/** Upload 1 tệp qua multipart (không set Content-Type để browser tự gắn boundary). */
+export async function uploadFile(path, file) {
+  const fd = new FormData()
+  fd.append('file', file)
+  const headers = {}
+  if (devUserEmail) headers['x-dev-user-email'] = devUserEmail
+  const res = await fetch(`${apiBase}${path}`, { method: 'POST', credentials: 'include', headers, body: fd })
+  if (res.status === 401) { const e = new Error('unauthorized'); e.status = 401; throw e }
+  if (!res.ok) { const b = await res.text().catch(() => ''); throw new Error(`Upload lỗi ${res.status}: ${b}`) }
+  return res.json()
+}

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
-import { apiFetch } from '../api/client'
+import { apiFetch, uploadFile } from '../api/client'
+import { apiBase } from '../auth/authConfig'
 import {
   canManageTask, canUpdateStatus, canWorkSubtasks, canComment, canCreateTask,
   canCreateDeptTask, canCreateChannelTask, visibleDepartmentsFor, visibleChannelsFor,
@@ -313,6 +314,14 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
           review: task.reviewRequired ?? (task.completionMode === 'review_required'),
         }
       },
+      // ── Đính kèm tệp (P0-1) ──
+      fetchAttachments: (taskId) => apiFetch(`/tasks/${taskId}/attachments`),
+      uploadAttachment: (taskId, file) => uploadFile(`/tasks/${taskId}/attachments`, file),
+      deleteAttachment: (id) => apiFetch(`/attachments/${id}`, { method: 'DELETE' }),
+      attachmentUrl: (id, dl) => `${apiBase}/attachments/${id}/file${dl ? '?dl=1' : ''}`,
+      canDeleteAttachment: (att, task) =>
+        !!currentUser && (currentUser.role === 'admin' || att.uploadedById === me || (task && canManageTask(currentUser, task))),
+
       // Tìm user cho picker (autocomplete) — KHÔNG load 706 user vào dropdown
       searchUsers: (q, { limit = 20, orgUnitId } = {}) => {
         const p = new URLSearchParams()

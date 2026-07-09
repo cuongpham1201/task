@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  X, CheckCircle2, Circle, Plus, Send, CalendarDays, ThumbsUp, Undo2, Pencil, Trash2,
+  X, CheckCircle2, Circle, Plus, Send, CalendarDays, ThumbsUp, Undo2, Pencil, Trash2, Paperclip, Download,
 } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
@@ -315,6 +315,8 @@ export default function TaskDetailPanel() {
             />
           </div>
 
+          <AttachmentsSection task={task} />
+
           <div className="detail-section">
             <h3>Việc con ({subs.filter((s) => s.done).length}/{subs.length})</h3>
             <div className="subtask-list">
@@ -475,5 +477,66 @@ export default function TaskDetailPanel() {
         )}
       </aside>
     </>
+  )
+}
+
+function AttachmentsSection({ task }) {
+  const {
+    fetchAttachments, uploadAttachment, deleteAttachment, attachmentUrl, canDeleteAttachment, perms, toast,
+  } = useApp()
+  const [items, setItems] = useState([])
+  const [busy, setBusy] = useState(false)
+  const fileRef = useRef()
+  const canAttach = perms.comment(task)
+
+  const load = () => fetchAttachments(task.id).then(setItems).catch(() => {})
+  useEffect(() => { load() /* eslint-disable-next-line */ }, [task.id])
+
+  const onFile = async (e) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setBusy(true)
+    try { await uploadAttachment(task.id, f); await load() }
+    catch (err) { toast('Tải tệp thất bại: ' + err.message) }
+    finally { setBusy(false); if (fileRef.current) fileRef.current.value = '' }
+  }
+  const del = async (a) => {
+    if (!window.confirm(`Xóa tệp "${a.fileName}"?`)) return
+    try { await deleteAttachment(a.id); setItems((x) => x.filter((y) => y.id !== a.id)) }
+    catch { toast('Xóa tệp thất bại') }
+  }
+
+  return (
+    <div className="detail-section">
+      <h3>Đính kèm ({items.length})</h3>
+      <div className="attach-list">
+        {items.length === 0 && <p className="muted">Chưa có tệp đính kèm.</p>}
+        {items.map((a) => (
+          <div key={a.id} className="attach-item">
+            {a.isImage ? (
+              <a href={attachmentUrl(a.id)} target="_blank" rel="noreferrer">
+                <img className="attach-thumb" src={attachmentUrl(a.id)} alt={a.fileName} />
+              </a>
+            ) : (
+              <span className="attach-icon"><Paperclip size={16} /></span>
+            )}
+            <a className="attach-name" href={attachmentUrl(a.id)} target="_blank" rel="noreferrer">{a.fileName}</a>
+            <span className="muted attach-size">{Math.max(1, Math.round(a.sizeBytes / 1024))} KB</span>
+            <a className="btn btn-ghost" href={attachmentUrl(a.id, true)} title="Tải xuống"><Download size={14} /></a>
+            {canDeleteAttachment(a, task) && (
+              <button className="btn btn-ghost" onClick={() => del(a)} title="Xóa"><Trash2 size={14} /></button>
+            )}
+          </div>
+        ))}
+      </div>
+      {canAttach && (
+        <div className="attach-add">
+          <input ref={fileRef} type="file" hidden onChange={onFile} />
+          <button className="btn" disabled={busy} onClick={() => fileRef.current?.click()}>
+            <Paperclip size={15} /> {busy ? 'Đang tải…' : 'Thêm tệp'}
+          </button>
+        </div>
+      )}
+    </div>
   )
 }

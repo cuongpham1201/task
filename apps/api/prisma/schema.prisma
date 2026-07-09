@@ -461,9 +461,11 @@ model Attachment {
   fileName     String    @map("file_name")
   mimeType     String    @map("mime_type")
   sizeBytes    BigInt    @map("size_bytes")
-  driveId      String    @map("drive_id")
-  driveItemId  String    @map("drive_item_id")
-  webUrl       String    @map("web_url")
+  // SharePoint (để sau); dev dùng storageKey (local disk). Nới nullable.
+  driveId      String?   @map("drive_id")
+  driveItemId  String?   @map("drive_item_id")
+  webUrl       String?   @map("web_url")
+  storageKey   String?   @map("storage_key")
   createdAt    DateTime  @default(now()) @map("created_at")
   deletedAt    DateTime? @map("deleted_at")
 
