@@ -995,3 +995,10 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .btn-sm { padding: 4px 8px; }
 .mytasks-group { margin-bottom: 14px; }
 .mytasks-group-title { font-size: 13px; font-weight: 600; color: var(--text-soft); margin: 10px 2px 6px; }
+
+/* ── @Mention comment ── */
+.mention-box { position: relative; }
+.mention-menu { position: absolute; bottom: calc(100% + 4px); left: 0; right: 0; z-index: 80; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); max-height: 220px; overflow-y: auto; }
+.mention-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 8px 10px; border: none; background: none; border-bottom: 1px solid var(--border); }
+.mention-item:hover { background: var(--accent-soft); }
+.mention-mail { margin-left: auto; font-size: 12px; }

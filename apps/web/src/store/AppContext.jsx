@@ -461,13 +461,13 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         persist(patch(`/tasks/${id}`, fieldPatch), (t) => dispatch({ type: 'REPLACE_TASK', task: t }))
       },
 
-      addComment: (taskId, content) => {
+      addComment: (taskId, content, mentionIds = []) => {
         const task = findTask(taskId)
         if (!task) return
         if (!guard(canComment(currentUser, task, state.channels), 'bình luận')) return
         const tempId = nextId('cm')
         dispatch({ type: 'ADD_COMMENT', comment: { id: tempId, taskId, userId: me, content, createdAt: now() }, activity: makeActivity(taskId, me, 'comment') })
-        persist(post(`/tasks/${taskId}/comments`, { content }), (c) => dispatch({ type: 'REPLACE_COMMENT', tempId, comment: c }))
+        persist(post(`/tasks/${taskId}/comments`, { content, mentionIds }), (c) => dispatch({ type: 'REPLACE_COMMENT', tempId, comment: c }))
       },
 
       toggleSubtask: (subtaskId) => {

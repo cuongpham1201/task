@@ -20,7 +20,7 @@ export class CommentsController {
 
   @Post('tasks/:taskId/comments')
   async create(@AuthUser() c: AuthClaims, @Param('taskId') taskId: string, @Body() dto: CreateCommentDto) {
-    return this.comments.create(await this.me(c), taskId, dto.content)
+    return this.comments.create(await this.me(c), taskId, dto.content, dto.mentionIds)
   }
 
   @Patch('comments/:id')

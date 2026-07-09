@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
+import MentionCommentBox from './MentionCommentBox'
 import { StatusBadge, PriorityBadge, StatusSelect, PrioritySelect } from '../shared/badges'
 import { SelectMenu } from '../shared/Dropdown'
 import { toInputDate, fromInputDate, timeAgo, formatDateFull } from '../../utils/date'
@@ -474,17 +475,7 @@ export default function TaskDetailPanel() {
         </div>
 
         {canCmt ? (
-          <div className="comment-input">
-            <input
-              placeholder="Viết bình luận…"
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && submitComment()}
-            />
-            <button className="btn btn-primary" onClick={submitComment} title="Gửi">
-              <Send size={15} />
-            </button>
-          </div>
+          <MentionCommentBox disabled={!canCmt} onSubmit={(t, ids) => addComment(task.id, t, ids)} />
         ) : (
           <div className="comment-input">
             <p className="muted">Bạn không tham gia công việc này nên không thể bình luận.</p>
