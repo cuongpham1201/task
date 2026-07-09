@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  X, CheckCircle2, Circle, Plus, Send, CalendarDays, ThumbsUp, Undo2, Pencil, Trash2, Paperclip, Download,
+  X, CheckCircle2, Circle, Plus, Send, CalendarDays, ThumbsUp, Undo2, Pencil, Trash2, Paperclip, Download, Eye, EyeOff,
 } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
@@ -53,7 +53,7 @@ export default function TaskDetailPanel() {
     assignTask, setDueDate, setPriority, submitTask, reviewTask,
     addComment, toggleSubtask, addSubtask, taskContextLabel,
     archiveTask, updateSubtask, deleteSubtask, editComment, deleteComment,
-    actionsById, channelsById, orgUnitName,
+    actionsById, channelsById, orgUnitName, watchTask, unwatchTask,
   } = useApp()
 
   const task = state.selectedTaskId ? getTask(state.selectedTaskId) : null
@@ -149,6 +149,18 @@ export default function TaskDetailPanel() {
             </button>
           )}
           <span className="detail-head-actions">
+            {(() => {
+              const watching = (task.watcherIds || []).includes(currentUser?.id)
+              return (
+                <button
+                  className={`btn btn-ghost ${watching ? 'is-watching' : ''}`}
+                  title={watching ? 'Đang theo dõi — bấm để bỏ' : 'Theo dõi để nhận thông báo'}
+                  onClick={() => (watching ? unwatchTask(task.id) : watchTask(task.id))}
+                >
+                  {watching ? <Eye size={17} /> : <EyeOff size={17} />}
+                </button>
+              )
+            })()}
             {canManage && (
               <button
                 className="btn btn-ghost"

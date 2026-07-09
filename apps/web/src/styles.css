@@ -1002,3 +1002,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .mention-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 8px 10px; border: none; background: none; border-bottom: 1px solid var(--border); }
 .mention-item:hover { background: var(--accent-soft); }
 .mention-mail { margin-left: auto; font-size: 12px; }
+
+/* watcher toggle */
+.btn-ghost.is-watching { color: var(--accent); }

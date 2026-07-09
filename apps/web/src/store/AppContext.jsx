@@ -415,6 +415,10 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         persist(post(`/tasks/${id}/review`, { decision, note }), (t) => dispatch({ type: 'REPLACE_TASK', task: t }))
       },
 
+      // ── Theo dõi (watcher) ──
+      watchTask: (id) => persist(post(`/tasks/${id}/watch`, {}), (t) => dispatch({ type: 'REPLACE_TASK', task: t })),
+      unwatchTask: (id) => persist(apiFetch(`/tasks/${id}/watch`, { method: 'DELETE' }), (t) => dispatch({ type: 'REPLACE_TASK', task: t })),
+
       assignTask: (id, assigneeId) => {
         const task = findTask(id)
         if (!task || task.assigneeId === assigneeId) return

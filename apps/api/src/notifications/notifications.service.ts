@@ -28,14 +28,15 @@ export class NotificationsService {
       data: { taskId: task.id, userId: actorId, action, metadata: metadata ?? {} },
     })
     if (notifyType) {
-      const collaborators = await tx.taskCollaborator.findMany({
-        where: { taskId: task.id },
-        select: { userId: true },
-      })
+      const [collaborators, watchers] = await Promise.all([
+        tx.taskCollaborator.findMany({ where: { taskId: task.id }, select: { userId: true } }),
+        tx.taskWatcher.findMany({ where: { taskId: task.id }, select: { userId: true } }),
+      ])
       const recipients = new Set<string>([
         task.assigneeId,
         task.creatorId,
         ...collaborators.map((c: any) => c.userId),
+        ...watchers.map((w: any) => w.userId),
         ...extraRecipients,
       ])
       recipients.delete(actorId)

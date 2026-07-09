@@ -42,6 +42,16 @@ export class TasksController {
     return this.tasks.submit(await this.me(c), id)
   }
 
+  @Post(':id/watch')
+  async watch(@AuthUser() c: AuthClaims, @Param('id') id: string) {
+    return this.tasks.watch(await this.me(c), id)
+  }
+
+  @Delete(':id/watch')
+  async unwatch(@AuthUser() c: AuthClaims, @Param('id') id: string) {
+    return this.tasks.unwatch(await this.me(c), id)
+  }
+
   @Post(':id/review')
   async review(@AuthUser() c: AuthClaims, @Param('id') id: string, @Body() dto: ReviewDto) {
     return this.tasks.review(await this.me(c), id, dto)

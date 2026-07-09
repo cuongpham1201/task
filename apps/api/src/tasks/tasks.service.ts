@@ -21,7 +21,7 @@ export class TasksService {
     const where = { AND: [{ archived: false }, await this.vis.taskWhere(me)] }
     const tasks = await this.prisma.task.findMany({
       where,
-      include: { collaborators: { select: { userId: true } }, workspace: true, orgUnit: { select: { name: true } }, action: { select: { title: true } } },
+      include: { collaborators: { select: { userId: true } }, watchers: { select: { userId: true } }, workspace: true, orgUnit: { select: { name: true } }, action: { select: { title: true } } },
       orderBy: { createdAt: 'desc' },
     })
     return tasks.map((t) => this.serialize(t, t.collaborators.map((c) => c.userId)))
@@ -30,13 +30,17 @@ export class TasksService {
   // Map → shape FE cũ (scope/departmentId/channelId, suy từ workspace để tương thích)
   // + phơi chiều tường minh mới (orgUnitId/projectId/actionId + KPI) + tên đơn vị/action cho FE.
   private serialize(task: any, collaboratorIds: string[]) {
-    const { collaborators, workspace, orgUnit, action, ...rest } = task
+    const { collaborators, watchers, workspace, orgUnit, action, ...rest } = task
     let scope = 'personal'
     let departmentId: string | null = null
     let channelId: string | null = null
     if (workspace?.type === 'org_unit') { scope = 'department'; departmentId = workspace.orgUnitId }
     else if (workspace?.type === 'project') { scope = 'channel'; channelId = workspace.id }
-    return { ...rest, scope, departmentId, channelId, collaboratorIds, orgUnitName: orgUnit?.name ?? null, actionTitle: action?.title ?? null }
+    return {
+      ...rest, scope, departmentId, channelId, collaboratorIds,
+      watcherIds: (watchers ?? []).map((w: any) => w.userId),
+      orgUnitName: orgUnit?.name ?? null, actionTitle: action?.title ?? null,
+    }
   }
 
   private async load(id: string) {
@@ -48,7 +52,7 @@ export class TasksService {
   private async withCollaborators(id: string) {
     const task = await this.prisma.task.findUnique({
       where: { id },
-      include: { collaborators: { select: { userId: true } }, workspace: true, orgUnit: { select: { name: true } }, action: { select: { title: true } } },
+      include: { collaborators: { select: { userId: true } }, watchers: { select: { userId: true } }, workspace: true, orgUnit: { select: { name: true } }, action: { select: { title: true } } },
     })
     return this.serialize(task, task!.collaborators.map((c) => c.userId))
   }
@@ -307,5 +311,22 @@ export class TasksService {
     this.policy.assert(await this.policy.canManage(me, task), 'Không có quyền xóa công việc')
     await this.prisma.task.update({ where: { id }, data: { archived: true } })
     return { archived: true }
+  }
+
+  // ── Theo dõi (watcher) — ai xem được task đều theo dõi được ──
+  async watch(me: Me, id: string) {
+    const task = await this.load(id)
+    this.policy.assert(await this.policy.canView(me, task), 'Không có quyền theo dõi công việc này')
+    await this.prisma.taskWatcher.upsert({
+      where: { taskId_userId: { taskId: id, userId: me.id } },
+      create: { taskId: id, userId: me.id }, update: {},
+    })
+    return this.withCollaborators(id)
+  }
+
+  async unwatch(me: Me, id: string) {
+    await this.load(id)
+    await this.prisma.taskWatcher.deleteMany({ where: { taskId: id, userId: me.id } })
+    return this.withCollaborators(id)
   }
 }
