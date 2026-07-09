@@ -5,19 +5,19 @@ import {
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import Avatar from '../components/shared/Avatar'
-import EmptyState from '../components/shared/EmptyState'
+import Breadcrumb from '../components/shared/Breadcrumb'
 import { StatusBadge } from '../components/shared/badges'
 import {
   ACTION_STATUS, ACTION_STATUS_ORDER, ACTION_UPDATE_TYPE, ACTION_UPDATE_TYPE_ORDER,
 } from '../data/constants'
-import { formatDate, formatDateFull, timeAgo } from '../utils/date'
+import { formatDate, formatDateFull, timeAgo, isOverdue } from '../utils/date'
 
 export default function ActionDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const {
     fetchActionDetail, addActionUpdate, updateAction, archiveAction, canManageAction,
-    usersById, departmentsById, channelsById, selectTask, openCreateModal,
+    usersById, departmentsById, channelsById, orgUnitsById, selectTask, openCreateModal,
   } = useApp()
 
   const [detail, setDetail] = useState(null)
@@ -40,8 +40,16 @@ export default function ActionDetail() {
 
   const owner = usersById[detail.ownerId]
   const dept = departmentsById[detail.orgUnitId]
+  const block = dept?.blockId ? orgUnitsById[dept.blockId] : null
   const project = detail.projectId ? channelsById[detail.projectId] : null
   const st = ACTION_STATUS[detail.status] || { label: detail.status, tone: 'gray' }
+  const tasks = detail.tasks || []
+  const taskStats = {
+    open: tasks.filter((t) => t.status !== 'done' && t.status !== 'paused' && t.status !== 'cancelled').length,
+    overdue: tasks.filter((t) => isOverdue(t)).length,
+    review: tasks.filter((t) => t.status === 'submitted').length,
+    done: tasks.filter((t) => t.status === 'done').length,
+  }
 
   const submitUpdate = () => {
     if (!form.content.trim() || saving) return
@@ -56,9 +64,12 @@ export default function ActionDetail() {
 
   return (
     <div className="page page-narrow">
-      <button className="btn btn-ghost" onClick={() => navigate('/action-log')} style={{ marginBottom: 8 }}>
-        <ArrowLeft size={16} /> Action Log
-      </button>
+      <Breadcrumb items={[
+        { label: 'Action Log', to: '/action-log' },
+        block && { label: block.name },
+        dept && { label: dept.name, to: `/departments/${dept.id}` },
+        { label: detail.title },
+      ]} />
 
       <div className="card">
         <div className="page-head" style={{ marginBottom: 12 }}>
@@ -79,6 +90,7 @@ export default function ActionDetail() {
         </div>
 
         <div className="action-header-grid">
+          {block && <div><span className="detail-label">Khối</span><div>{block.name}</div></div>}
           <div><span className="detail-label">Đơn vị</span><div>{dept?.name || detail.orgUnitId}</div></div>
           <div><span className="detail-label">Owner</span><div className="cell-user">{owner ? <><Avatar user={owner} size={20} /> {owner.displayName}</> : '—'}</div></div>
           {project && <div><span className="detail-label">Dự án</span><div>{project.name}</div></div>}
@@ -88,6 +100,12 @@ export default function ActionDetail() {
             <span className="progress-track" style={{ width: 60 }}><span className={`progress-fill ${detail.progress >= 100 ? 'complete' : ''}`} style={{ width: `${detail.progress}%` }} /></span>
             <span className="muted">{detail.progress}%</span>
           </div></div>
+        </div>
+        <div className="action-mini-stats">
+          <span className="ams"><b>{taskStats.open}</b> đang mở</span>
+          <span className="ams t-red"><b>{taskStats.overdue}</b> quá hạn</span>
+          <span className="ams t-amber"><b>{taskStats.review}</b> chờ nghiệm thu</span>
+          <span className="ams t-green"><b>{taskStats.done}</b> hoàn thành</span>
         </div>
       </div>
 
@@ -138,7 +156,7 @@ export default function ActionDetail() {
                   <div className="action-update-body">
                     <p>{u.content}</p>
                     <span className="muted">
-                      {author?.displayName || 'Người dùng'} · {timeAgo(u.createdAt)}
+                      <strong>{formatDate(u.createdAt)}</strong> · {author?.displayName || 'Người dùng'} · {timeAgo(u.createdAt)}
                       {u.statusTo && <> · chuyển {ACTION_STATUS[u.statusTo]?.label}</>}
                       {u.progressValue != null && <> · {u.progressValue}%</>}
                     </span>
@@ -154,7 +172,7 @@ export default function ActionDetail() {
         <div className="card">
           {canManage && (
             <div style={{ marginBottom: 10 }}>
-              <button className="btn btn-primary" onClick={() => openCreateModal({ scope: 'department', departmentId: detail.orgUnitId, actionId: detail.id })}>
+              <button className="btn btn-primary" onClick={() => openCreateModal({ scope: 'department', departmentId: detail.orgUnitId, actionId: detail.id, projectId: detail.projectId })}>
                 <Plus size={15} /> Tạo Task thuộc Action này
               </button>
             </div>

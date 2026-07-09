@@ -20,13 +20,13 @@ export class BootstrapController {
   ) {}
 
   private serializeTask(t: any) {
-    const { collaborators, workspace, ...rest } = t
+    const { collaborators, workspace, orgUnit, action, ...rest } = t
     let scope = 'personal'
     let departmentId: string | null = null
     let channelId: string | null = null
     if (workspace?.type === 'org_unit') { scope = 'department'; departmentId = workspace.orgUnitId }
     else if (workspace?.type === 'project') { scope = 'channel'; channelId = workspace.id }
-    return { ...rest, scope, departmentId, channelId, collaboratorIds: collaborators.map((c: any) => c.userId) }
+    return { ...rest, scope, departmentId, channelId, collaboratorIds: collaborators.map((c: any) => c.userId), orgUnitName: orgUnit?.name ?? null, actionTitle: action?.title ?? null }
   }
 
   @Get()
@@ -36,7 +36,7 @@ export class BootstrapController {
     // ── Task đã scope theo quyền ──
     const tasksRaw = await this.prisma.task.findMany({
       where: { AND: [{ archived: false }, await this.vis.taskWhere(me)] },
-      include: { collaborators: { select: { userId: true } }, workspace: true },
+      include: { collaborators: { select: { userId: true } }, workspace: true, orgUnit: { select: { name: true } }, action: { select: { title: true } } },
       orderBy: { createdAt: 'desc' },
     })
     const tasks = tasksRaw.map((t) => this.serializeTask(t))

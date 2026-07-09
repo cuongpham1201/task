@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   X, CheckCircle2, Circle, Plus, Send, CalendarDays, ThumbsUp, Undo2, Pencil, Trash2,
 } from 'lucide-react'
@@ -37,7 +38,7 @@ function AssigneeSelect({ value, onChange }) {
         <button className="detail-user-btn">
           {user ? (
             <span className="cell-user"><Avatar user={user} size={24} /> {user.displayName}</span>
-          ) : 'Chọn người phụ trách'}
+          ) : 'Chọn người thực hiện'}
         </button>
       )}
     />
@@ -51,7 +52,7 @@ export default function TaskDetailPanel() {
     assignTask, setDueDate, setPriority, submitTask, reviewTask,
     addComment, toggleSubtask, addSubtask, taskContextLabel,
     archiveTask, updateSubtask, deleteSubtask, editComment, deleteComment,
-    actionsById, channelsById,
+    actionsById, channelsById, orgUnitName,
   } = useApp()
 
   const task = state.selectedTaskId ? getTask(state.selectedTaskId) : null
@@ -181,6 +182,7 @@ export default function TaskDetailPanel() {
             )}
           </h2>
 
+          <h3 className="detail-group-title">Nguồn giao việc</h3>
           <div className="detail-fields">
             <Field label="Người giao">
               {creator && (
@@ -215,15 +217,22 @@ export default function TaskDetailPanel() {
                 </span>
               )}
             </Field>
-            <Field label="Đơn vị chịu trách nhiệm">{taskContextLabel(task)}</Field>
+            <Field label="Đơn vị yêu cầu">{task.orgUnitName || taskContextLabel(task)}</Field>
+            <Field label="Đơn vị thực hiện">{assignee?.orgUnitId ? (orgUnitName(assignee.orgUnitId) || '—') : '—'}</Field>
             {task.projectId && (
               <Field label="Dự án">{channelsById[task.projectId]?.name || '—'}</Field>
             )}
             {task.actionId && (
               <Field label="Action">
-                <a className="link" href={`/actions/${task.actionId}`}>{actionsById[task.actionId]?.title || 'Xem Action'}</a>
+                <Link className="link" to={`/actions/${task.actionId}`} onClick={() => selectTask(null)}>
+                  {task.actionTitle || actionsById[task.actionId]?.title || 'Xem Action'}
+                </Link>
               </Field>
             )}
+          </div>
+
+          <h3 className="detail-group-title">Chi tiết công việc</h3>
+          <div className="detail-fields">
             <Field label="Nghiệm thu">{reviewRequired ? 'Cần nghiệm thu' : 'Tự hoàn thành'}</Field>
             {task.isScorable && (
               <Field label="KPI">

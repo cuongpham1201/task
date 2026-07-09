@@ -31,6 +31,25 @@ export class ReportsService {
       this.prisma.orgUnit.findMany({ where: { active: true }, select: { id: true, name: true, code: true, type: true, parentId: true } }),
     ])
 
+    // Đếm task open/overdue/review per action (scope theo quyền) — cho mini badge Action Log
+    const actionIds = actions.map((a) => a.id)
+    const taskAgg: Record<string, { open: number; overdue: number; review: number; done: number }> = {}
+    if (actionIds.length) {
+      const today = new Date(); today.setHours(0, 0, 0, 0)
+      const tasks = await this.prisma.task.findMany({
+        where: { AND: [{ actionId: { in: actionIds }, archived: false }, await this.vis.taskWhere(me)] },
+        select: { actionId: true, status: true, dueDate: true },
+      })
+      for (const t of tasks) {
+        const k = t.actionId as string
+        const a = (taskAgg[k] ??= { open: 0, overdue: 0, review: 0, done: 0 })
+        if (t.status === 'done') a.done++
+        else if (t.status !== 'paused') a.open++
+        if (t.status === 'submitted') a.review++
+        if (t.dueDate && t.status !== 'done' && new Date(t.dueDate) < today) a.overdue++
+      }
+    }
+
     const orgById = new Map(orgUnits.map((o) => [o.id, o]))
     // Tìm block tổ tiên của 1 org unit (đi lên tới type=block)
     const blockOf = (orgId: string): { id: string; name: string; code: string } | null => {
@@ -48,6 +67,10 @@ export class ReportsService {
       ownerId: a.ownerId, ownerName: a.owner?.displayName ?? null,
       deadline: a.deadline, status: a.status, priority: a.priority,
       progress: a.progress, period: a.period, taskCount: a._count.tasks,
+      taskOpen: taskAgg[a.id]?.open || 0,
+      taskOverdue: taskAgg[a.id]?.overdue || 0,
+      taskReview: taskAgg[a.id]?.review || 0,
+      taskDone: taskAgg[a.id]?.done || 0,
       latestUpdate: a.updates[0]
         ? { type: a.updates[0].type, content: a.updates[0].content, createdAt: a.updates[0].createdAt }
         : null,

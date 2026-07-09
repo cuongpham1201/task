@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { X, Plus, Trash2 } from 'lucide-react'
+import { X, Plus, Trash2, Target } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
+import SearchUser from '../shared/SearchUser'
 import { PRIORITY, PRIORITY_ORDER, SECTIONS, SECTION_ORDER, SCOPES } from '../../data/constants'
 import { fromInputDate } from '../../utils/date'
 
@@ -11,6 +12,11 @@ export default function CreateTaskModal() {
     actionsForOrg, kpiDefinitions,
   } = useApp()
   const defaults = state.createModal?.defaults || {}
+  // Tạo từ Action → khóa Đơn vị yêu cầu + Action, không bắt nhập lại (PHẦN 5)
+  const fromAction = !!defaults.actionId
+  const fromActionInfo = fromAction
+    ? { dept: visibleDepartments.find((d) => d.id === defaults.departmentId), action: (actionsForOrg(defaults.departmentId) || []).find((a) => a.id === defaults.actionId) }
+    : null
 
   // Phòng ban chọn được = các phòng user đang thấy (server đã scope theo quyền).
   const deptOptions = visibleDepartments
@@ -68,13 +74,11 @@ export default function CreateTaskModal() {
     return [currentUser] // personal: tự phụ trách
   }, [form.scope, form.departmentId, form.channelId, state.users, state.channels, currentUser])
 
-  // Đổi phạm vi → đảm bảo assignee còn nằm trong pool
+  // Personal → tự phụ trách (các scope khác dùng SearchUser, cho phép giao chéo phòng)
   useEffect(() => {
-    if (!assigneePool.some((u) => u.id === form.assigneeId)) {
-      set({ assigneeId: assigneePool[0]?.id || currentUser.id })
-    }
+    if (form.scope === 'personal' && form.assigneeId !== currentUser.id) set({ assigneeId: currentUser.id })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assigneePool])
+  }, [form.scope])
 
   // Org chịu trách nhiệm để lọc Action: phòng (nếu scope=department) hoặc org của người thực hiện
   const responsibleOrg = form.scope === 'department'
@@ -124,6 +128,7 @@ export default function CreateTaskModal() {
         priority: form.priority,
         completionMode: form.completionMode,
         actionId: form.actionId || null,
+        ...(fromAction && defaults.projectId ? { projectId: defaults.projectId } : {}),
         isScorable: form.isScorable,
         kpiDefinitionId: form.isScorable ? form.kpiDefinitionId : null,
         kpiWeight: form.isScorable ? Number(form.kpiWeight) : null,
@@ -166,25 +171,34 @@ export default function CreateTaskModal() {
             />
           </label>
 
-          <div className="form-field">
-            <span>Loại công việc</span>
-            <div className="scope-options">
-              {Object.entries(SCOPES)
-                .filter(([key]) => scopeAllowed(key))
-                .map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    className={`scope-option ${form.scope === key ? 'active' : ''}`}
-                    onClick={() => set({ scope: key })}
-                  >
-                    {label}
-                  </button>
-                ))}
+          {fromAction && (
+            <div className="fromaction-banner">
+              <Target size={15} />
+              <span>Thuộc Action: <strong>{fromActionInfo?.action?.title || 'Action'}</strong> · Đơn vị yêu cầu: <strong>{fromActionInfo?.dept?.name || '—'}</strong></span>
             </div>
-          </div>
+          )}
 
-          {form.scope === 'department' && (
+          {!fromAction && (
+            <div className="form-field">
+              <span>Loại công việc</span>
+              <div className="scope-options">
+                {Object.entries(SCOPES)
+                  .filter(([key]) => scopeAllowed(key))
+                  .map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`scope-option ${form.scope === key ? 'active' : ''}`}
+                      onClick={() => set({ scope: key })}
+                    >
+                      {label}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {form.scope === 'department' && !fromAction && (
             <div className="form-row">
               <label className="form-field">
                 <span>Phòng ban</span>
@@ -221,18 +235,14 @@ export default function CreateTaskModal() {
           )}
 
           <div className="form-row">
-            <label className="form-field">
+            <div className="form-field">
               <span>Người thực hiện</span>
-              <select
-                value={form.assigneeId}
-                disabled={form.scope === 'personal'}
-                onChange={(e) => set({ assigneeId: e.target.value })}
-              >
-                {assigneePool.map((u) => (
-                  <option key={u.id} value={u.id}>{u.displayName}</option>
-                ))}
-              </select>
-            </label>
+              {form.scope === 'personal' ? (
+                <div className="searchuser-selected"><span className="cell-user"><Avatar user={currentUser} size={22} /> {currentUser.displayName}</span></div>
+              ) : (
+                <SearchUser value={form.assigneeId} onSelect={(id) => set({ assigneeId: id || currentUser.id })} placeholder="Tìm người thực hiện…" />
+              )}
+            </div>
             <label className="form-field">
               <span>Ưu tiên</span>
               <select value={form.priority} onChange={(e) => set({ priority: e.target.value })}>
@@ -246,23 +256,23 @@ export default function CreateTaskModal() {
           <div className="form-field">
             <span>Người phối hợp</span>
             <div className="collab-chips">
-              {collaboratorOptions.map((u) => (
-                <button
-                  key={u.id}
-                  type="button"
-                  className={`collab-chip ${form.collaboratorIds.includes(u.id) ? 'active' : ''}`}
-                  onClick={() => toggleCollaborator(u.id)}
-                >
-                  <Avatar user={u} size={18} /> {u.displayName}
-                </button>
-              ))}
-              {collaboratorOptions.length === 0 && (
-                <span className="muted">Không có người phù hợp</span>
-              )}
+              {form.collaboratorIds.map((id) => {
+                const u = state.users.find((x) => x.id === id)
+                return u && (
+                  <button key={id} type="button" className="collab-chip active" onClick={() => toggleCollaborator(id)}>
+                    <Avatar user={u} size={18} /> {u.displayName} <X size={12} />
+                  </button>
+                )
+              })}
             </div>
+            <SearchUser
+              value={null}
+              onSelect={(id) => { if (id && id !== form.assigneeId && !form.collaboratorIds.includes(id)) set({ collaboratorIds: [...form.collaboratorIds, id] }) }}
+              placeholder="Thêm người phối hợp…"
+            />
           </div>
 
-          {actionOptions.length > 0 && (
+          {!fromAction && actionOptions.length > 0 && (
             <label className="form-field">
               <span>Action (tùy chọn)</span>
               <select value={form.actionId} onChange={(e) => set({ actionId: e.target.value })}>

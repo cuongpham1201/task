@@ -24,7 +24,7 @@ function recentPeriods() {
 }
 
 export default function ActionLog() {
-  const { fetchActionLog, canManageActions, openCreateActionModal, usersById } = useApp()
+  const { fetchActionLog, canManageActions, openCreateActionModal, usersById, channelsById } = useApp()
   const navigate = useNavigate()
   const periods = useMemo(recentPeriods, [])
   const [period, setPeriod] = useState('') // '' = tất cả kỳ
@@ -83,17 +83,24 @@ export default function ActionLog() {
                     return (
                       <button key={a.id} className="actlog-row" onClick={() => openAction(a.id)}>
                         <span className="actlog-main">
-                          <span className="actlog-title">{a.title}</span>
+                          <span className="actlog-title">
+                            {a.title}
+                            {a.projectId && channelsById[a.projectId] && <span className="chip chip-project"># {channelsById[a.projectId].name}</span>}
+                          </span>
                           {a.latestUpdate && <span className="actlog-latest muted">“{a.latestUpdate.content}”</span>}
                         </span>
                         <span className="actlog-meta">
                           <ActionStatusBadge status={a.status} />
+                          <span className="actlog-taskbadges">
+                            <span className="muted" title="Đang mở">{a.taskOpen ?? 0} mở</span>
+                            {a.taskOverdue > 0 && <span className="badge tone-red" title="Quá hạn">{a.taskOverdue} trễ</span>}
+                            {a.taskReview > 0 && <span className="badge tone-amber" title="Chờ nghiệm thu">{a.taskReview} NT</span>}
+                          </span>
                           <span className="muted">{a.ownerName || usersById[a.ownerId]?.displayName || '—'}</span>
                           {a.deadline && <span className={over ? 'text-overdue' : 'muted'}>{formatDate(a.deadline)}</span>}
                           <span className="progress-track" style={{ width: 48 }}>
                             <span className={`progress-fill ${a.progress >= 100 ? 'complete' : ''}`} style={{ width: `${a.progress}%` }} />
                           </span>
-                          <span className="muted actlog-tasks">{a.taskCount} việc</span>
                           <ChevronRight size={15} className="muted" />
                         </span>
                       </button>

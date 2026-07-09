@@ -13,6 +13,25 @@ export class UsersService {
     })
   }
 
+  // Tìm user cho picker (autocomplete) — KHÔNG trả toàn bộ 706 user vào bootstrap.
+  search(q: string, limit = 20, orgUnitId?: string) {
+    const term = (q || '').trim()
+    const where: any = { active: true }
+    if (orgUnitId) where.orgUnitId = orgUnitId
+    if (term) {
+      where.OR = [
+        { displayName: { contains: term, mode: 'insensitive' } },
+        { email: { contains: term, mode: 'insensitive' } },
+      ]
+    }
+    return this.prisma.user.findMany({
+      where,
+      take: Math.min(Math.max(Number(limit) || 20, 1), 50),
+      orderBy: { displayName: 'asc' },
+      select: { id: true, email: true, displayName: true, orgUnitId: true, jobTitle: true, avatarUrl: true },
+    })
+  }
+
   findOne(id: string) {
     return this.prisma.user.findUnique({ where: { id } })
   }

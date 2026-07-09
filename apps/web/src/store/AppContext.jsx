@@ -198,6 +198,7 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
     const usersById = Object.fromEntries(state.users.map((u) => [u.id, u]))
     const departmentsById = Object.fromEntries(state.departments.map((d) => [d.id, d]))
     const channelsById = Object.fromEntries(state.channels.map((c) => [c.id, c]))
+    const orgUnitsById = Object.fromEntries([...state.departments, ...(state.blocks || [])].map((o) => [o.id, o]))
     const me = usersById[state.currentUserId] ? state.currentUserId : state.users[0]?.id
     const currentUser = usersById[me]
 
@@ -295,6 +296,30 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         if (task.scope === 'department') return departmentsById[task.departmentId]?.name || '—'
         if (task.scope === 'channel') return channelsById[task.channelId]?.name || '—'
         return 'Cá nhân'
+      },
+      orgUnitsById,
+      orgUnitName: (id) => orgUnitsById[id]?.name || null,
+      // Ngữ cảnh đầy đủ 1 task (My Tasks polish) — không phải mở Detail mới hiểu
+      taskContextFull: (task) => {
+        const creator = usersById[task.creatorId]
+        const assignee = usersById[task.assigneeId]
+        return {
+          creator,
+          assignee,
+          requestUnitName: task.orgUnitName || orgUnitsById[task.orgUnitId]?.name || null,
+          doUnitName: assignee?.orgUnitId ? (orgUnitsById[assignee.orgUnitId]?.name || null) : null,
+          projectName: task.projectId ? (channelsById[task.projectId]?.name || null) : null,
+          actionTitle: task.actionTitle || (task.actionId ? state.actions.find((a) => a.id === task.actionId)?.title : null),
+          review: task.reviewRequired ?? (task.completionMode === 'review_required'),
+        }
+      },
+      // Tìm user cho picker (autocomplete) — KHÔNG load 706 user vào dropdown
+      searchUsers: (q, { limit = 20, orgUnitId } = {}) => {
+        const p = new URLSearchParams()
+        if (q) p.set('q', q)
+        if (limit) p.set('limit', String(limit))
+        if (orgUnitId) p.set('orgUnitId', orgUnitId)
+        return apiFetch(`/users/search?${p.toString()}`)
       },
       // Thông báo thật từ server (fan-out khi giao việc/comment/nghiệm thu…)
       notifications: state.notifications,

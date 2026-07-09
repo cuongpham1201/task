@@ -8,6 +8,7 @@ import TaskTable from '../components/task/TaskTable'
 import KanbanBoard from '../components/task/KanbanBoard'
 import Avatar, { AvatarGroup } from '../components/shared/Avatar'
 import EmptyState from '../components/shared/EmptyState'
+import Breadcrumb from '../components/shared/Breadcrumb'
 import { STATUS, STATUS_ORDER } from '../data/constants'
 import { activityText } from '../utils/activity'
 import { timeAgo, isOverdue, isUpcoming } from '../utils/date'
@@ -60,6 +61,7 @@ export default function ChannelPage() {
 
   return (
     <div className="page">
+      <Breadcrumb items={[{ label: 'Dự án' }, { label: channel.name }]} />
       <div className="page-head">
         <div>
           <h1><Hash size={20} className="side-hash" /> {channel.name}</h1>

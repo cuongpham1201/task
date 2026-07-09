@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
+import SearchUser from '../shared/SearchUser'
 import { PRIORITY, PRIORITY_ORDER } from '../../data/constants'
 import { fromInputDate } from '../../utils/date'
 
@@ -29,12 +30,6 @@ export default function CreateActionModal() {
   }))
   const [error, setError] = useState('')
   const set = (patch) => setForm((f) => ({ ...f, ...patch }))
-
-  // Owner gợi ý theo phòng đã chọn (fallback toàn bộ user)
-  const ownerPool = useMemo(() => {
-    const inDept = state.users.filter((u) => u.orgUnitId === form.orgUnitId)
-    return inDept.length ? inDept : state.users
-  }, [state.users, form.orgUnitId])
 
   const submit = () => {
     if (!form.title.trim()) { setError('Nhập tên Action'); return }
@@ -86,12 +81,10 @@ export default function CreateActionModal() {
             </label>
           </div>
           <div className="form-row">
-            <label className="form-field">
+            <div className="form-field">
               <span>Owner (người chịu trách nhiệm báo cáo)</span>
-              <select value={form.ownerId} onChange={(e) => set({ ownerId: e.target.value })}>
-                {ownerPool.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
-              </select>
-            </label>
+              <SearchUser value={form.ownerId} onSelect={(id) => set({ ownerId: id || currentUser.id })} placeholder="Tìm owner…" />
+            </div>
             <label className="form-field">
               <span>Ưu tiên</span>
               <select value={form.priority} onChange={(e) => set({ priority: e.target.value })}>

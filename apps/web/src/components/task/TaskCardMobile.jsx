@@ -10,8 +10,9 @@ import { dueLabel } from '../../utils/date'
  */
 export default function TaskCardMobile({ task, showContext = true }) {
   const {
-    usersById, perms, selectTask, toggleComplete, getSubtasks, getComments, taskContextLabel,
+    usersById, perms, selectTask, toggleComplete, getSubtasks, getComments, taskContextLabel, taskContextFull,
   } = useApp()
+  const ctx = taskContextFull(task)
   const assignee = usersById[task.assigneeId]
   const subs = getSubtasks(task.id)
   const commentCount = getComments(task.id).length
@@ -34,6 +35,12 @@ export default function TaskCardMobile({ task, showContext = true }) {
           {isDone ? <CheckCircle2 size={22} /> : <Circle size={22} />}
         </span>
         <span className="task-card-title">{task.title}</span>
+      </div>
+      <div className="task-subline">
+        {ctx.requestUnitName && <span className="chip chip-unit">{ctx.requestUnitName}</span>}
+        {ctx.actionTitle && <span className="chip chip-action">🎯 {ctx.actionTitle}</span>}
+        {ctx.projectName && <span className="chip chip-project"># {ctx.projectName}</span>}
+        {ctx.review && <span className="chip chip-review">Nghiệm thu</span>}
       </div>
       <div className="task-card-badges">
         <StatusBadge status={task.status} />

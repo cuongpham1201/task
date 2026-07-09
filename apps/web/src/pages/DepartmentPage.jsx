@@ -6,6 +6,7 @@ import TaskTable from '../components/task/TaskTable'
 import KanbanBoard from '../components/task/KanbanBoard'
 import CalendarView from '../components/task/CalendarView'
 import { AvatarGroup } from '../components/shared/Avatar'
+import Breadcrumb from '../components/shared/Breadcrumb'
 import { isOverdue } from '../utils/date'
 import { deptColor } from '../utils/color'
 
@@ -17,20 +18,26 @@ const VIEWS = [
 
 export default function DepartmentPage() {
   const { id } = useParams()
-  const { state, usersById, perms, departmentTasks, openCreateModal } = useApp()
+  const { state, usersById, perms, departmentTasks, openCreateModal, orgUnitsById } = useApp()
   const [view, setView] = useState('list')
 
   const dept = state.departments.find((d) => d.id === id)
   if (!dept) return <div className="page"><p>Không tìm thấy phòng ban.</p></div>
+  const block = dept.blockId ? orgUnitsById[dept.blockId] : null
 
   const tasks = departmentTasks(dept.id)
   const members = state.users.filter((u) => u.orgUnitId === dept.id)
   const managerName = dept.managerName
   const openCount = tasks.filter((t) => t.status !== 'done').length
   const overdueCount = tasks.filter(isOverdue).length
+  const reviewCount = tasks.filter((t) => t.status === 'submitted').length
+  const nowM = new Date().getMonth(); const nowY = new Date().getFullYear()
+  const doneThisMonth = tasks.filter((t) => t.status === 'done' && t.completedAt && new Date(t.completedAt).getMonth() === nowM && new Date(t.completedAt).getFullYear() === nowY).length
+  const actionOpen = (state.actions || []).filter((a) => a.orgUnitId === dept.id && !a.archived && a.status !== 'done' && a.status !== 'cancelled').length
 
   return (
     <div className="page">
+      <Breadcrumb items={[block && { label: block.name }, { label: dept.name }]} />
       <div className="page-head">
         <div>
           <h1>
@@ -52,6 +59,16 @@ export default function DepartmentPage() {
               <Plus size={15} /> Tạo công việc
             </button>
           )}
+        </div>
+      </div>
+
+      <div className="card dept-mini">
+        <div className="action-mini-stats" style={{ marginTop: 0, paddingTop: 0, borderTop: 'none' }}>
+          <span className="ams"><b>{actionOpen}</b> Action mở</span>
+          <span className="ams"><b>{openCount}</b> việc mở</span>
+          <span className="ams t-red"><b>{overdueCount}</b> quá hạn</span>
+          <span className="ams t-amber"><b>{reviewCount}</b> chờ nghiệm thu</span>
+          <span className="ams t-green"><b>{doneThisMonth}</b> hoàn thành tháng này</span>
         </div>
       </div>
 

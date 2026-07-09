@@ -12,7 +12,7 @@ import { SECTIONS, SECTION_ORDER } from '../../data/constants'
 function TaskRow({ task, showContext }) {
   const {
     usersById, perms, selectTask, toggleComplete, setStatus,
-    getSubtasks, getComments, taskContextLabel,
+    getSubtasks, getComments, taskContextLabel, taskContextFull,
   } = useApp()
   const creator = usersById[task.creatorId]
   const subs = getSubtasks(task.id)
@@ -20,6 +20,7 @@ function TaskRow({ task, showContext }) {
   const due = dueLabel(task)
   const isDone = task.status === 'done'
   const canStatus = perms.updateStatus(task)
+  const ctx = taskContextFull(task)
 
   return (
     <tr className={`task-row ${isDone ? 'done' : ''}`} onClick={() => selectTask(task.id)}>
@@ -36,6 +37,13 @@ function TaskRow({ task, showContext }) {
           {isDone ? <CheckCircle2 size={18} /> : <Circle size={18} />}
         </button>
         <span className="task-title">{task.title}</span>
+        <span className="task-subline">
+          {ctx.requestUnitName && <span className="chip chip-unit" title="Đơn vị yêu cầu">{ctx.requestUnitName}</span>}
+          {ctx.doUnitName && ctx.doUnitName !== ctx.requestUnitName && <span className="chip chip-do" title="Đơn vị thực hiện">→ {ctx.doUnitName}</span>}
+          {ctx.actionTitle && <span className="chip chip-action" title="Action">🎯 {ctx.actionTitle}</span>}
+          {ctx.projectName && <span className="chip chip-project" title="Dự án"># {ctx.projectName}</span>}
+          {ctx.review && <span className="chip chip-review" title="Cần nghiệm thu">Nghiệm thu</span>}
+        </span>
         <span className="task-meta-icons">
           {subs.length > 0 && (
             <span className="meta-icon" title="Việc con">

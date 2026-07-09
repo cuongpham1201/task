@@ -80,7 +80,10 @@ export default function Reports() {
   return (
     <div className="page">
       <div className="page-head">
-        <h1>Báo cáo</h1>
+        <div>
+          <h1>Thống kê</h1>
+          <p className="page-sub">Thống kê hoàn thành công việc theo phòng ban.</p>
+        </div>
       </div>
 
       <div className="filter-row">

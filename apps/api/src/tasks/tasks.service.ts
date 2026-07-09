@@ -21,22 +21,22 @@ export class TasksService {
     const where = { AND: [{ archived: false }, await this.vis.taskWhere(me)] }
     const tasks = await this.prisma.task.findMany({
       where,
-      include: { collaborators: { select: { userId: true } }, workspace: true },
+      include: { collaborators: { select: { userId: true } }, workspace: true, orgUnit: { select: { name: true } }, action: { select: { title: true } } },
       orderBy: { createdAt: 'desc' },
     })
     return tasks.map((t) => this.serialize(t, t.collaborators.map((c) => c.userId)))
   }
 
   // Map → shape FE cũ (scope/departmentId/channelId, suy từ workspace để tương thích)
-  // + phơi chiều tường minh mới (orgUnitId/projectId/actionId + KPI) cho A3.
+  // + phơi chiều tường minh mới (orgUnitId/projectId/actionId + KPI) + tên đơn vị/action cho FE.
   private serialize(task: any, collaboratorIds: string[]) {
-    const { collaborators, workspace, ...rest } = task
+    const { collaborators, workspace, orgUnit, action, ...rest } = task
     let scope = 'personal'
     let departmentId: string | null = null
     let channelId: string | null = null
     if (workspace?.type === 'org_unit') { scope = 'department'; departmentId = workspace.orgUnitId }
     else if (workspace?.type === 'project') { scope = 'channel'; channelId = workspace.id }
-    return { ...rest, scope, departmentId, channelId, collaboratorIds }
+    return { ...rest, scope, departmentId, channelId, collaboratorIds, orgUnitName: orgUnit?.name ?? null, actionTitle: action?.title ?? null }
   }
 
   private async load(id: string) {
@@ -48,7 +48,7 @@ export class TasksService {
   private async withCollaborators(id: string) {
     const task = await this.prisma.task.findUnique({
       where: { id },
-      include: { collaborators: { select: { userId: true } }, workspace: true },
+      include: { collaborators: { select: { userId: true } }, workspace: true, orgUnit: { select: { name: true } }, action: { select: { title: true } } },
     })
     return this.serialize(task, task!.collaborators.map((c) => c.userId))
   }
