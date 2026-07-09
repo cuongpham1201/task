@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  X, CheckCircle2, Circle, Plus, Send, CalendarDays, ThumbsUp, Undo2, Pencil, Trash2, Paperclip, Download, Eye, EyeOff,
+  X, CheckCircle2, Circle, Plus, Send, CalendarDays, ThumbsUp, Undo2, Pencil, Trash2, Paperclip, Download, Eye, EyeOff, Camera,
 } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
@@ -505,6 +505,7 @@ function AttachmentsSection({ task }) {
   const [items, setItems] = useState([])
   const [busy, setBusy] = useState(false)
   const fileRef = useRef()
+  const camRef = useRef()
   const canAttach = perms.comment(task)
 
   const load = () => fetchAttachments(task.id).then(setItems).catch(() => {})
@@ -550,8 +551,12 @@ function AttachmentsSection({ task }) {
       {canAttach && (
         <div className="attach-add">
           <input ref={fileRef} type="file" hidden onChange={onFile} />
+          <input ref={camRef} type="file" accept="image/*" capture="environment" hidden onChange={onFile} />
           <button className="btn" disabled={busy} onClick={() => fileRef.current?.click()}>
             <Paperclip size={15} /> {busy ? 'Đang tải…' : 'Thêm tệp'}
+          </button>
+          <button className="btn mobile-only" disabled={busy} onClick={() => camRef.current?.click()}>
+            <Camera size={15} /> Chụp ảnh
           </button>
         </div>
       )}

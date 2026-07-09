@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Target, Plus, ChevronRight, Building2 } from 'lucide-react'
+import { Target, Plus, ChevronRight, Building2, Printer } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import EmptyState from '../components/shared/EmptyState'
 import { ACTION_STATUS } from '../data/constants'
@@ -55,8 +55,11 @@ export default function ActionLog() {
             <option value="">Tất cả kỳ</option>
             {periods.map((p) => <option key={p} value={p}>Tháng {p.slice(5)}/{p.slice(0, 4)}</option>)}
           </select>
+          <button className="btn no-print" onClick={() => window.print()} title="In / Xuất bản họp">
+            <Printer size={15} /> In
+          </button>
           {canManageActions && (
-            <button className="btn btn-primary" onClick={() => openCreateActionModal()}>
+            <button className="btn btn-primary no-print" onClick={() => openCreateActionModal()}>
               <Plus size={15} /> Tạo Action
             </button>
           )}

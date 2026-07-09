@@ -1005,3 +1005,17 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 
 /* watcher toggle */
 .btn-ghost.is-watching { color: var(--accent); }
+
+/* ── Print Action Log (item 15) ── */
+@media print {
+  .sidebar, .topbar, .mobile-nav, .no-print { display: none !important; }
+  .app-shell { display: block; height: auto; overflow: visible; }
+  .app-content { overflow: visible !important; }
+  .page { max-width: 100%; padding: 0; }
+  .actlog-row, .actlog-dept, .card { break-inside: avoid; }
+  .actlog-row:hover { background: none; }
+}
+
+/* ── Activity timeline polish (item 19) ── */
+.activity-item { border-left: 2px solid var(--border); padding-left: 12px; margin-left: 6px; }
+.activity-item:hover { border-left-color: var(--accent); }
