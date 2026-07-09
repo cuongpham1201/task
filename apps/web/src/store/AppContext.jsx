@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
 import { apiFetch, uploadFile } from '../api/client'
 import { apiBase } from '../auth/authConfig'
+import { pushRecent } from '../utils/useLocalStorage'
 import {
   canManageTask, canUpdateStatus, canWorkSubtasks, canComment, canCreateTask,
   canCreateDeptTask, canCreateChannelTask, visibleDepartmentsFor, visibleChannelsFor,
@@ -347,7 +348,10 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
       dismissToast: (id) => dispatch({ type: 'REMOVE_TOAST', id }),
 
       // UI actions
-      selectTask: (id) => dispatch({ type: 'SELECT_TASK', id }),
+      selectTask: (id) => {
+        if (id) { const t = findTask(id); if (t) pushRecent({ type: 'task', id, title: t.title }) }
+        dispatch({ type: 'SELECT_TASK', id })
+      },
       openCreateModal: (defaults) => dispatch({ type: 'OPEN_CREATE_MODAL', defaults }),
       closeCreateModal: () => dispatch({ type: 'CLOSE_CREATE_MODAL' }),
       setCurrentUser: (id) => dispatch({ type: 'SET_CURRENT_USER', id }),

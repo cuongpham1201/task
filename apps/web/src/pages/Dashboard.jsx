@@ -4,6 +4,7 @@ import {
   ClipboardList, CheckCircle2, AlertTriangle, ClipboardCheck, ChevronRight,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
+import { getRecent } from '../utils/useLocalStorage'
 import { deptColor } from '../utils/color'
 import { StatusBadge } from '../components/shared/badges'
 import {
@@ -49,6 +50,7 @@ export default function Dashboard() {
   const me = currentUser?.id
 
   const mine = myTasks()
+  const recent = getRecent()
   const buckets = useMemo(() => {
     const returned = mine.filter((t) => t.status === 'returned')
     // Bucket theo thời gian chỉ tính việc mình còn xử lý được:
@@ -146,6 +148,23 @@ export default function Dashboard() {
             </>
           )}
         </div>
+
+        {recent.length > 0 && (
+          <div className="card">
+            <div className="card-head"><h2>Gần đây</h2></div>
+            <div className="dash-task-list">
+              {recent.map((r) => (r.type === 'task' ? (
+                <button key={`t${r.id}`} className="dash-task" onClick={() => selectTask(r.id)}>
+                  <span className="dash-task-title">{r.title}</span><span className="muted">việc</span>
+                </button>
+              ) : (
+                <Link key={`${r.type}${r.id}`} className="dash-task" to={r.type === 'action' ? `/actions/${r.id}` : `/channels/${r.id}`}>
+                  <span className="dash-task-title">{r.title}</span><span className="muted">{r.type === 'action' ? 'action' : 'dự án'}</span>
+                </Link>
+              )))}
+            </div>
+          </div>
+        )}
 
         {deptOverview.length > 0 && (
           <div className="card">

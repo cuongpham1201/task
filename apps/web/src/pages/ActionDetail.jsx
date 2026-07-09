@@ -11,6 +11,7 @@ import {
   ACTION_STATUS, ACTION_STATUS_ORDER, ACTION_UPDATE_TYPE, ACTION_UPDATE_TYPE_ORDER,
 } from '../data/constants'
 import { formatDate, formatDateFull, timeAgo, isOverdue } from '../utils/date'
+import { pushRecent } from '../utils/useLocalStorage'
 
 export default function ActionDetail() {
   const { id } = useParams()
@@ -28,7 +29,7 @@ export default function ActionDetail() {
 
   const load = () => {
     setLoading(true)
-    fetchActionDetail(id).then((d) => setDetail(d)).catch(() => setDetail(null)).finally(() => setLoading(false))
+    fetchActionDetail(id).then((d) => { setDetail(d); if (d) pushRecent({ type: 'action', id, title: d.title }) }).catch(() => setDetail(null)).finally(() => setLoading(false))
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [id])

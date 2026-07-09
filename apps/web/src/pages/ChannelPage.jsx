@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   LayoutGrid, List, Kanban, Users, Activity, Plus, Hash, UserPlus, X, Pencil, Archive,
@@ -13,6 +13,7 @@ import Breadcrumb from '../components/shared/Breadcrumb'
 import { STATUS, STATUS_ORDER } from '../data/constants'
 import { activityText } from '../utils/activity'
 import { timeAgo, isOverdue, isUpcoming } from '../utils/date'
+import { pushRecent } from '../utils/useLocalStorage'
 
 const TABS = [
   { key: 'overview', label: 'Tổng quan', icon: LayoutGrid },
@@ -47,6 +48,8 @@ export default function ChannelPage() {
     const ids = new Set(allTasks.map((t) => t.id))
     return state.activities.filter((a) => ids.has(a.taskId)).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
   }, [channel, allTasks, state.activities])
+
+  useEffect(() => { if (channel) pushRecent({ type: 'project', id: channel.id, title: channel.name }) /* eslint-disable-next-line */ }, [channel?.id])
 
   if (!channel) return <div className="page"><p>Không tìm thấy dự án.</p></div>
 

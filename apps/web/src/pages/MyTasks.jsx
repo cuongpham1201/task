@@ -5,6 +5,7 @@ import TaskTable from '../components/task/TaskTable'
 import QuickAddTask from '../components/task/QuickAddTask'
 import { STATUS } from '../data/constants'
 import { isOverdue, isDueToday, isUpcoming } from '../utils/date'
+import { useLocalStorage } from '../utils/useLocalStorage'
 
 const TABS = [
   { key: 'all', label: 'Tất cả' },
@@ -19,9 +20,9 @@ const inReview = (t) => t.status === 'submitted' || t.status === 'returned'
 
 export default function MyTasks() {
   const { myTasks, openCreateModal, channelsById } = useApp()
-  const [tab, setTab] = useState('all')
-  const [sortBy, setSortBy] = useState('due')
-  const [groupBy, setGroupBy] = useState('none')
+  const [tab, setTab] = useLocalStorage('mytasks.tab', 'all')
+  const [sortBy, setSortBy] = useLocalStorage('mytasks.sort', 'due')
+  const [groupBy, setGroupBy] = useLocalStorage('mytasks.group', 'none')
 
   const all = myTasks()
   const filtered = useMemo(() => {

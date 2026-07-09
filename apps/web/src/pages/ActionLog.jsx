@@ -6,6 +6,7 @@ import EmptyState from '../components/shared/EmptyState'
 import { ACTION_STATUS } from '../data/constants'
 import { deptColor } from '../utils/color'
 import { formatDate, isOverdue } from '../utils/date'
+import { useLocalStorage } from '../utils/useLocalStorage'
 
 function ActionStatusBadge({ status }) {
   const s = ACTION_STATUS[status] || { label: status, tone: 'gray' }
@@ -27,7 +28,7 @@ export default function ActionLog() {
   const { fetchActionLog, canManageActions, openCreateActionModal, usersById, channelsById } = useApp()
   const navigate = useNavigate()
   const periods = useMemo(recentPeriods, [])
-  const [period, setPeriod] = useState('') // '' = tất cả kỳ
+  const [period, setPeriod] = useLocalStorage('actionlog.period', '') // '' = tất cả kỳ
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
