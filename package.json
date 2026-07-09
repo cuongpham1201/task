@@ -11,6 +11,7 @@
     "dev:api": "npm run start:dev -w api",
     "build:api": "npm run build -w api",
     "db:migrate": "npm run prisma:migrate -w api",
-    "db:seed": "npm run prisma:seed -w api"
+    "db:seed": "npm run prisma:seed -w api",
+    "sync:hrm-dev": "node --env-file=apps/api/.env apps/api/scripts/sync-hrm-dev.mjs"
   }
 }
