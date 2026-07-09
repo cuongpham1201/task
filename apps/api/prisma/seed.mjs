@@ -174,7 +174,22 @@ async function main() {
     }))),
   })
 
-  await prisma.task.createMany({ data: tasks.map(({ collaboratorIds, ...t }) => t) })
+  // A1: set chiều tường minh org_unit_id/project_id/review_required (mirror backfill migration)
+  const userOrg = Object.fromEntries(users.map((u) => [u.id, u.orgUnitId]))
+  const enrich = (t) => {
+    const ws = t.workspaceId
+    const isProject = ws && ws.startsWith('p')
+    const orgUnitId = ws && ws.startsWith('w-')
+      ? ws.slice(2) // workspace org_unit → dept id
+      : (userOrg[t.assigneeId] ?? userOrg[t.creatorId] ?? null) // project/cá nhân → org assignee/creator
+    return {
+      ...t,
+      orgUnitId,
+      projectId: isProject ? ws : null,
+      reviewRequired: t.completionMode === 'review_required',
+    }
+  }
+  await prisma.task.createMany({ data: tasks.map(({ collaboratorIds, ...t }) => enrich(t)) })
   await prisma.taskCollaborator.createMany({
     data: tasks.flatMap((t) => t.collaboratorIds.map((userId) => ({ taskId: t.id, userId }))),
   })

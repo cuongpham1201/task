@@ -143,6 +143,23 @@ enum PushStatus {
   @@map("push_status")
 }
 
+// ── A1: Action Log (cam kết/mục tiêu quản lý, thuộc org_unit) ──
+enum ActionStatus {
+  todo
+  doing
+  done
+  paused
+
+  @@map("action_status")
+}
+
+enum ProgressMode {
+  manual
+  auto_from_tasks
+
+  @@map("progress_mode")
+}
+
 model User {
   id          String   @id @default(uuid())
   entraId     String?  @unique @map("entra_id")
@@ -173,6 +190,9 @@ model User {
   notifications         Notification[]
   attachments           Attachment[]
   externalMapping       ExternalUserMapping?
+  ownedActions          Action[]             @relation("ActionOwner")
+  createdActions        Action[]             @relation("ActionCreatedBy")
+  reviewedKpiResults    TaskKpiResult[]      @relation("KpiResultReviewer")
 
   @@map("users")
 }
@@ -190,11 +210,14 @@ model OrgUnit {
   source        String      @default("HRM")
   externalHrmId String?     @map("external_hrm_id")
 
-  parent    OrgUnit?      @relation("OrgTree", fields: [parentId], references: [id])
-  children  OrgUnit[]     @relation("OrgTree")
-  members   User[]        @relation("OrgUnitMembers")
-  roles     OrgUnitRole[]
-  workspace Workspace? // workspace ORG_UNIT tương ứng (1-1)
+  parent         OrgUnit?        @relation("OrgTree", fields: [parentId], references: [id])
+  children       OrgUnit[]       @relation("OrgTree")
+  members        User[]          @relation("OrgUnitMembers")
+  roles          OrgUnitRole[]
+  workspace      Workspace? // workspace ORG_UNIT tương ứng (1-1)
+  tasks          Task[]          @relation("TaskOrgUnit")
+  actions        Action[]        @relation("ActionOrgUnit")
+  kpiDefinitions KpiDefinition[] @relation("KpiDefOrgUnit")
 
   @@index([parentId])
   @@index([type])
@@ -256,31 +279,44 @@ model WorkspaceMember {
 }
 
 model Task {
-  id             String         @id @default(uuid())
-  title          String
-  description    String         @default("")
-  workspaceId    String?        @map("workspace_id") // null = việc cá nhân
-  section        TaskSection?
-  creatorId      String         @map("creator_id")
-  assigneeId     String         @map("assignee_id")
-  status         TaskStatus     @default(todo)
-  completionMode CompletionMode @default(self) @map("completion_mode")
-  priority       TaskPriority   @default(normal)
-  startDate      DateTime?      @map("start_date") @db.Date
-  dueDate        DateTime?      @map("due_date") @db.Date
-  progress       Int            @default(0) @db.SmallInt
-  sortOrder      Float          @default(0) @map("sort_order")
-  archived       Boolean        @default(false)
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
-  completedAt    DateTime?      @map("completed_at")
-  completedById  String?        @map("completed_by")
+  id              String         @id @default(uuid())
+  title           String
+  description     String         @default("")
+  workspaceId     String?        @map("workspace_id") // null = việc cá nhân (DEPRECATED sau A2 — thay bằng org_unit_id/project_id)
+  // ── A1: các chiều tường minh ──
+  orgUnitId       String?        @map("org_unit_id") // đơn vị chịu trách nhiệm (bắt buộc ở tầng app với task nghiệp vụ)
+  projectId       String?        @map("project_id") // P1: = workspace.id của workspace type=project (không đặt FK để dễ tách bảng projects sau)
+  actionId        String?        @map("action_id") // thuộc Action nào (nullable)
+  section         TaskSection?
+  creatorId       String         @map("creator_id")
+  assigneeId      String         @map("assignee_id")
+  status          TaskStatus     @default(todo)
+  completionMode  CompletionMode @default(self) @map("completion_mode") // DEPRECATED — dùng reviewRequired
+  reviewRequired  Boolean        @default(false) @map("review_required")
+  priority        TaskPriority   @default(normal)
+  startDate       DateTime?      @map("start_date") @db.Date
+  dueDate         DateTime?      @map("due_date") @db.Date
+  progress        Int            @default(0) @db.SmallInt
+  sortOrder       Float          @default(0) @map("sort_order")
+  archived        Boolean        @default(false)
+  // ── A1: KPI evidence (App KHÔNG tính điểm cuối — chỉ mapping/evidence) ──
+  isScorable      Boolean        @default(false) @map("is_scorable")
+  kpiDefinitionId String?        @map("kpi_definition_id")
+  kpiWeight       Float?         @map("kpi_weight")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  completedAt     DateTime?      @map("completed_at")
+  acceptedAt      DateTime?      @map("accepted_at") // thời điểm nghiệm thu Đạt
+  completedById   String?        @map("completed_by")
 
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
-  creator     User       @relation("TaskCreator", fields: [creatorId], references: [id])
-  assignee    User       @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  completedBy User?      @relation("TaskCompletedBy", fields: [completedById], references: [id])
-  review      TaskReview?
+  workspace     Workspace?     @relation(fields: [workspaceId], references: [id])
+  orgUnit       OrgUnit?       @relation("TaskOrgUnit", fields: [orgUnitId], references: [id])
+  action        Action?        @relation(fields: [actionId], references: [id])
+  kpiDefinition KpiDefinition? @relation(fields: [kpiDefinitionId], references: [id])
+  creator       User           @relation("TaskCreator", fields: [creatorId], references: [id])
+  assignee      User           @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  completedBy   User?          @relation("TaskCompletedBy", fields: [completedById], references: [id])
+  review        TaskReview?
 
   collaborators TaskCollaborator[]
   watchers      TaskWatcher[]
@@ -288,9 +324,13 @@ model Task {
   comments      Comment[]
   activities    Activity[]
   attachments   Attachment[]
+  kpiResults    TaskKpiResult[]
 
   @@index([assigneeId])
   @@index([workspaceId, status])
+  @@index([orgUnitId, status])
+  @@index([projectId, status])
+  @@index([actionId])
   @@index([dueDate])
   @@index([status])
   @@map("tasks")
@@ -455,8 +495,22 @@ model TaskKpiResult {
   idempotencyKey  String     @unique @map("idempotency_key")
   pushStatus      PushStatus @default(pending) @map("push_status")
   createdAt       DateTime   @default(now()) @map("created_at")
+  // ── A1: evidence bổ sung (App sinh, HRM tiêu thụ — App KHÔNG tính điểm cuối) ──
+  orgUnitId       String?    @map("org_unit_id")
+  kpiDefinitionId String?    @map("kpi_definition_id")
+  kpiWeight       Float?     @map("kpi_weight")
+  reviewResult    String?    @map("review_result") // accepted | returned
+  onTime          Boolean?   @map("on_time")
+  evidenceNote    String?    @map("evidence_note")
+  reviewedById    String?    @map("reviewed_by")
+  reviewedAt      DateTime?  @map("reviewed_at")
+  externalHrmId   String?    @map("external_hrm_id") // id bên HRM sau khi push
+
+  task       Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("KpiResultReviewer", fields: [reviewedById], references: [id])
 
   @@index([pushStatus])
+  @@index([taskId])
   @@map("task_kpi_results")
 }
 
@@ -472,4 +526,54 @@ model SyncLog {
   createdAt  DateTime      @default(now()) @map("created_at")
 
   @@map("sync_logs")
+}
+
+// ── A1: Action = cam kết/mục tiêu quản lý, thuộc 1 org_unit (KHÔNG thuộc project).
+// Action là container; KHÔNG nghiệm thu, KHÔNG tính KPI trực tiếp. Chỉ Task mới review/KPI.
+model Action {
+  id           String       @id @default(uuid())
+  title        String
+  description  String       @default("")
+  orgUnitId    String       @map("org_unit_id")
+  ownerId      String       @map("owner_id")
+  deadline     DateTime?    @db.Date
+  status       ActionStatus @default(todo)
+  priority     TaskPriority @default(normal)
+  progressMode ProgressMode @default(manual) @map("progress_mode")
+  progress     Int          @default(0) @db.SmallInt
+  period       String? // vd '2026-07'
+  createdById  String       @map("created_by")
+  archived     Boolean      @default(false)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  orgUnit   OrgUnit @relation("ActionOrgUnit", fields: [orgUnitId], references: [id])
+  owner     User    @relation("ActionOwner", fields: [ownerId], references: [id])
+  createdBy User    @relation("ActionCreatedBy", fields: [createdById], references: [id])
+  tasks     Task[]
+
+  @@index([orgUnitId, period])
+  @@index([status])
+  @@map("actions")
+}
+
+// ── A1: KPI definition = cache read-only từ HRM (source=HRM) hoặc mẫu local (source=local_seed).
+// App KHÔNG là master định nghĩa KPI; đây chỉ để Task ánh xạ + hiển thị. Sync thật ở A6.
+model KpiDefinition {
+  id            String   @id @default(uuid())
+  externalHrmId String?  @unique @map("external_hrm_id")
+  orgUnitId     String?  @map("org_unit_id")
+  name          String
+  unit          String? // đơn vị đo
+  defaultWeight Float?   @map("default_weight")
+  periodType    String?  @map("period_type")
+  active        Boolean  @default(true)
+  source        String   @default("HRM") // HRM | local_seed
+  syncedAt      DateTime @default(now()) @map("synced_at")
+
+  orgUnit OrgUnit? @relation("KpiDefOrgUnit", fields: [orgUnitId], references: [id])
+  tasks   Task[]
+
+  @@index([orgUnitId])
+  @@map("kpi_definitions")
 }
