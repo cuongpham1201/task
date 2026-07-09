@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { List, Kanban, CalendarDays, Plus } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import TaskTable from '../components/task/TaskTable'
+import QuickAddTask from '../components/task/QuickAddTask'
 import KanbanBoard from '../components/task/KanbanBoard'
 import CalendarView from '../components/task/CalendarView'
 import { AvatarGroup } from '../components/shared/Avatar'
@@ -84,6 +85,9 @@ export default function DepartmentPage() {
         ))}
       </div>
 
+      {view === 'list' && perms.createDeptTask(dept.id) && (
+        <QuickAddTask scope="department" departmentId={dept.id} placeholder="Thêm nhanh việc cho phòng… (Enter)" />
+      )}
       {view === 'list' && (
         <TaskTable
           tasks={tasks}

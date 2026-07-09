@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import TaskTable from '../components/task/TaskTable'
+import QuickAddTask from '../components/task/QuickAddTask'
 import KanbanBoard from '../components/task/KanbanBoard'
 import Avatar, { AvatarGroup } from '../components/shared/Avatar'
 import EmptyState from '../components/shared/EmptyState'
@@ -126,6 +127,9 @@ export default function ChannelPage() {
               {members.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
             </select>
           </div>
+          {perms.createChannelTask(channel) && (
+            <QuickAddTask scope="channel" channelId={channel.id} placeholder="Thêm nhanh việc cho dự án… (Enter)" />
+          )}
           {view === 'list'
             ? <TaskTable tasks={filtered} showContext={false} emptyText="Không có công việc phù hợp" />
             : <KanbanBoard tasks={filtered} />}

@@ -987,3 +987,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .side-section-title { position: relative; }
 .side-add { margin-left: auto; border: none; background: none; color: #7d8089; padding: 2px; border-radius: 4px; cursor: pointer; display: inline-flex; }
 .side-add:hover { background: var(--sidebar-hover); color: #fff; }
+
+/* ── Quick add + My Tasks group ── */
+.quick-add { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 220px; border: 1px dashed var(--border-strong); border-radius: 8px; padding: 6px 10px; background: var(--surface); }
+.quick-add input { flex: 1; border: none; padding: 4px 0; outline: none; background: none; }
+.quick-add:focus-within { border-color: var(--accent); border-style: solid; }
+.btn-sm { padding: 4px 8px; }
+.mytasks-group { margin-bottom: 14px; }
+.mytasks-group-title { font-size: 13px; font-weight: 600; color: var(--text-soft); margin: 10px 2px 6px; }
