@@ -9,6 +9,7 @@ const MODES = ['self', 'review_required']
 export class CreateTaskDto {
   @IsString() @MaxLength(255) title!: string
   @IsOptional() @IsString() description?: string
+  @IsOptional() @IsString() @MaxLength(2000) expectedOutput?: string
   @IsOptional() @IsString() workspaceId?: string | null // DEPRECATED (FE cũ) — null = việc cá nhân
   // Freeze §5: chiều tường minh (A3 gửi trực tiếp; A2 vẫn suy được từ workspaceId cho FE cũ)
   @IsOptional() @IsString() orgUnitId?: string | null
@@ -47,6 +48,7 @@ export class ProgressDto {
 export class UpdateTaskDto {
   @IsOptional() @IsString() @MaxLength(255) title?: string
   @IsOptional() @IsString() description?: string
+  @IsOptional() @IsString() @MaxLength(2000) expectedOutput?: string
   @IsOptional() @IsIn(SECTIONS) section?: string
   @IsOptional() @IsDateString() startDate?: string | null
 }

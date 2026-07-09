@@ -371,6 +371,7 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         const dto = {
           title: input.title || '(Chưa đặt tên)',
           description: input.description || '',
+          expectedOutput: input.expectedOutput || '',
           workspaceId,
           orgUnitId: input.orgUnitId ?? (scope === 'department' ? input.departmentId : undefined),
           projectId: input.projectId ?? (scope === 'channel' ? input.channelId : undefined),

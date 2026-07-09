@@ -50,6 +50,7 @@ export default function CreateTaskModal() {
       dueDate: '',
       priority: 'normal',
       completionMode: 'self', // 'review_required' = phải nộp nghiệm thu mới đóng được
+      expectedOutput: '',
       actionId: defaults.actionId || '',
       isScorable: false,
       kpiDefinitionId: '',
@@ -117,6 +118,7 @@ export default function CreateTaskModal() {
       {
         title: form.title.trim(),
         description: form.description.trim(),
+        expectedOutput: form.expectedOutput.trim(),
         scope: form.scope,
         departmentId: form.scope === 'department' ? form.departmentId : null,
         channelId: form.scope === 'channel' ? form.channelId : null,
@@ -168,6 +170,16 @@ export default function CreateTaskModal() {
               placeholder="Mô tả chi tiết công việc…"
               value={form.description}
               onChange={(e) => set({ description: e.target.value })}
+            />
+          </label>
+
+          <label className="form-field">
+            <span>Kết quả cần đạt</span>
+            <textarea
+              rows={2}
+              placeholder="VD: Nộp báo cáo đối chiếu công nợ, có xác nhận của NPP"
+              value={form.expectedOutput}
+              onChange={(e) => set({ expectedOutput: e.target.value })}
             />
           </label>
 

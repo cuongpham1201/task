@@ -57,6 +57,7 @@ export default function TaskDetailPanel() {
 
   const task = state.selectedTaskId ? getTask(state.selectedTaskId) : null
   const [description, setDescription] = useState('')
+  const [expectedLocal, setExpectedLocal] = useState('')
   const [progressLocal, setProgressLocal] = useState(0)
   const [commentText, setCommentText] = useState('')
   const [newSubtask, setNewSubtask] = useState('')
@@ -65,6 +66,7 @@ export default function TaskDetailPanel() {
   useEffect(() => {
     if (task) {
       setDescription(task.description || '')
+      setExpectedLocal(task.expectedOutput || '')
       setProgressLocal(task.progress || 0)
       setCommentText('')
       setNewSubtask('')
@@ -312,6 +314,19 @@ export default function TaskDetailPanel() {
                 }
               }}
               rows={3}
+            />
+          </div>
+
+          <div className="detail-section">
+            <h3>Kết quả cần đạt {reviewRequired && <span className="chip chip-review">đối chiếu khi nghiệm thu</span>}</h3>
+            <textarea
+              className="detail-desc"
+              placeholder={canManage ? 'Nhập kết quả cần đạt để nghiệm thu đối chiếu…' : 'Chưa đặt kết quả cần đạt'}
+              readOnly={!canManage}
+              value={expectedLocal}
+              onChange={(e) => setExpectedLocal(e.target.value)}
+              onBlur={() => { if (canManage && expectedLocal !== (task.expectedOutput || '')) updateTaskField(task.id, { expectedOutput: expectedLocal }) }}
+              rows={2}
             />
           </div>
 

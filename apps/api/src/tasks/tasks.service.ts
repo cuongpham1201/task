@@ -115,6 +115,7 @@ export class TasksService {
         data: {
           title: dto.title,
           description: dto.description ?? '',
+          expectedOutput: dto.expectedOutput ?? '',
           workspaceId: dims.workspaceId,
           orgUnitId: dims.orgUnitId,
           projectId: dims.projectId,
@@ -291,6 +292,7 @@ export class TasksService {
         data: {
           ...(dto.title !== undefined ? { title: dto.title } : {}),
           ...(dto.description !== undefined ? { description: dto.description } : {}),
+          ...(dto.expectedOutput !== undefined ? { expectedOutput: dto.expectedOutput } : {}),
           ...(dto.section !== undefined ? { section: dto.section as any } : {}),
           ...(dto.startDate !== undefined ? { startDate: dto.startDate ? new Date(dto.startDate) : null } : {}),
         },

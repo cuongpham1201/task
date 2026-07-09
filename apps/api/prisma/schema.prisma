@@ -299,6 +299,7 @@ model Task {
   id              String         @id @default(uuid())
   title           String
   description     String         @default("")
+  expectedOutput  String         @default("") @map("expected_output") // Kết quả cần đạt (nghiệm thu đối chiếu)
   workspaceId     String?        @map("workspace_id") // null = việc cá nhân (DEPRECATED sau A2 — thay bằng org_unit_id/project_id)
   // ── A1: các chiều tường minh ──
   orgUnitId       String?        @map("org_unit_id") // đơn vị chịu trách nhiệm (bắt buộc ở tầng app với task nghiệp vụ)
