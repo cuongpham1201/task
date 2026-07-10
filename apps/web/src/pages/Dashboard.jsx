@@ -52,16 +52,16 @@ export default function Dashboard() {
   const mine = myTasks()
   const recent = getRecent()
   const buckets = useMemo(() => {
-    const returned = mine.filter((t) => t.status === 'returned')
-    // Bucket theo thời gian chỉ tính việc mình còn xử lý được:
-    // loại 'done' (đã xong), 'returned' (đã có bucket riêng), 'submitted' (đang chờ nghiệm thu, ngoài tầm tay)
-    // → mỗi task chỉ xuất hiện ở đúng một nhóm.
-    const active = mine.filter(
-      (t) => t.status !== 'done' && t.status !== 'returned' && t.status !== 'submitted'
-    )
+    // Phân hoạch TOÀN BỘ việc CHƯA XONG của tôi vào đúng một nhóm (không bỏ sót):
+    const nonDone = mine.filter((t) => t.status !== 'done')
+    const returned = nonDone.filter((t) => t.status === 'returned')
+    const submittedMine = nonDone.filter((t) => t.status === 'submitted')
+    const active = nonDone.filter((t) => t.status !== 'returned' && t.status !== 'submitted')
     const overdue = active.filter(isOverdue)
     const today = active.filter((t) => isDueToday(t) && !isOverdue(t))
     const week = active.filter((t) => isUpcoming(t, 7) && !isDueToday(t) && !isOverdue(t))
+    // Catch-all: việc đang xử lý nhưng hạn xa (>7 ngày) hoặc CHƯA đặt hạn → vẫn phải hiện
+    const later = active.filter((t) => !isOverdue(t) && !isDueToday(t) && !isUpcoming(t, 7))
     const toReview = state.tasks.filter(
       (t) => t.status === 'submitted' && (t.creatorId === me || perms.review(t))
     )
@@ -69,12 +69,12 @@ export default function Dashboard() {
       .filter((t) => t.status === 'done')
       .sort((a, b) => new Date(b.completedAt || b.updatedAt) - new Date(a.completedAt || a.updatedAt))
       .slice(0, 5)
-    return { overdue, today, week, returned, toReview, recentDone }
+    return { overdue, today, week, later, returned, submittedMine, toReview, recentDone, nonDoneCount: nonDone.length }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mine, state.tasks, me])
 
   const stats = {
-    total: mine.length,
+    total: buckets.nonDoneCount, // "Việc của tôi" = việc CHƯA XONG → khớp với widget
     done: mine.filter((t) => t.status === 'done').length,
     overdue: buckets.overdue.length,
     review: buckets.toReview.length,
@@ -112,8 +112,8 @@ export default function Dashboard() {
   }, [canManageActions, state.actions, me])
 
   const nothingPersonal =
-    buckets.overdue.length + buckets.today.length + buckets.week.length +
-    buckets.returned.length + buckets.toReview.length + buckets.recentDone.length === 0
+    buckets.overdue.length + buckets.today.length + buckets.week.length + buckets.later.length +
+    buckets.returned.length + buckets.submittedMine.length + buckets.toReview.length + buckets.recentDone.length === 0
 
   return (
     <div className="page">
@@ -142,7 +142,9 @@ export default function Dashboard() {
               <Bucket title="Quá hạn" tone="t-red" tasks={buckets.overdue} selectTask={selectTask} />
               <Bucket title="Hôm nay" tone="t-green" tasks={buckets.today} selectTask={selectTask} />
               <Bucket title="Tuần này" tasks={buckets.week} selectTask={selectTask} />
+              <Bucket title="Sắp tới / chưa đặt hạn" tasks={buckets.later} selectTask={selectTask} />
               <Bucket title="Bị trả lại — chờ tôi xử lý" tone="t-red" tasks={buckets.returned} selectTask={selectTask} />
+              <Bucket title="Đã nộp — chờ nghiệm thu" tone="t-amber" tasks={buckets.submittedMine} selectTask={selectTask} />
               <Bucket title="Chờ tôi nghiệm thu" tone="t-amber" tasks={buckets.toReview} selectTask={selectTask} />
               <Bucket title="Hoàn thành gần đây" tasks={buckets.recentDone} selectTask={selectTask} />
             </>
