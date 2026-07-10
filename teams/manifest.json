@@ -1,0 +1,53 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "8ff868b3-844b-4006-b932-db7db82d9f05",
+  "packageName": "com.biahalong.giaoviec",
+  "developer": {
+    "name": "Bia Ha Long",
+    "websiteUrl": "https://task.biahalong.com",
+    "privacyUrl": "https://task.biahalong.com",
+    "termsOfUseUrl": "https://task.biahalong.com"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "Giao việc",
+    "full": "App Giao việc Bia Hạ Long"
+  },
+  "description": {
+    "short": "Giao việc và theo dõi công việc nội bộ",
+    "full": "Ứng dụng giao việc, theo dõi tiến độ, Action Log điều hành và nghiệm thu công việc nội bộ của Công ty CP Bia và NGK Hạ Long."
+  },
+  "accentColor": "#6B5CE7",
+  "staticTabs": [
+    {
+      "entityId": "giaoviec-home",
+      "name": "Việc của tôi",
+      "contentUrl": "https://task.biahalong.com/my-tasks?source=teams",
+      "websiteUrl": "https://task.biahalong.com/my-tasks",
+      "scopes": ["personal"]
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": ["task.biahalong.com"],
+  "webApplicationInfo": {
+    "id": "__AZURE_CLIENT_ID__",
+    "resource": "api://task.biahalong.com/__AZURE_CLIENT_ID__"
+  },
+  "activities": {
+    "activityTypes": [
+      { "type": "taskAssigned",       "description": "Được giao công việc",        "templateText": "Bạn được giao việc: {taskInfo}" },
+      { "type": "taskMentioned",      "description": "Được nhắc đến",              "templateText": "Bạn được nhắc đến trong: {taskInfo}" },
+      { "type": "taskCommented",      "description": "Có bình luận mới",           "templateText": "Bình luận mới: {taskInfo}" },
+      { "type": "taskDueSoon",        "description": "Công việc sắp đến hạn",      "templateText": "Sắp đến hạn: {taskInfo}" },
+      { "type": "taskOverdue",        "description": "Công việc quá hạn",          "templateText": "Quá hạn: {taskInfo}" },
+      { "type": "taskReturned",       "description": "Công việc bị trả lại",       "templateText": "Bị trả lại: {taskInfo}" },
+      { "type": "taskAccepted",       "description": "Công việc được nghiệm thu",  "templateText": "Đã nghiệm thu: {taskInfo}" },
+      { "type": "projectMemberAdded", "description": "Được thêm vào dự án",        "templateText": "Bạn được thêm vào dự án: {taskInfo}" }
+    ]
+  }
+}
