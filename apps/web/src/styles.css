@@ -1033,3 +1033,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .worklog-item { border-left: 2px solid var(--blue); padding: 4px 0 4px 10px; }
 .worklog-content { display: block; }
 .worklog-meta { font-size: 12px; }
+
+/* ── M365 avatar image ── */
+.avatar-img { border-radius: 50%; object-fit: cover; display: inline-block; flex-shrink: 0; }

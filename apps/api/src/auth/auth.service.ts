@@ -26,8 +26,8 @@ export class AuthService {
     return `${this.cfg.authorizeUrl}?${p.toString()}`
   }
 
-  /** Đổi authorization code lấy token, verify id_token, trả danh tính. */
-  async exchangeCode(code: string): Promise<SessionUser> {
+  /** Đổi authorization code lấy token, verify id_token, trả danh tính (+ access token Graph cho avatar). */
+  async exchangeCode(code: string): Promise<SessionUser & { accessToken?: string }> {
     const body = new URLSearchParams({
       client_id: this.cfg.clientId,
       client_secret: this.cfg.clientSecret,
@@ -59,6 +59,7 @@ export class AuthService {
       oid: (claims.oid as string) || (claims.sub as string) || null,
       email,
       name: (claims.name as string) || null,
+      accessToken: (json.access_token as string) || undefined, // scope User.Read → Graph /me/photo
     }
   }
 

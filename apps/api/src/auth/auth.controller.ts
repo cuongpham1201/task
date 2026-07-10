@@ -3,6 +3,8 @@ import { randomUUID } from 'crypto'
 import type { Request, Response } from 'express'
 import { AuthService } from './auth.service'
 import { SessionService } from './session.service'
+import { UsersService } from '../users/users.service'
+import { AvatarService } from '../users/avatar.service'
 
 const STATE_COOKIE = 'giaoviec_oauth_state'
 
@@ -11,6 +13,8 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly session: SessionService,
+    private readonly users: UsersService,
+    private readonly avatars: AvatarService,
   ) {}
 
   private secure() {
@@ -53,6 +57,11 @@ export class AuthController {
         return res.redirect(`${cfg.webOrigin}/?auth_error=domain`)
       }
       const token = await this.session.sign(user)
+      // BUG3: lấy ảnh Graph (delegated User.Read) — fire-and-forget, không chặn login
+      this.users
+        .resolveFromClaims({ oid: user.oid, email: user.email, name: user.name, raw: {} })
+        .then((u) => this.avatars.fetchAndCache(u.id, user.accessToken))
+        .catch(() => {})
       res.cookie(SessionService.COOKIE, token, {
         httpOnly: true,
         sameSite: 'lax',
