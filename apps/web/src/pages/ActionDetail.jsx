@@ -17,7 +17,7 @@ export default function ActionDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const {
-    fetchActionDetail, addActionUpdate, updateAction, archiveAction, canManageAction,
+    state, fetchActionDetail, addActionUpdate, updateAction, archiveAction, canManageAction,
     usersById, departmentsById, channelsById, orgUnitsById, selectTask, openCreateModal,
   } = useApp()
 
@@ -33,6 +33,14 @@ export default function ActionDetail() {
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [id])
+
+  // BUG2: đồng bộ snapshot khi task/action đổi ở nơi khác (tạo task từ modal, sửa trong
+  // panel, đổi status/review...) — state.tasks/actions đổi identity → refetch, không cần F5.
+  // fetchActionDetail không dispatch nên không tạo vòng lặp.
+  useEffect(() => {
+    if (!loading && detail) load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.tasks, state.actions])
 
   const canManage = useMemo(() => (detail ? canManageAction(detail) : false), [detail, canManageAction])
 

@@ -25,7 +25,7 @@ function recentPeriods() {
 }
 
 export default function ActionLog() {
-  const { fetchActionLog, canManageActions, openCreateActionModal, usersById, channelsById } = useApp()
+  const { state, fetchActionLog, canManageActions, openCreateActionModal, usersById, channelsById } = useApp()
   const navigate = useNavigate()
   const periods = useMemo(recentPeriods, [])
   const [period, setPeriod] = useLocalStorage('actionlog.period', '') // '' = tất cả kỳ
@@ -41,6 +41,13 @@ export default function ActionLog() {
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [period])
+
+  // BUG2: refetch khi actions/tasks đổi (tạo/sửa/lưu trữ action, tạo task thuộc action)
+  // → list + badge task luôn khớp, không cần F5. fetchActionLog không dispatch → không loop.
+  useEffect(() => {
+    if (!loading && data) load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.actions, state.tasks])
 
   const openAction = (id) => navigate(`/actions/${id}`)
 
