@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { BrowserRouter, Routes, Route, useNavigate, useSearchParams } from 'react-router-dom'
+import { isInTeamsHostFast, initTeams, getTeamsSubEntityId } from './utils/teams'
 import { AppProvider, useApp } from './store/AppContext'
 import { AuthProvider } from './auth/AuthProvider'
 import LoginGate from './auth/LoginGate'
@@ -22,11 +23,42 @@ import ActionDetail from './pages/ActionDetail'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 
+/** Deep link: ?task=<id> mở TaskDetailPanel (browser + Teams Activity Feed đều dùng). */
+function DeepLinkHandler() {
+  const { selectTask, getTask } = useApp()
+  const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const taskId = params.get('task')
+    if (taskId && getTask(taskId)) {
+      selectTask(taskId)
+      params.delete('task')
+      setParams(params, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params])
+
+  // Teams: init SDK + route theo subEntityId (chỉ chạy khi heuristic trong Teams — browser/PWA bỏ qua)
+  useEffect(() => {
+    if (!isInTeamsHostFast()) return
+    initTeams().then(async (ok) => {
+      if (!ok) return
+      const sub = await getTeamsSubEntityId()
+      if (sub && sub.startsWith('/')) navigate(sub, { replace: true })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return null
+}
+
 function AppShell() {
   const { state } = useApp()
   const [drawerOpen, setDrawerOpen] = useState(false)
   return (
     <div className="app-shell">
+      <DeepLinkHandler />
       <Sidebar />
       <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
       <div className="app-main">

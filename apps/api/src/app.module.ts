@@ -13,6 +13,7 @@ import { ProjectsModule } from './projects/projects.module'
 import { ActionsModule } from './actions/actions.module'
 import { AttachmentsModule } from './attachments/attachments.module'
 import { ReportsModule } from './reports/reports.module'
+import { TeamsModule } from './teams/teams.module'
 import { BootstrapModule } from './bootstrap/bootstrap.module'
 
 @Module({
@@ -30,6 +31,7 @@ import { BootstrapModule } from './bootstrap/bootstrap.module'
     ActionsModule,
     AttachmentsModule,
     ReportsModule,
+    TeamsModule,
     BootstrapModule,
   ],
   controllers: [HealthController],

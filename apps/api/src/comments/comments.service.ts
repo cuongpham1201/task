@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { PrismaService } from '../prisma/prisma.service'
 import { PolicyService } from '../common/policy.service'
 import { NotificationsService } from '../notifications/notifications.service'
+import { TeamsActivityService } from '../teams/teams-activity.service'
 
 type Me = { id: string; role: string; orgUnitId: string | null }
 
@@ -11,6 +12,7 @@ export class CommentsService {
     private readonly prisma: PrismaService,
     private readonly policy: PolicyService,
     private readonly notifications: NotificationsService,
+    private readonly teams: TeamsActivityService,
   ) {}
 
   async create(me: Me, taskId: string, content: string, mentionIds: string[] = []) {
@@ -31,6 +33,35 @@ export class CommentsService {
       }
       return c
     })
+    // Teams Activity (SAU commit): comment cho stakeholders; mention riêng cho người được nhắc.
+    // eventSuffix = comment.id (bền) → cùng comment không bao giờ gửi trùng.
+    const [collaborators, watchers] = await Promise.all([
+      this.prisma.taskCollaborator.findMany({ where: { taskId }, select: { userId: true } }),
+      this.prisma.taskWatcher.findMany({ where: { taskId }, select: { userId: true } }),
+    ])
+    const mentionSet = new Set((mentionIds || []).filter(Boolean))
+    const commentRecipients = new Set<string>([
+      task.assigneeId, task.creatorId,
+      ...collaborators.map((c) => c.userId), ...watchers.map((w) => w.userId),
+    ])
+    const preview = content.length > 120 ? content.slice(0, 117) + '…' : content
+    const events = []
+    for (const uid of mentionSet) {
+      events.push({
+        type: 'taskMentioned' as const, recipientUserId: uid, actorUserId: me.id,
+        targetType: 'task' as const, targetId: taskId, taskInfo: task.title,
+        previewText: preview, path: `/my-tasks?task=${taskId}`, eventSuffix: comment.id,
+      })
+    }
+    for (const uid of commentRecipients) {
+      if (mentionSet.has(uid)) continue // đã nhận mention — không gửi kép
+      events.push({
+        type: 'taskCommented' as const, recipientUserId: uid, actorUserId: me.id,
+        targetType: 'task' as const, targetId: taskId, taskInfo: task.title,
+        previewText: preview, path: `/my-tasks?task=${taskId}`, eventSuffix: comment.id,
+      })
+    }
+    this.teams.sendMany(events)
     return comment
   }
 

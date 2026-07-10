@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { PolicyService } from '../common/policy.service'
 import { VisibilityService, type Me } from '../common/visibility.service'
 import { NotificationsService } from '../notifications/notifications.service'
+import { TeamsActivityService } from '../teams/teams-activity.service'
 import type {
   AssigneeDto, CreateTaskDto, DueDateDto, PriorityDto, ProgressDto, ReviewDto, UpdateTaskDto,
 } from './task.dto'
@@ -14,7 +15,13 @@ export class TasksService {
     private readonly policy: PolicyService,
     private readonly vis: VisibilityService,
     private readonly notifications: NotificationsService,
+    private readonly teams: TeamsActivityService,
   ) {}
+
+  /** Deep link path của task (khớp FE ?task= + Teams subEntityId). */
+  private taskPath(id: string) {
+    return `/my-tasks?task=${id}`
+  }
 
   // ── Đọc (đã scope theo quyền) — shape khớp frontend hiện tại + chiều mới ──
   async findAll(me: Me) {
@@ -151,6 +158,13 @@ export class TasksService {
       await this.notifications.emit(tx, { task: created, actorId: me.id, action: 'create', notifyType: 'task_assigned' })
       return created
     })
+    // Teams Activity (fire-and-forget, SAU commit): giao việc cho assignee
+    this.teams.sendMany([{
+      type: 'taskAssigned', recipientUserId: task.assigneeId, actorUserId: me.id,
+      targetType: 'task', targetId: task.id, taskInfo: task.title,
+      previewText: 'Bạn được giao một công việc mới', path: this.taskPath(task.id),
+      eventSuffix: 'create',
+    }])
     const serialized = await this.withCollaborators(task.id)
     const subtasks = await this.prisma.subtask.findMany({ where: { taskId: task.id }, orderBy: { sortOrder: 'asc' } })
     return { ...serialized, subtasks }
@@ -239,6 +253,14 @@ export class TasksService {
       }
       await this.notifications.emit(tx, { task, actorId: me.id, action: 'review', metadata: { decision: dto.decision }, notifyType: passed ? 'task_accepted' : 'task_returned' })
     })
+    // Teams Activity: kết quả nghiệm thu cho người thực hiện (suffix = mốc review → idempotent per review)
+    this.teams.sendMany([{
+      type: passed ? 'taskAccepted' : 'taskReturned',
+      recipientUserId: task.assigneeId, actorUserId: me.id,
+      targetType: 'task', targetId: id, taskInfo: task.title,
+      previewText: passed ? 'Công việc của bạn đã được nghiệm thu Đạt' : `Bị trả lại${dto.note ? ': ' + dto.note : ''}`,
+      path: this.taskPath(id), eventSuffix: String(now.getTime()),
+    }])
     return this.withCollaborators(id)
   }
 
@@ -249,6 +271,13 @@ export class TasksService {
       await tx.task.update({ where: { id }, data: { assigneeId: dto.assigneeId } })
       await this.notifications.emit(tx, { task: { ...task, assigneeId: dto.assigneeId }, actorId: me.id, action: 'assign', metadata: { from: task.assigneeId, to: dto.assigneeId }, notifyType: 'task_assigned', extraRecipients: [dto.assigneeId] })
     })
+    // Teams Activity: giao lại cho người thực hiện mới
+    this.teams.sendMany([{
+      type: 'taskAssigned', recipientUserId: dto.assigneeId, actorUserId: me.id,
+      targetType: 'task', targetId: id, taskInfo: task.title,
+      previewText: 'Bạn được giao một công việc', path: this.taskPath(id),
+      eventSuffix: `assign-${Date.now()}`,
+    }])
     return this.withCollaborators(id)
   }
 

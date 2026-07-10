@@ -5,6 +5,7 @@ import { AuthUser } from '../auth/current-user.decorator'
 import type { AuthClaims } from '../auth/auth.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { UsersService } from '../users/users.service'
+import { TeamsActivityService } from '../teams/teams-activity.service'
 
 class AddMemberDto {
   @IsString() userId!: string
@@ -25,6 +26,7 @@ export class ProjectsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
+    private readonly teams: TeamsActivityService,
   ) {}
 
   private map(w: any) {
@@ -100,6 +102,12 @@ export class ProjectsController {
       update: {},
     })
     const ws = await this.prisma.workspace.findUnique({ where: { id }, include: { members: { select: { userId: true } } } })
+    // Teams Activity: được thêm vào dự án (suffix cố định — thêm lại cùng dự án không gửi lại)
+    this.teams.sendMany([{
+      type: 'projectMemberAdded', recipientUserId: dto.userId, actorUserId: me.id,
+      targetType: 'project', targetId: id, taskInfo: ws?.name || 'Dự án',
+      previewText: 'Bạn được thêm vào dự án', path: `/channels/${id}`, eventSuffix: 'member',
+    }])
     return this.map(ws)
   }
 

@@ -552,6 +552,26 @@ model TaskWorkLog {
   @@map("task_work_logs")
 }
 
+// Teams Activity Feed delivery log — idempotency + trạng thái gửi + retry/error per recipient.
+// KHÔNG dùng notifications (không lưu attempt/error/entra) hay sync_logs (không có unique per-recipient key).
+model TeamsActivityDelivery {
+  id             String    @id @default(uuid())
+  eventKey       String    @unique @map("event_key") // <activityType>:<targetId>:<recipientId>:<suffix>
+  recipientId    String    @map("recipient_user_id")
+  recipientEntra String?   @map("recipient_entra_id")
+  activityType   String    @map("activity_type")
+  targetType     String    @map("target_type") // task | project
+  targetId       String    @map("target_id")
+  status         String // sent | skipped_missing_entra_id | error | disabled
+  attemptCount   Int       @default(0) @map("attempt_count")
+  lastError      String?   @map("last_error")
+  sentAt         DateTime? @map("sent_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([recipientId, createdAt])
+  @@map("teams_activity_deliveries")
+}
+
 model SyncLog {
   id         String        @id @default(uuid())
   direction  SyncDirection
