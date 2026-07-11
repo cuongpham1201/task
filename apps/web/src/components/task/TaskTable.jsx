@@ -103,6 +103,17 @@ function TableHead({ showContext, selectable, allChecked, onToggleAll }) {
   )
 }
 
+// Nhóm theo section — task chưa gán mục (section null, VD tạo từ dự án/chuyển đơn vị)
+// PHẢI vào nhóm "Chưa phân mục", không được biến mất khỏi danh sách.
+function sectionGroups(tasks) {
+  const groups = SECTION_ORDER
+    .map((key) => ({ key, name: SECTIONS[key], items: tasks.filter((t) => t.section === key) }))
+  const known = new Set(SECTION_ORDER)
+  const other = tasks.filter((t) => !known.has(t.section))
+  if (other.length) groups.push({ key: 'other', name: 'Chưa phân mục', items: other })
+  return groups.filter((g) => g.items.length > 0)
+}
+
 export default function TaskTable({ tasks, showContext = true, groupBySection = false, emptyText = 'Không có công việc nào' }) {
   const isMobile = useIsMobile()
 
@@ -119,9 +130,7 @@ export default function TaskTable({ tasks, showContext = true, groupBySection = 
         </div>
       )
     }
-    const groups = SECTION_ORDER
-      .map((key) => ({ key, name: SECTIONS[key], items: tasks.filter((t) => t.section === key) }))
-      .filter((g) => g.items.length > 0)
+    const groups = sectionGroups(tasks)
     return (
       <div className="task-card-list">
         {groups.map((g) => (
@@ -141,9 +150,7 @@ export default function TaskTable({ tasks, showContext = true, groupBySection = 
   }
 
   // Nhóm theo section kiểu Asana (dùng cho trang Phòng ban)
-  const groups = SECTION_ORDER
-    .map((key) => ({ key, name: SECTIONS[key], items: tasks.filter((t) => t.section === key) }))
-    .filter((g) => g.items.length > 0)
+  const groups = sectionGroups(tasks)
 
   return (
     <div className="table-wrap">
