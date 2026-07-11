@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { X, Plus, Eye, Pencil, Power, ShieldCheck } from 'lucide-react'
 import { apiFetch } from '../../api/client'
 import { useApp } from '../../store/AppContext'
+import { orgUnitLabel, orgUnitShortLabel } from '../../utils/org'
 
 /**
  * FEATURE-003 — "Vai trò tổ chức & phạm vi dữ liệu" (admin).
@@ -9,14 +10,15 @@ import { useApp } from '../../store/AppContext'
  * - KHÔNG suy quyền từ jobTitle. Preview phạm vi LẤY TỪ BACKEND (không tính lại ở FE).
  * - Xóa = vô hiệu hóa (archive, giữ lịch sử audit) — không hard delete.
  */
-const ROLE_LABEL = { ceo: 'Tổng giám đốc', block_director: 'Giám đốc khối', department_manager: 'Trưởng phòng/ban', viewer: 'Người xem' }
+const ROLE_LABEL = { ceo: 'Tổng giám đốc', block_director: 'Giám đốc khối', department_manager: 'Trưởng đơn vị', viewer: 'Người xem' }
 const SCOPE_LABEL = { self_only: 'Chỉ đơn vị này', include_children: 'Gồm đơn vị con' }
 const TYPE_LABEL = { company: 'Công ty', block: 'Khối', department: 'Phòng/ban' }
 const SOURCE_LABEL = { MANUAL: 'Admin gán', HRM_SYNC: 'HRM sync', MANUAL_TEST: 'Seed test', SEED: 'Seed' }
 const EMPTY_FORM = { role: 'department_manager', orgUnitId: '', scope: 'self_only', note: '' }
 
 export default function OrgRolesModal({ user, onClose }) {
-  const { toast } = useApp()
+  const { toast, state } = useApp()
+  const homeDept = state.departments.find((d) => d.id === user.orgUnitId)
   const [roles, setRoles] = useState(null)
   const [orgUnits, setOrgUnits] = useState([])
   const [effective, setEffective] = useState(null)
@@ -35,12 +37,8 @@ export default function OrgRolesModal({ user, onClose }) {
     // eslint-disable-next-line
   }, [user.id])
 
-  const orgById = useMemo(() => Object.fromEntries(orgUnits.map((o) => [o.id, o])), [orgUnits])
-  const orgLabel = (o) => {
-    if (!o) return '—'
-    const parent = o.parentId ? orgById[o.parentId] : null
-    return `${parent ? parent.name + ' → ' : ''}${o.name}${o.active ? '' : ' (NGƯNG)'}`
-  }
+  // FEATURE-004: nhãn đơn vị luôn kèm pháp nhân + mã (nhiều đơn vị trùng tên)
+  const orgLabel = (o) => (o ? `${orgUnitLabel(o)}${o.active ? '' : ' (NGƯNG)'}` : '—')
   const grouped = useMemo(() => ({
     company: orgUnits.filter((o) => o.type === 'company'),
     block: orgUnits.filter((o) => o.type === 'block'),
@@ -105,12 +103,15 @@ export default function OrgRolesModal({ user, onClose }) {
               {!user.active && <> · <span className="badge tone-gray">NGƯNG HOẠT ĐỘNG</span></>}
             </p>
             <p className="muted" style={{ margin: '4px 0 0' }}>
-              Chức danh (HRM): {user.jobTitle || '—'} · Phòng ban (HRM): {user.orgUnitName || '—'} ·{' '}
+              Chức danh (HRM): {user.jobTitle || '—'} · Đơn vị biên chế (HRM):{' '}
+              {homeDept ? orgUnitShortLabel(homeDept) : (user.orgUnitName || '—')} ·{' '}
               {user.hasEntra && <span className="badge tone-blue">M365</span>}{' '}
               {user.hasLocal && <span className="badge tone-green">Local</span>}
+              {!user.hasEntra && !user.hasLocal && <span className="badge tone-gray">Chưa cấp đăng nhập</span>}
             </p>
             <p className="muted" style={{ margin: '4px 0 0', fontSize: 12 }}>
-              Chức danh HRM chỉ để hiển thị — quyền nghiệp vụ do vai trò tổ chức bên dưới quyết định.
+              Chức danh HRM & đơn vị biên chế chỉ để hiển thị (HRM là master) — quyền nghiệp vụ
+              do vai trò tổ chức bên dưới quyết định. Một người có thể quản/tham gia nhiều đơn vị.
             </p>
           </div>
 
@@ -176,6 +177,17 @@ export default function OrgRolesModal({ user, onClose }) {
               </tbody>
             </table>
           </div>
+
+          {/* FEATURE-004 TASK 6: chỗ dành sẵn cho OrgUnitMembership (phase sau) —
+              thành viên ban chức năng KHÔNG phải vai trò quản lý; sẽ có bảng/API riêng.
+              Không implement DB/API ở sprint này — chỉ giữ cấu trúc UI. */}
+          <div className="card-head" style={{ marginTop: 14, marginBottom: 6 }}>
+            <h2>Thành viên Ban chức năng</h2>
+          </div>
+          <p className="muted" style={{ margin: '0 0 4px', fontSize: 13 }}>
+            Chưa triển khai — phase sau (OrgUnitMembership): ghi nhận một người là <em>thành viên</em>{' '}
+            nhiều ban chức năng (khác với vai trò quản lý/xem ở trên).
+          </p>
 
           {/* Form thêm/sửa + preview phạm vi từ backend */}
           {form && (

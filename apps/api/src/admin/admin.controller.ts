@@ -22,7 +22,10 @@ class AccessDto {
   @IsOptional() @IsBoolean() unlock?: boolean
 }
 class RoleDto {
-  @IsIn(['admin', 'manager', 'member']) role!: string
+  // FEATURE-004: role kỹ thuật chỉ còn admin/member — "trưởng phòng" là VAI TRÒ
+  // TỔ CHỨC (org_unit_roles.department_manager), không phải role kỹ thuật.
+  // Enum DB giữ 'manager' để tương thích (0 user đang dùng), API không cho set nữa.
+  @IsIn(['admin', 'member']) role!: string
 }
 
 // ── FEATURE-003: vai trò tổ chức ──
@@ -236,7 +239,7 @@ export class AdminController {
     await this.admin(c)
     const units = await this.prisma.orgUnit.findMany({
       orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
-      select: { id: true, code: true, name: true, type: true, parentId: true, active: true },
+      select: { id: true, code: true, name: true, type: true, parentId: true, active: true, legalEntity: true },
     })
     return units
   }

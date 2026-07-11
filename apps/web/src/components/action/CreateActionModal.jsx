@@ -5,6 +5,7 @@ import { useApp } from '../../store/AppContext'
 import SearchUser from '../shared/SearchUser'
 import { PRIORITY, PRIORITY_ORDER } from '../../data/constants'
 import { fromInputDate } from '../../utils/date'
+import { orgUnitLabel } from '../../utils/org'
 
 const thisMonth = () => {
   const d = new Date()
@@ -69,7 +70,7 @@ export default function CreateActionModal() {
             <label className="form-field">
               <span>Đơn vị chịu trách nhiệm *</span>
               <select value={form.orgUnitId} onChange={(e) => set({ orgUnitId: e.target.value })}>
-                {deptOptions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                {deptOptions.map((d) => <option key={d.id} value={d.id}>{orgUnitLabel(d)}</option>)}
               </select>
             </label>
             <label className="form-field">

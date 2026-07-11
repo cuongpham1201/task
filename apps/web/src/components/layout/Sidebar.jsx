@@ -6,7 +6,7 @@ import { useApp } from '../../store/AppContext'
 import { deptColor } from '../../utils/color'
 import Avatar from '../shared/Avatar'
 import BrandLogo from '../shared/BrandLogo'
-import { ROLES } from '../../data/constants'
+import { roleLabel } from '../../data/constants'
 
 export default function Sidebar() {
   const { currentUser, unreadCount: unread, blocks, visibleDepartments, visibleChannels, canViewActionLog, openCreateProjectModal } = useApp()
@@ -92,7 +92,7 @@ export default function Sidebar() {
         <Avatar user={currentUser} size={32} />
         <div className="side-user-info">
           <span className="side-user-name">{currentUser.displayName}</span>
-          <span className="side-user-role">{ROLES[currentUser.role]}</span>
+          <span className="side-user-role">{roleLabel(currentUser.role)}</span>
         </div>
       </div>
     </aside>

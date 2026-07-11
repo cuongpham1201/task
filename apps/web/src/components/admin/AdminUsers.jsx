@@ -5,7 +5,14 @@ import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
 import OrgRolesModal from './OrgRolesModal'
 import { deaccent } from '../../utils/text'
+import { orgUnitLabel, orgUnitShortLabel } from '../../utils/org'
 import { ROLES } from '../../data/constants'
+
+// FEATURE-004: hình thức đăng nhập gộp — admin thấy ngay ai M365 / Local / chưa cấp
+const loginKind = (u) =>
+  u.hasEntra && u.hasLocal ? 'M365 + Local' : u.hasEntra ? 'M365' : u.hasLocal ? 'Local' : 'Chưa cấp'
+const loginTone = (u) =>
+  u.hasEntra && u.hasLocal ? 'tone-purple' : u.hasEntra ? 'tone-blue' : u.hasLocal ? 'tone-green' : 'tone-gray'
 
 /**
  * FEATURE-001 — Tab "Người dùng" (admin). HRM là master tên/phòng/chức danh (read-only);
@@ -24,6 +31,8 @@ export default function AdminUsers() {
 
   const load = () => apiFetch('/admin/users').then(setUsers).catch(() => toast('Không tải được danh sách'))
   useEffect(() => { load() /* eslint-disable-next-line */ }, [])
+
+  const deptById = useMemo(() => Object.fromEntries(state.departments.map((d) => [d.id, d])), [state.departments])
 
   const filtered = useMemo(() => {
     if (!users) return []
@@ -75,8 +84,8 @@ export default function AdminUsers() {
       <div className="filter-row">
         <input placeholder="Tìm tên / email / username / mã NV…" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 240 }} />
         <select value={dept} onChange={(e) => setDept(e.target.value)}>
-          <option value="">Mọi phòng ban</option>
-          {state.departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          <option value="">Mọi đơn vị biên chế</option>
+          {state.departments.map((d) => <option key={d.id} value={d.id}>{orgUnitLabel(d)}</option>)}
         </select>
         <select value={flt} onChange={(e) => setFlt(e.target.value)}>
           <option value="all">Tất cả</option>
@@ -95,21 +104,27 @@ export default function AdminUsers() {
         <table className="task-table admin-users-table">
           <thead>
             <tr>
-              <th>Nhân viên</th><th>Mã NV</th><th>Phòng ban</th><th>Đăng nhập</th>
+              <th>Nhân viên</th><th>Mã NV</th><th>Chức danh (HRM)</th><th>Đơn vị biên chế</th><th>Đăng nhập</th>
               <th>Trạng thái</th><th>Lần cuối</th><th>Role</th><th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {filtered.slice(0, 200).map((u) => (
               <tr key={u.id} className={!u.active ? 'row-inactive' : ''}>
-                <td><span className="cell-user"><Avatar user={u} size={24} /> <span>{u.displayName}<br /><small className="muted">{u.username || u.email}</small></span></span></td>
-                <td>{u.empCode || '—'}</td>
-                <td>{u.orgUnitName || '—'}</td>
                 <td>
-                  {u.hasEntra && <span className="badge tone-blue">M365</span>}{' '}
-                  {u.hasLocal && <span className="badge tone-green">Local</span>}
-                  {!u.hasEntra && !u.hasLocal && <span className="badge tone-gray">Chưa có</span>}
+                  <span className="cell-user">
+                    <Avatar user={u} size={26} />{' '}
+                    <span>
+                      {u.displayName}
+                      <br /><small className="muted">{u.email}</small>
+                      {u.username && <><br /><small className="muted">username: <code>{u.username}</code></small></>}
+                    </span>
+                  </span>
                 </td>
+                <td>{u.empCode || '—'}</td>
+                <td className="muted">{u.jobTitle || '—'}</td>
+                <td>{deptById[u.orgUnitId] ? orgUnitShortLabel(deptById[u.orgUnitId]) : (u.orgUnitName || '—')}</td>
+                <td><span className={`badge ${loginTone(u)}`}>{loginKind(u)}</span></td>
                 <td>
                   {!u.active ? <span className="badge tone-gray">Ngưng</span>
                     : u.locked ? <span className="badge tone-red">Khóa tạm</span>
@@ -118,7 +133,8 @@ export default function AdminUsers() {
                 </td>
                 <td className="muted">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString('vi') : 'Chưa'}</td>
                 <td>
-                  <select value={u.role} disabled={busyId === u.id} onChange={(e) => setRole(u, e.target.value)}>
+                  {/* FEATURE-004: role kỹ thuật chỉ Admin/Nhân viên — trưởng phòng = vai trò tổ chức (nút khiên) */}
+                  <select value={ROLES[u.role] ? u.role : 'member'} disabled={busyId === u.id} onChange={(e) => setRole(u, e.target.value)}>
                     {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </td>

@@ -4,6 +4,7 @@ import { useApp } from '../store/AppContext'
 import { deptColor } from '../utils/color'
 import TaskTable from '../components/task/TaskTable'
 import { isOverdue, diffDays } from '../utils/date'
+import { orgUnitLabel, orgUnitShortLabel } from '../utils/org'
 
 function inTimeRange(task, range) {
   if (range === 'all' || !task.dueDate) return range === 'all'
@@ -88,7 +89,7 @@ export default function Reports() {
           <select value={deptFilter} onChange={(e) => { setDeptFilter(e.target.value); setUserFilter('all') }}>
             <option value="all">Phòng ban: Tất cả</option>
             {(isAdmin ? state.departments : visibleDepartments).map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
+              <option key={d.id} value={d.id}>{orgUnitLabel(d)}</option>
             ))}
           </select>
         )}
@@ -137,7 +138,7 @@ export default function Reports() {
             {deptStats.map((d) => (
               <div key={d.id} className="report-bar-row">
                 <span className="report-bar-name">
-                  <span className="side-dot" style={{ background: deptColor(d.code) }} /> {d.name}
+                  <span className="side-dot" style={{ background: deptColor(d.code) }} /> {orgUnitShortLabel(d)}
                 </span>
                 <span className="report-bar-track">
                   <span className="report-bar-fill" style={{ width: `${d.rate}%` }} />

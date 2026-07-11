@@ -8,7 +8,8 @@ import { useAuth } from '../../auth/AuthProvider'
 import Avatar from '../shared/Avatar'
 import Dropdown from '../shared/Dropdown'
 import { StatusBadge } from '../shared/badges'
-import { ROLES } from '../../data/constants'
+import { roleLabel } from '../../data/constants'
+import { orgUnitShortLabel } from '../../utils/org'
 
 export default function Topbar({ onMenu }) {
   const {
@@ -79,7 +80,7 @@ export default function Topbar({ onMenu }) {
             {results.departments.length > 0 && <div className="search-group">Phòng ban</div>}
             {results.departments.map((d) => (
               <button key={d.id} className="search-result" onClick={() => go(`/departments/${d.id}`)}>
-                <span className="search-result-title"><Building2 size={13} /> {d.name}</span>
+                <span className="search-result-title"><Building2 size={13} /> {orgUnitShortLabel(d)}</span>
               </button>
             ))}
             {results.users.length > 0 && <div className="search-group">Người dùng</div>}
@@ -104,7 +105,7 @@ export default function Topbar({ onMenu }) {
           <div className="user-menu-header">
             <strong>{currentUser.displayName}</strong>
             <span>{currentUser.email}</span>
-            <span className="user-menu-role">{ROLES[currentUser.role]}</span>
+            <span className="user-menu-role">{roleLabel(currentUser.role)}</span>
           </div>
           <Link to="/settings" className="dropdown-item">Cài đặt tài khoản</Link>
           <button className="dropdown-item" onClick={logout}>Đăng xuất</button>

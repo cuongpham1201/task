@@ -5,6 +5,7 @@ import Avatar from '../shared/Avatar'
 import SearchUser from '../shared/SearchUser'
 import { PRIORITY, PRIORITY_ORDER, SECTIONS, SECTION_ORDER, SCOPES } from '../../data/constants'
 import { fromInputDate } from '../../utils/date'
+import { orgUnitLabel } from '../../utils/org'
 
 export default function CreateTaskModal() {
   const {
@@ -220,7 +221,7 @@ export default function CreateTaskModal() {
                   onChange={(e) => set({ departmentId: e.target.value })}
                 >
                   {deptOptions.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
+                    <option key={d.id} value={d.id}>{orgUnitLabel(d)}</option>
                   ))}
                 </select>
               </label>

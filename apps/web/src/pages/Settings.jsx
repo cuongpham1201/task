@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { LogOut, RefreshCw } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../auth/AuthProvider'
 import { apiFetch } from '../api/client'
 import Avatar from '../components/shared/Avatar'
 import AdminUsers from '../components/admin/AdminUsers'
-import { ROLES } from '../data/constants'
+import { roleLabel } from '../data/constants'
+import { legalEntityLabel, orgUnitShortLabel, ORG_TYPE } from '../utils/org'
 
 export default function Settings() {
   const { state, currentUser } = useApp()
@@ -43,12 +44,12 @@ export default function Settings() {
             <div>
               <p className="settings-name">{currentUser.displayName}</p>
               <p className="muted">{currentUser.email}</p>
-              <p className="muted">{dept?.name ? `${dept.name} · ` : ''}{ROLES[currentUser.role]}</p>
+              <p className="muted">{dept ? `Đơn vị biên chế: ${orgUnitShortLabel(dept)} · ` : ''}{roleLabel(currentUser.role)}</p>
             </div>
           </div>
           <p className="muted settings-hint" style={{ marginTop: 12 }}>
             Đăng nhập bằng Microsoft 365 hoặc tài khoản nội bộ do quản trị viên cấp.
-            Thông tin phòng ban/chức danh đồng bộ từ hệ thống Nhân sự.
+            Đơn vị biên chế/chức danh đồng bộ từ hệ thống Nhân sự (HRM).
           </p>
           <button className="btn" onClick={logout}><LogOut size={15} /> Đăng xuất</button>
         </div>
@@ -58,26 +59,50 @@ export default function Settings() {
         <div className="card"><div className="card-head"><h2>Người dùng</h2></div><AdminUsers /></div>
       )}
 
-      {tab === 'departments' && isAdmin && (
-        <div className="card">
-          <div className="card-head"><h2>Phòng ban (từ HRM — read-only)</h2></div>
-          <div className="table-wrap">
-            <table className="task-table settings-table">
-              <thead><tr><th>Phòng ban</th><th>Mã</th><th>Trưởng phòng</th><th>Số thành viên</th></tr></thead>
-              <tbody>
-                {state.departments.map((d) => (
-                  <tr key={d.id}>
-                    <td>{d.name}</td><td>{d.code}</td><td>{d.managerName || '—'}</td>
-                    <td>{state.users.filter((u) => u.orgUnitId === d.id).length}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {tab === 'departments' && isAdmin && <DepartmentsTab state={state} />}
 
       {tab === 'hrm' && isAdmin && <HrmSyncTab />}
+    </div>
+  )
+}
+
+/**
+ * FEATURE-004 TASK 7: cây tổ chức đầy đủ (công ty/khối/phòng) từ /admin/org-units —
+ * kèm pháp nhân + loại + mã để đơn vị TRÙNG TÊN phân biệt được ngay, không cần click.
+ * Read-only: cây tổ chức là master của HRM.
+ */
+function DepartmentsTab({ state }) {
+  const [units, setUnits] = useState(null)
+  useEffect(() => { apiFetch('/admin/org-units').then(setUnits).catch(() => setUnits([])) }, [])
+  const managerByOrg = Object.fromEntries(state.departments.map((d) => [d.id, d.managerName]))
+  const memberCount = (id) => state.users.filter((u) => u.orgUnitId === id).length
+  return (
+    <div className="card">
+      <div className="card-head"><h2>Đơn vị tổ chức (từ HRM — read-only)</h2></div>
+      <div className="table-wrap">
+        <table className="task-table settings-table">
+          <thead>
+            <tr><th>Đơn vị</th><th>Mã</th><th>Pháp nhân</th><th>Loại</th><th>Trưởng đơn vị</th><th>Số nhân viên</th></tr>
+          </thead>
+          <tbody>
+            {(units || []).filter((o) => o.active).map((o) => (
+              <tr key={o.id}>
+                <td>{o.name}</td>
+                <td><code>{o.code}</code></td>
+                <td>{legalEntityLabel(o.legalEntity) || '—'}</td>
+                <td>{ORG_TYPE[o.type] || o.type}</td>
+                <td>{managerByOrg[o.id] || '—'}</td>
+                <td>{memberCount(o.id)}</td>
+              </tr>
+            ))}
+            {units === null && <tr><td colSpan={6} className="muted">Đang tải…</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <p className="muted settings-hint" style={{ marginTop: 8 }}>
+        "Số nhân viên" = biên chế chính từ HRM (users.orgUnitId). Thành viên ban chức năng
+        sẽ thống kê riêng khi triển khai OrgUnitMembership (phase sau).
+      </p>
     </div>
   )
 }

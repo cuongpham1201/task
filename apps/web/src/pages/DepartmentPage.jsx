@@ -45,7 +45,7 @@ export default function DepartmentPage() {
             <span className="side-dot big" style={{ background: deptColor(dept.code) }} /> {dept.name}
           </h1>
           <p className="page-sub">
-            Trưởng phòng: <strong>{managerName || '—'}</strong>
+            Trưởng đơn vị: <strong>{managerName || '—'}</strong>
             {' · '}{openCount} việc đang mở
             {overdueCount > 0 && <span className="text-overdue"> · {overdueCount} việc quá hạn</span>}
           </p>

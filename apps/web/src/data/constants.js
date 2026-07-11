@@ -29,11 +29,13 @@ export const SECTIONS = {
 }
 export const SECTION_ORDER = ['suvu', 'kehoach', 'hangngay', 'phatsinh']
 
+// FEATURE-004: role KỸ THUẬT chỉ còn admin/member. "Trưởng phòng" là VAI TRÒ
+// TỔ CHỨC (org_unit_roles), không nằm ở đây. Giá trị lạ (enum cũ) hiển thị Nhân viên.
 export const ROLES = {
   admin: 'Admin',
-  manager: 'Trưởng phòng',
   member: 'Nhân viên',
 }
+export const roleLabel = (r) => ROLES[r] || ROLES.member
 
 export const SCOPES = {
   personal: 'Cá nhân',
