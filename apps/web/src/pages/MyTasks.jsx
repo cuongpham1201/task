@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import TaskTable from '../components/task/TaskTable'
@@ -22,6 +23,16 @@ const inReview = (t) => t.status === 'submitted' || t.status === 'returned'
 export default function MyTasks() {
   const { myTasks, tasksIAssigned, openCreateModal, channelsById } = useApp()
   const [tab, setTab] = useLocalStorage('mytasks.tab', 'all')
+  // FEATURE-004: deep-link ?tab= (thẻ thống kê Trang chủ trỏ thẳng tab tương ứng)
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t && TABS.some((x) => x.key === t)) {
+      setTab(t)
+      searchParams.delete('tab'); setSearchParams(searchParams, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
   const [sortBy, setSortBy] = useLocalStorage('mytasks.sort', 'due')
   const [groupBy, setGroupBy] = useLocalStorage('mytasks.group', 'none')
 

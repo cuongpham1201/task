@@ -12,14 +12,17 @@ import {
 } from '../utils/date'
 import { orgUnitDisplayName } from '../utils/org'
 
-function StatCard({ icon: Icon, label, value, tone }) {
-  return (
-    <div className={`stat-card tone-${tone}`}>
+// FEATURE-004: thẻ thống kê bấm được — trỏ thẳng tab tương ứng ở "Việc của tôi"
+function StatCard({ icon: Icon, label, value, tone, to }) {
+  const inner = (
+    <>
       <span className="stat-icon"><Icon size={18} /></span>
       <span className="stat-value">{value}</span>
       <span className="stat-label">{label}</span>
-    </div>
+    </>
   )
+  if (to) return <Link to={to} className={`stat-card tone-${tone} clickable`}>{inner}</Link>
+  return <div className={`stat-card tone-${tone}`}>{inner}</div>
 }
 
 function Bucket({ title, tasks, tone, selectTask }) {
@@ -126,10 +129,10 @@ export default function Dashboard() {
       </div>
 
       <div className="stat-grid">
-        <StatCard icon={ClipboardList} label="Việc của tôi" value={stats.total} tone="blue" />
-        <StatCard icon={AlertTriangle} label="Quá hạn" value={stats.overdue} tone="red" />
-        <StatCard icon={ClipboardCheck} label="Chờ tôi nghiệm thu" value={stats.review} tone="amber" />
-        <StatCard icon={CheckCircle2} label="Đã hoàn thành" value={stats.done} tone="green" />
+        <StatCard icon={ClipboardList} label="Việc của tôi" value={stats.total} tone="blue" to="/my-tasks?tab=all" />
+        <StatCard icon={AlertTriangle} label="Quá hạn" value={stats.overdue} tone="red" to="/my-tasks?tab=overdue" />
+        <StatCard icon={ClipboardCheck} label="Chờ tôi nghiệm thu" value={stats.review} tone="amber" to="/my-tasks?tab=review" />
+        <StatCard icon={CheckCircle2} label="Đã hoàn thành" value={stats.done} tone="green" to="/my-tasks?tab=done" />
       </div>
 
       <div className="dash-grid">

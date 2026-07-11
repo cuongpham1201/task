@@ -71,6 +71,17 @@ export default function Reports() {
     .filter(isOverdue)
     .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
 
+  // FEATURE-004: thẻ thống kê = bộ lọc cho bảng chi tiết bên dưới
+  const [bucket, setBucket] = useState('overdue')
+  const bucketTasks = bucket === 'all' ? scoped
+    : bucket === 'done' ? scoped.filter((t) => t.status === 'done')
+    : overdueTasks
+  const BUCKET_TITLE = {
+    all: `Tất cả task trong phạm vi (${scoped.length})`,
+    done: `Task hoàn thành (${stats.done})`,
+    overdue: `Danh sách task quá hạn (${overdueTasks.length})`,
+  }
+
   const userOptions = deptFilter === 'all'
     ? state.users
     : state.users.filter((u) => u.orgUnitId === deptFilter)
@@ -109,26 +120,27 @@ export default function Reports() {
       </div>
 
       <div className="stat-grid">
-        <div className="stat-card tone-blue">
+        <button className={`stat-card tone-blue clickable ${bucket === 'all' ? 'active' : ''}`} onClick={() => setBucket('all')}>
           <span className="stat-icon"><ClipboardList size={18} /></span>
           <span className="stat-value">{stats.total}</span>
           <span className="stat-label">Số task được giao</span>
-        </div>
-        <div className="stat-card tone-green">
+        </button>
+        <button className={`stat-card tone-green clickable ${bucket === 'done' ? 'active' : ''}`} onClick={() => setBucket('done')}>
           <span className="stat-icon"><CheckCircle2 size={18} /></span>
           <span className="stat-value">{stats.done}</span>
           <span className="stat-label">Task hoàn thành</span>
-        </div>
-        <div className="stat-card tone-red">
+        </button>
+        <button className={`stat-card tone-red clickable ${bucket === 'overdue' ? 'active' : ''}`} onClick={() => setBucket('overdue')}>
           <span className="stat-icon"><AlertTriangle size={18} /></span>
           <span className="stat-value">{stats.overdue}</span>
           <span className="stat-label">Task quá hạn</span>
-        </div>
-        <div className="stat-card tone-purple">
+        </button>
+        <button className={`stat-card tone-purple clickable ${bucket === 'done' ? 'active' : ''}`} onClick={() => setBucket('done')}
+          title="Tỷ lệ hoàn thành = task hoàn thành / tổng — bấm xem danh sách hoàn thành">
           <span className="stat-icon"><Percent size={18} /></span>
           <span className="stat-value">{stats.rate}%</span>
           <span className="stat-label">Tỷ lệ hoàn thành</span>
-        </div>
+        </button>
       </div>
 
       {(isAdmin || hasOrgScope) && (
@@ -155,9 +167,9 @@ export default function Reports() {
 
       <div className="card">
         <div className="card-head">
-          <h2>Danh sách task quá hạn ({overdueTasks.length})</h2>
+          <h2>{BUCKET_TITLE[bucket]}</h2>
         </div>
-        <TaskTable tasks={overdueTasks} emptyText="Không có task nào quá hạn 🎉" />
+        <TaskTable tasks={bucketTasks} emptyText={bucket === 'overdue' ? 'Không có task nào quá hạn 🎉' : 'Không có task nào'} />
       </div>
     </div>
   )

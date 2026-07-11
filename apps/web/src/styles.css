@@ -1119,3 +1119,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .side-nav { scrollbar-color: rgba(255, 255, 255, 0.22) transparent; }
 .side-nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
 .side-nav:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.32); background-clip: content-box; }
+
+/* FEATURE-004: thẻ thống kê bấm được */
+.stat-card.clickable { cursor: pointer; border: 1px solid var(--border); background: var(--surface); text-align: left; font: inherit; color: inherit; transition: box-shadow .15s, transform .15s, border-color .15s; text-decoration: none; }
+.stat-card.clickable:hover { transform: translateY(-1px); box-shadow: var(--shadow-lg); border-color: var(--accent); }
+.stat-card.clickable.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
