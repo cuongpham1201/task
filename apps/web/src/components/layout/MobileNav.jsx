@@ -25,7 +25,7 @@ function MobileActionSheet({ title, onClose, children }) {
 
 /** Bottom navigation cố định cho mobile. */
 export default function MobileNav() {
-  const { unreadCount: unread, visibleDepartments, visibleChannels, canManageActions } = useApp()
+  const { unreadCount: unread, visibleDepartments, visibleChannels, canViewActionLog } = useApp()
   const { logout } = useAuth()
   const navigate = useNavigate()
   const [sheet, setSheet] = useState(null) // null | 'projects' | 'more'
@@ -82,7 +82,7 @@ export default function MobileNav() {
             </Link>
           ))}
           <div className="sheet-divider" />
-          {canManageActions && (
+          {canViewActionLog && (
             <Link to="/action-log" className="sheet-item"><Target size={17} /> Action Log</Link>
           )}
           <Link to="/reports" className="sheet-item"><BarChart3 size={17} /> Thống kê</Link>

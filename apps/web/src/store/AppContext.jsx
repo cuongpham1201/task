@@ -33,6 +33,11 @@ function buildInitialState(currentUserId, bootstrap) {
     notifications: bootstrap.notifications || [], // thông báo thật từ server
     actions: bootstrap.actions || [], // Action Log (A3)
     counts: bootstrap.counts || { pendingReviewCount: 0, myActionCount: 0 },
+    // FEATURE-003: permission hiệu lực từ backend (org_unit_roles) — FE CHỈ show/hide
+    permissions: bootstrap.permissions || {
+      isAdmin: false, hasOrgRole: false, canViewActionLog: false,
+      canManageActions: false, canViewReports: false, managedOrgUnitIds: [],
+    },
     kpiDefinitions: bootstrap.kpiDefinitions || [], // trống tới A4
     selectedTaskId: null,
     createModal: null,
@@ -220,12 +225,16 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
       return allowed
     }
 
-    // Nghiệm thu: admin / người giao (creator) / trưởng phòng của phòng liên quan
+    // FEATURE-003: quyền tổ chức lấy từ backend permissions — KHÔNG suy từ users.role='manager'
+    const orgPerms = state.permissions || {}
+    const managedIds = orgPerms.managedOrgUnitIds || []
+
+    // Nghiệm thu: admin / người giao (creator) / người quản lý org_unit của task
     const canReview = (task) =>
       !!currentUser &&
       (currentUser.role === 'admin' ||
         task.creatorId === me ||
-        (currentUser.role === 'manager' && task.departmentId === currentUser.orgUnitId))
+        (task.departmentId && managedIds.includes(task.departmentId)))
 
     // Toast nhẹ thay alert
     const toast = (message, type = 'error') => {
@@ -277,14 +286,16 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
       channelsById,
 
       perms: {
-        manage: (task) => canManageTask(currentUser, task),
-        updateStatus: (task) => canUpdateStatus(currentUser, task),
-        subtasks: (task) => canWorkSubtasks(currentUser, task),
+        manage: (task) => canManageTask(currentUser, task, managedIds),
+        updateStatus: (task) => canUpdateStatus(currentUser, task, managedIds),
+        subtasks: (task) => canWorkSubtasks(currentUser, task, managedIds),
         comment: (task) => canComment(currentUser, task),
         review: (task) => canReview(task),
         createDeptTask: (departmentId) => canCreateDeptTask(currentUser, departmentId, state.departments),
         createChannelTask: (channel) => canCreateChannelTask(currentUser, channel),
       },
+      // FEATURE-003: permission hiệu lực (backend tính) — nguồn duy nhất cho gate nghiệp vụ
+      permissions: orgPerms,
       blocks: state.blocks,
       visibleDepartments: visibleDepartmentsFor(currentUser, state.departments),
       visibleChannels: visibleChannelsFor(currentUser, state.channels),
@@ -337,7 +348,7 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
       deleteAttachment: (id) => apiFetch(`/attachments/${id}`, { method: 'DELETE' }),
       attachmentUrl: (id, dl) => `${apiBase}/attachments/${id}/file${dl ? '?dl=1' : ''}`,
       canDeleteAttachment: (att, task) =>
-        !!currentUser && (currentUser.role === 'admin' || att.uploadedById === me || (task && canManageTask(currentUser, task))),
+        !!currentUser && (currentUser.role === 'admin' || att.uploadedById === me || (task && canManageTask(currentUser, task, managedIds))),
 
       // Tìm user cho picker (autocomplete) — KHÔNG load 706 user vào dropdown
       searchUsers: (q, { limit = 20, orgUnitId } = {}) => {
@@ -580,10 +591,13 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
       myActions: () => state.actions.filter((a) => a.ownerId === me),
       // Action cho org_unit cụ thể (để lọc trong form Task)
       actionsForOrg: (orgUnitId) => state.actions.filter((a) => a.orgUnitId === orgUnitId && !a.archived),
-      // Gate UI (server vẫn enforce 403 chính xác theo org)
-      canManageActions: currentUser?.role === 'admin' || currentUser?.role === 'manager',
+      // Gate UI theo permission backend (server vẫn enforce 403 chính xác theo org)
+      canManageActions: !!orgPerms.canManageActions,
+      canViewActionLog: !!(orgPerms.canViewActionLog || orgPerms.canManageActions),
       canManageAction: (a) =>
-        !!currentUser && (currentUser.role === 'admin' || a?.ownerId === me || a?.createdById === me || currentUser.role === 'manager'),
+        !!currentUser &&
+        (currentUser.role === 'admin' || a?.ownerId === me || a?.createdById === me ||
+          (a?.orgUnitId && managedIds.includes(a.orgUnitId))),
 
       createActionModal: state.createActionModal,
       openCreateActionModal: (defaults) => dispatch({ type: 'OPEN_CREATE_ACTION', defaults }),

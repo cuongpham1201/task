@@ -5,26 +5,26 @@
 // user.orgUnitId = phòng/ban chính. task.departmentId (trong shape FE) = org_unit của
 // workspace ORG_UNIT; task.channelId = id workspace PROJECT.
 
-export function canManageTask(user, task) {
+// FEATURE-003: quyền quản lý theo tổ chức = managedOrgUnitIds (backend tính từ
+// org_unit_roles, trả qua bootstrap.permissions) — KHÔNG suy từ users.role='manager'/jobTitle.
+export function canManageTask(user, task, managedOrgUnitIds = []) {
   if (!user) return false
   if (user.role === 'admin') return true
   if (task.creatorId === user.id) return true
-  // Quản lý phòng: manager & task thuộc phòng mình (gợi ý UI; server kiểm chính xác theo org role)
-  if (user.role === 'manager' && task.departmentId && task.departmentId === user.orgUnitId) return true
+  if (task.departmentId && managedOrgUnitIds.includes(task.departmentId)) return true
   return false
 }
 
-export function canUpdateStatus(user, task) {
-  return task.assigneeId === user.id || canManageTask(user, task)
+export function canUpdateStatus(user, task, managedOrgUnitIds = []) {
+  return task.assigneeId === user.id || canManageTask(user, task, managedOrgUnitIds)
 }
 
-export function canWorkSubtasks(user, task) {
-  return canUpdateStatus(user, task) || task.collaboratorIds.includes(user.id)
+export function canWorkSubtasks(user, task, managedOrgUnitIds = []) {
+  return canUpdateStatus(user, task, managedOrgUnitIds) || task.collaboratorIds.includes(user.id)
 }
 
 // Task đã được server scope → nếu thấy task nghĩa là được xem; cho phép comment.
 export function canComment(user, task) {
-  if (canWorkSubtasks(user, task)) return true
   return true
 }
 

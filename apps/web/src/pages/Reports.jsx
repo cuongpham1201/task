@@ -14,24 +14,21 @@ function inTimeRange(task, range) {
 }
 
 export default function Reports() {
-  const { state, currentUser, usersById } = useApp()
-  const isAdmin = currentUser.role === 'admin'
-  const isManager = currentUser.role === 'manager'
+  const { state, currentUser, usersById, permissions, visibleDepartments } = useApp()
+  // FEATURE-003: gate theo permission backend (org_unit_roles) — không dùng users.role='manager'
+  const isAdmin = !!permissions.isAdmin
+  const hasOrgScope = !isAdmin && !!permissions.canViewReports
 
-  // Phân quyền: admin xem tất cả, trưởng phòng xem phòng mình, nhân viên xem việc của mình
-  const [deptFilter, setDeptFilter] = useState(isManager ? currentUser.orgUnitId : 'all')
+  // Phân quyền: admin/người có vai trò tổ chức xem theo phạm vi (task server đã scope),
+  // nhân viên thường xem việc của mình
+  const [deptFilter, setDeptFilter] = useState('all')
   const [userFilter, setUserFilter] = useState('all')
   const [timeFilter, setTimeFilter] = useState('all')
 
   const scoped = useMemo(() => {
     let list = state.tasks
-    if (!isAdmin && !isManager) {
+    if (!isAdmin && !hasOrgScope) {
       list = list.filter((t) => t.assigneeId === currentUser.id)
-    } else if (isManager) {
-      list = list.filter((t) =>
-        t.departmentId === currentUser.orgUnitId ||
-        usersById[t.assigneeId]?.orgUnitId === currentUser.orgUnitId
-      )
     } else if (deptFilter !== 'all') {
       list = list.filter((t) =>
         t.departmentId === deptFilter ||
@@ -41,7 +38,7 @@ export default function Reports() {
     if (userFilter !== 'all') list = list.filter((t) => t.assigneeId === userFilter)
     if (timeFilter !== 'all') list = list.filter((t) => inTimeRange(t, timeFilter))
     return list
-  }, [state.tasks, deptFilter, userFilter, timeFilter, isAdmin, isManager, currentUser, usersById])
+  }, [state.tasks, deptFilter, userFilter, timeFilter, isAdmin, hasOrgScope, currentUser, usersById])
 
   const stats = useMemo(() => {
     const done = scoped.filter((t) => t.status === 'done').length
@@ -53,9 +50,9 @@ export default function Reports() {
     }
   }, [scoped])
 
-  // Tỷ lệ hoàn thành theo phòng ban (chỉ admin)
+  // Tỷ lệ hoàn thành theo phòng ban (admin + người có phạm vi tổ chức; departments đã scope server)
   const deptStats = useMemo(() => {
-    if (!isAdmin) return []
+    if (!isAdmin && !hasOrgScope) return []
     return state.departments.map((d) => {
       const ts = state.tasks.filter((t) => t.departmentId === d.id)
       const done = ts.filter((t) => t.status === 'done').length
@@ -67,7 +64,7 @@ export default function Reports() {
         rate: ts.length ? Math.round((done / ts.length) * 100) : 0,
       }
     })
-  }, [isAdmin, state.departments, state.tasks])
+  }, [isAdmin, hasOrgScope, state.departments, state.tasks])
 
   const overdueTasks = scoped
     .filter(isOverdue)
@@ -87,21 +84,18 @@ export default function Reports() {
       </div>
 
       <div className="filter-row">
-        {isAdmin && (
+        {(isAdmin || hasOrgScope) && (
           <select value={deptFilter} onChange={(e) => { setDeptFilter(e.target.value); setUserFilter('all') }}>
             <option value="all">Phòng ban: Tất cả</option>
-            {state.departments.map((d) => (
+            {(isAdmin ? state.departments : visibleDepartments).map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </select>
         )}
-        {(isAdmin || isManager) && (
+        {(isAdmin || hasOrgScope) && (
           <select value={userFilter} onChange={(e) => setUserFilter(e.target.value)}>
             <option value="all">Nhân sự: Tất cả</option>
-            {(isManager
-              ? state.users.filter((u) => u.orgUnitId === currentUser.orgUnitId)
-              : userOptions
-            ).map((u) => (
+            {userOptions.map((u) => (
               <option key={u.id} value={u.id}>{u.displayName}</option>
             ))}
           </select>
@@ -136,7 +130,7 @@ export default function Reports() {
         </div>
       </div>
 
-      {isAdmin && (
+      {(isAdmin || hasOrgScope) && (
         <div className="card">
           <div className="card-head"><h2>Tỷ lệ hoàn thành theo phòng ban</h2></div>
           <div className="report-bars">

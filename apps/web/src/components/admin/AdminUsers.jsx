@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { KeyRound, RefreshCw, Lock, Unlock, ScrollText, X } from 'lucide-react'
+import { KeyRound, RefreshCw, Lock, Unlock, ScrollText, ShieldCheck, X } from 'lucide-react'
 import { apiFetch } from '../../api/client'
 import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
+import OrgRolesModal from './OrgRolesModal'
 import { deaccent } from '../../utils/text'
 import { ROLES } from '../../data/constants'
 
@@ -18,6 +19,7 @@ export default function AdminUsers() {
   const [flt, setFlt] = useState('all') // all|active|inactive|entra|local|nologin|locked|noaccess
   const [cred, setCred] = useState(null) // {displayName, username, tempPassword} — 1 lần
   const [logFor, setLogFor] = useState(null) // {user, rows}
+  const [rolesFor, setRolesFor] = useState(null) // FEATURE-003: user đang mở modal vai trò tổ chức
   const [busyId, setBusyId] = useState(null)
 
   const load = () => apiFetch('/admin/users').then(setUsers).catch(() => toast('Không tải được danh sách'))
@@ -134,6 +136,7 @@ export default function AdminUsers() {
                       </button>
                     </>
                   )}
+                  <button className="btn btn-ghost" onClick={() => setRolesFor(u)} title="Vai trò tổ chức & phạm vi dữ liệu"><ShieldCheck size={14} /></button>
                   <button className="btn btn-ghost" onClick={() => showLog(u)} title="Nhật ký quản trị"><ScrollText size={14} /></button>
                 </td>
               </tr>
@@ -158,6 +161,8 @@ export default function AdminUsers() {
           </div>
         </div>
       )}
+
+      {rolesFor && <OrgRolesModal user={rolesFor} onClose={() => setRolesFor(null)} />}
 
       {logFor && (
         <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && setLogFor(null)}>

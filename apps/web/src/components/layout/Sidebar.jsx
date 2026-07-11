@@ -9,7 +9,7 @@ import BrandLogo from '../shared/BrandLogo'
 import { ROLES } from '../../data/constants'
 
 export default function Sidebar() {
-  const { currentUser, unreadCount: unread, blocks, visibleDepartments, visibleChannels, canManageActions, openCreateProjectModal } = useApp()
+  const { currentUser, unreadCount: unread, blocks, visibleDepartments, visibleChannels, canViewActionLog, openCreateProjectModal } = useApp()
   // Nhóm phòng ban theo khối (chỉ khối có phòng đang thấy)
   const deptGroups = (blocks || [])
     .map((b) => ({ block: b, depts: visibleDepartments.filter((d) => d.blockId === b.id) }))
@@ -32,7 +32,7 @@ export default function Sidebar() {
         <NavLink to="/my-tasks" className={linkClass}>
           <CheckSquare size={17} /> Việc của tôi
         </NavLink>
-        {canManageActions && (
+        {canViewActionLog && (
           <NavLink to="/action-log" className={linkClass}>
             <Target size={17} /> Action Log
           </NavLink>
