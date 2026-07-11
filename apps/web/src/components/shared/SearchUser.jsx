@@ -22,6 +22,8 @@ export default function SearchUser({ value, onSelect, orgUnitId, placeholder = '
   useEffect(() => {
     if (!open) return
     clearTimeout(timer.current)
+    // FEATURE-004: chỉ gợi ý KHI ĐÃ GÕ — focus không xổ sẵn danh sách
+    if (!q.trim()) { setResults([]); setLoading(false); return }
     timer.current = setTimeout(() => {
       setLoading(true)
       searchUsers(q, { orgUnitId, limit: 20 })
@@ -57,10 +59,10 @@ export default function SearchUser({ value, onSelect, orgUnitId, placeholder = '
           <button type="button" className="btn btn-ghost" title="Bỏ chọn" onClick={() => { onSelect(null); setOpen(false) }}><X size={14} /></button>
         )}
       </div>
-      {open && (
+      {open && q.trim() !== '' && (
         <div className="searchuser-results">
           {loading && <div className="searchuser-empty">Đang tìm…</div>}
-          {!loading && results.length === 0 && <div className="searchuser-empty">{q ? 'Không tìm thấy' : 'Gõ tên/email để tìm…'}</div>}
+          {!loading && results.length === 0 && <div className="searchuser-empty">Không tìm thấy</div>}
           {results.map((u) => (
             <button type="button" key={u.id} className="searchuser-item" onClick={() => { onSelect(u.id, u); setQ(''); setOpen(false) }}>
               <Avatar user={u} size={22} />
