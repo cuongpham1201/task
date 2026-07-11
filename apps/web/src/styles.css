@@ -376,7 +376,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
   border-bottom: 1px solid var(--border); font-size: 13px;
   border-left: none; background: none; text-align: left; width: 100%;
 }
-.activity-item > span:first-of-type { flex: 1; }
+/* span text (sau avatar) mới giãn — KHÔNG áp vào avatar fallback (cũng là span) */
+.activity-item > span:first-of-type:not(.avatar),
+.activity-item > .avatar + span,
+.activity-item > img + span { flex: 1; min-width: 0; }
+.activity-item > .avatar { flex: 0 0 auto; }
 .activity-item.clickable { border: none; border-bottom: 1px solid var(--border); cursor: pointer; }
 .activity-item.clickable:hover { background: var(--bg); }
 .comment-input {
