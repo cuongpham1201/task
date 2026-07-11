@@ -10,6 +10,7 @@ import KanbanBoard from '../components/task/KanbanBoard'
 import Avatar, { AvatarGroup } from '../components/shared/Avatar'
 import EmptyState from '../components/shared/EmptyState'
 import Breadcrumb from '../components/shared/Breadcrumb'
+import SearchUser from '../components/shared/SearchUser'
 import { STATUS, STATUS_ORDER } from '../data/constants'
 import { activityText } from '../utils/activity'
 import { timeAgo, isOverdue, isUpcoming } from '../utils/date'
@@ -55,7 +56,7 @@ export default function ChannelPage() {
 
   const members = channel.members.map((uid) => usersById[uid]).filter(Boolean)
   const canManageMembers = currentUser.role === 'admin' || channel.ownerId === currentUser.id
-  const nonMembers = state.users.filter((u) => !channel.members.includes(u.id))
+  const addUserIsMember = !!addUser && channel.members.includes(addUser)
   const stats = {
     total: allTasks.length,
     open: allTasks.filter((t) => t.status !== 'done').length,
@@ -143,13 +144,15 @@ export default function ChannelPage() {
         <div className="card">
           {canManageMembers && (
             <div className="member-add filter-row">
-              <select value={addUser} onChange={(e) => setAddUser(e.target.value)}>
-                <option value="">+ Chọn người để thêm…</option>
-                {nonMembers.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
-              </select>
-              <button className="btn btn-primary" disabled={!addUser} onClick={() => { addProjectMember(channel.id, addUser); setAddUser('') }}>
+              {/* FEATURE-004: picker tìm kiếm (SearchUser) thay combobox 705 người */}
+              <div style={{ minWidth: 280 }}>
+                <SearchUser value={addUser || null} onSelect={(uid) => setAddUser(uid || '')} placeholder="Tìm người để thêm vào dự án…" />
+              </div>
+              <button className="btn btn-primary" disabled={!addUser || addUserIsMember}
+                onClick={() => { addProjectMember(channel.id, addUser); setAddUser('') }}>
                 <UserPlus size={15} /> Thêm
               </button>
+              {addUserIsMember && <span className="muted">Đã là thành viên dự án</span>}
             </div>
           )}
           <div className="member-list">
