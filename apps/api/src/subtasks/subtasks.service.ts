@@ -38,12 +38,21 @@ export class SubtasksService {
     if (!sub) throw new NotFoundException('Không tìm thấy việc con')
     const task = await this.task(sub.taskId)
     this.policy.assert(await this.policy.canUpdateStatus(me, task), 'Không có quyền cập nhật việc con')
-    return this.prisma.subtask.update({
-      where: { id },
-      data: {
-        ...(data.done !== undefined ? { done: data.done } : {}),
-        ...(data.title !== undefined ? { title: data.title } : {}),
-      },
+    // FEATURE-004: ghi activity để tab Hoạt động lưu vết tick/sửa việc con
+    return this.prisma.$transaction(async (tx) => {
+      const s = await tx.subtask.update({
+        where: { id },
+        data: {
+          ...(data.done !== undefined ? { done: data.done } : {}),
+          ...(data.title !== undefined ? { title: data.title } : {}),
+        },
+      })
+      await this.notifications.emit(tx, {
+        task, actorId: me.id, action: 'subtask',
+        metadata: { title: s.title, ...(data.done !== undefined ? { done: data.done } : {}) },
+        notifyType: null,
+      })
+      return s
     })
   }
 

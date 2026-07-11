@@ -938,6 +938,16 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .breadcrumb-current { color: var(--text); font-weight: 600; }
 
 /* SearchUser picker */
+/* FEATURE-004: cây việc con xổ trong bảng task */
+.subtask-toggle { border: none; background: none; cursor: pointer; padding: 0 2px; border-radius: 4px; }
+.subtask-toggle:hover, .subtask-toggle.open { color: var(--accent); background: var(--accent-soft); }
+.subtask-row { cursor: pointer; background: var(--bg); }
+.subtask-row:hover { background: var(--accent-soft); }
+.subtask-row td { padding: 5px 8px 5px 44px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.subtask-row-inner { display: inline-flex; align-items: center; gap: 8px; }
+.subtask-done { text-decoration: line-through; color: var(--text-muted); }
+.tick.small { padding: 0; }
+
 .searchuser { position: relative; }
 .searchuser-input { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border-strong); border-radius: 6px; padding: 4px 8px; background: var(--surface); }
 .searchuser-input input { border: none; padding: 3px 0; flex: 1; outline: none; }

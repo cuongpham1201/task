@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CheckCircle2, Circle, MessageSquare, GitBranch, Trash2, X } from 'lucide-react'
+import { CheckCircle2, Circle, MessageSquare, GitBranch, ChevronDown, ChevronRight, Trash2, X } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
 import { StatusBadge, StatusSelect, PriorityBadge } from '../shared/badges'
@@ -13,17 +13,22 @@ import { SECTIONS, SECTION_ORDER, STATUS, STATUS_ORDER, PRIORITY, PRIORITY_ORDER
 function TaskRow({ task, showContext, selectable, selected, onToggleSel }) {
   const {
     usersById, perms, selectTask, toggleComplete, setStatus,
-    getSubtasks, getComments, taskContextLabel, taskContextFull,
+    getSubtasks, getComments, taskContextLabel, taskContextFull, toggleSubtask,
   } = useApp()
+  // FEATURE-004: xổ cây việc con ngay trong bảng (không cần mở drawer)
+  const [expanded, setExpanded] = useState(false)
   const creator = usersById[task.creatorId]
   const subs = getSubtasks(task.id)
   const commentCount = getComments(task.id).length
   const due = dueLabel(task)
   const isDone = task.status === 'done'
   const canStatus = perms.updateStatus(task)
+  const canSubs = perms.subtasks(task)
   const ctx = taskContextFull(task)
+  const colCount = 7 + (showContext ? 1 : 0) + (selectable ? 1 : 0)
 
   return (
+    <>
     <tr className={`task-row ${isDone ? 'done' : ''} ${selected ? 'row-selected' : ''}`} onClick={() => selectTask(task.id)}>
       {selectable && (
         <td className="col-check" onClick={(e) => e.stopPropagation()}>
@@ -52,9 +57,14 @@ function TaskRow({ task, showContext, selectable, selected, onToggleSel }) {
         </span>
         <span className="task-meta-icons">
           {subs.length > 0 && (
-            <span className="meta-icon" title="Việc con">
+            <button
+              className={`meta-icon subtask-toggle ${expanded ? 'open' : ''}`}
+              title={expanded ? 'Thu gọn việc con' : 'Xổ danh sách việc con'}
+              onClick={(e) => { e.stopPropagation(); setExpanded(!expanded) }}
+            >
               <GitBranch size={13} /> {subs.filter((s) => s.done).length}/{subs.length}
-            </span>
+              {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            </button>
           )}
           {commentCount > 0 && (
             <span className="meta-icon" title="Bình luận">
@@ -83,7 +93,31 @@ function TaskRow({ task, showContext, selectable, selected, onToggleSel }) {
       <td className={`col-due due-${due.tone}`}>{due.text}</td>
       <td className="col-progress"><ProgressBar value={task.progress} /></td>
     </tr>
+    {expanded && <SubtaskRows task={task} subs={subs} colCount={colCount} canSubs={canSubs} />}
+    </>
   )
+}
+
+/** Các dòng việc con xổ dưới TaskRow — tick trực tiếp, click mở panel task cha. */
+function SubtaskRows({ task, subs, colCount, canSubs }) {
+  const { toggleSubtask, selectTask } = useApp()
+  return subs.map((sub) => (
+    <tr key={sub.id} className="subtask-row" onClick={() => selectTask(task.id)}>
+      <td colSpan={colCount}>
+        <span className="subtask-row-inner">
+          <button
+            className={`tick small ${sub.done ? 'ticked' : ''}`}
+            disabled={!canSubs}
+            title={!canSubs ? 'Bạn không có quyền cập nhật việc con' : sub.done ? 'Bỏ hoàn thành' : 'Hoàn thành'}
+            onClick={(e) => { e.stopPropagation(); toggleSubtask(sub.id) }}
+          >
+            {sub.done ? <CheckCircle2 size={15} /> : <Circle size={15} />}
+          </button>
+          <span className={sub.done ? 'subtask-done' : ''}>{sub.title}</span>
+        </span>
+      </td>
+    </tr>
+  ))
 }
 
 function TableHead({ showContext, selectable, allChecked, onToggleAll }) {

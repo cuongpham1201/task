@@ -417,6 +417,12 @@ export class TasksService {
       }
       const w = await tx.taskWorkLog.create({ data: { taskId: id, authorId: me.id, content: dto.content, progressValue: dto.progressValue ?? null } })
       if (newTotal != null) await tx.task.update({ where: { id }, data: { progress: newTotal } })
+      // FEATURE-004: nhật ký thực hiện phải xuất hiện trong tab Hoạt động
+      await this.notifications.emit(tx, {
+        task, actorId: me.id, action: 'progress',
+        metadata: { worklog: true, add: dto.progressValue ?? null, to: newTotal },
+        notifyType: null,
+      })
       return { row: w, total: newTotal }
     })
     return {

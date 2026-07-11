@@ -342,9 +342,11 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
       fetchWorkLogs: (taskId) => apiFetch(`/tasks/${taskId}/worklogs`),
       // Nhật ký thực hiện — % cộng dồn; server trả taskProgress = tổng mới (cap 100)
       addWorkLog: (taskId, dto) => post(`/tasks/${taskId}/worklogs`, dto).then((w) => {
-        if (w.taskProgress != null) {
-          dispatch({ type: 'UPDATE_TASK_FIELD', id: taskId, at: now(), patch: { progress: w.taskProgress } })
-        }
+        dispatch({
+          type: 'UPDATE_TASK_FIELD', id: taskId, at: now(),
+          patch: w.taskProgress != null ? { progress: w.taskProgress } : {},
+          activities: [makeActivity(taskId, me, 'progress', { worklog: true, add: dto.progressValue ?? null, to: w.taskProgress })],
+        })
         return w
       }),
 
@@ -526,9 +528,11 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         const sub = state.subtasks.find((s) => s.id === subtaskId)
         const task = sub && findTask(sub.taskId)
         if (!task) return
-        if (!guard(canWorkSubtasks(currentUser, task), 'cập nhật việc con')) return
+        if (!guard(canWorkSubtasks(currentUser, task, managedIds), 'cập nhật việc con')) return
         const done = !sub.done
         dispatch({ type: 'TOGGLE_SUBTASK', id: subtaskId, done })
+        // Hiện ngay trong tab Hoạt động (server cũng ghi activity 'subtask')
+        dispatch({ type: 'UPDATE_TASK_FIELD', id: task.id, at: now(), patch: {}, activities: [makeActivity(task.id, me, 'subtask', { title: sub.title, done })] })
         persist(patch(`/subtasks/${subtaskId}`, { done }), (s) => dispatch({ type: 'REPLACE_SUBTASK', id: subtaskId, subtask: s }))
       },
 

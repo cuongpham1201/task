@@ -24,6 +24,11 @@ export function activityText(activity, usersById) {
     case 'priority':
       return `đã đổi độ ưu tiên sang “${PRIORITY[meta.to]?.label || meta.to}”`
     case 'progress':
+      if (meta.worklog) {
+        return meta.add != null
+          ? `đã ghi nhật ký thực hiện (+${meta.add}% → ${meta.to}%)`
+          : 'đã ghi nhật ký thực hiện'
+      }
       return `đã cập nhật tiến độ lên ${meta.to}%`
     case 'comment':
       return 'đã bình luận'
@@ -40,6 +45,8 @@ export function activityText(activity, usersById) {
       return names ? `đã sửa ${names}` : 'đã sửa thông tin công việc'
     }
     case 'subtask':
+      if (meta.done === true) return `đã hoàn thành việc con “${meta.title || ''}”`
+      if (meta.done === false) return `đã bỏ hoàn thành việc con “${meta.title || ''}”`
       return 'đã cập nhật việc con'
     default:
       return 'đã cập nhật công việc'
