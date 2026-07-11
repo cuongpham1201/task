@@ -186,6 +186,15 @@ model User {
   jobTitle    String?  @map("job_title")
   avatarUrl   String?  @map("avatar_url")
   active      Boolean  @default(true)
+  // ── FEATURE-001: Local login (App sở hữu; HRM KHÔNG đụng các field này) ──
+  username          String?   @unique
+  passwordHash      String?   @map("password_hash") // bcrypt — KHÔNG BAO GIỜ trả qua API
+  localLoginEnabled Boolean   @default(false) @map("local_login_enabled")
+  mustChangePassword Boolean  @default(false) @map("must_change_password")
+  failedLoginCount  Int       @default(0) @map("failed_login_count")
+  lockedUntil       DateTime? @map("locked_until")
+  lastLoginAt       DateTime? @map("last_login_at")
+  passwordChangedAt DateTime? @map("password_changed_at")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -211,6 +220,8 @@ model User {
   actionUpdates         ActionUpdate[]       @relation("ActionUpdateAuthor")
   reviewedKpiResults    TaskKpiResult[]      @relation("KpiResultReviewer")
   workLogs              TaskWorkLog[]        @relation("WorkLogAuthor")
+  adminActionsDone      AdminAuditLog[]      @relation("AuditActor")
+  adminActionsReceived  AdminAuditLog[]      @relation("AuditTarget")
 
   @@map("users")
 }
@@ -570,6 +581,22 @@ model TeamsActivityDelivery {
 
   @@index([recipientId, createdAt])
   @@map("teams_activity_deliveries")
+}
+
+// FEATURE-001: Nhật ký quản trị (provision/reset/lock/role...) — KHÔNG lưu password.
+model AdminAuditLog {
+  id           String   @id @default(uuid())
+  actorId      String   @map("actor_id")
+  targetUserId String?  @map("target_user_id")
+  action       String // provision_local | reset_password | set_access | set_role | hrm_sync_run | link_entra
+  metadata     Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  actor  User  @relation("AuditActor", fields: [actorId], references: [id])
+  target User? @relation("AuditTarget", fields: [targetUserId], references: [id])
+
+  @@index([targetUserId, createdAt])
+  @@map("admin_audit_logs")
 }
 
 model SyncLog {

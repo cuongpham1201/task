@@ -35,6 +35,7 @@ export class UsersController {
       orgUnitId: u.orgUnitId,
       jobTitle: u.jobTitle,
       avatarUrl: u.avatarUrl,
+      mustChangePassword: u.mustChangePassword,
     }
   }
 

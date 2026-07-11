@@ -1,10 +1,24 @@
-import { Controller, Get, Query, Req, Res } from '@nestjs/common'
+import { Body, Controller, Get, Post, Query, Req, Res, UseGuards } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 import type { Request, Response } from 'express'
 import { AuthService } from './auth.service'
 import { SessionService } from './session.service'
 import { UsersService } from '../users/users.service'
 import { AvatarService } from '../users/avatar.service'
+import { LocalAuthService } from './local-auth.service'
+import { AuthGuard } from './auth.guard'
+import { AuthUser } from './current-user.decorator'
+import type { AuthClaims } from './auth.types'
+import { IsString, MaxLength, MinLength } from 'class-validator'
+
+class LocalLoginDto {
+  @IsString() @MaxLength(120) username!: string
+  @IsString() @MaxLength(200) password!: string
+}
+class ChangePasswordDto {
+  @IsString() @MaxLength(200) oldPassword!: string
+  @IsString() @MinLength(8) @MaxLength(200) newPassword!: string
+}
 
 const STATE_COOKIE = 'giaoviec_oauth_state'
 // Đánh dấu login khởi phát từ Teams popup (giá trị boolean nội bộ — không chứa URL).
@@ -17,6 +31,7 @@ export class AuthController {
     private readonly session: SessionService,
     private readonly users: UsersService,
     private readonly avatars: AvatarService,
+    private readonly localAuth: LocalAuthService,
   ) {}
 
   private secure() {
@@ -94,6 +109,29 @@ export class AuthController {
       console.error('[auth/callback] exchange error:', (e as Error).message)
       return res.redirect(`${cfg.webOrigin}/?auth_error=exchange`)
     }
+  }
+
+  /** FEATURE-001: đăng nhập nội bộ (username/email + password) — CÙNG session cookie với Entra. */
+  @Post('local/login')
+  async localLogin(@Body() dto: LocalLoginDto, @Res() res: Response) {
+    const user = await this.localAuth.login(dto.username, dto.password)
+    const token = await this.session.sign({ oid: user.entraId, email: user.email, name: user.displayName })
+    res.cookie(SessionService.COOKIE, token, {
+      httpOnly: true,
+      sameSite: this.sameSite(),
+      secure: this.secure(),
+      maxAge: 8 * 60 * 60 * 1000,
+      path: '/',
+    })
+    return res.json({ ok: true, mustChangePassword: user.mustChangePassword })
+  }
+
+  /** Đổi mật khẩu local (yêu cầu đã đăng nhập; bắt buộc khi mustChangePassword). */
+  @Post('local/change-password')
+  @UseGuards(AuthGuard)
+  async changePassword(@AuthUser() claims: AuthClaims, @Body() dto: ChangePasswordDto) {
+    const me = await this.users.resolveFromClaims(claims)
+    return this.localAuth.changePassword(me.id, dto.oldPassword, dto.newPassword)
   }
 
   /** Đăng xuất: xóa cookie session, gọi logout của Microsoft. */

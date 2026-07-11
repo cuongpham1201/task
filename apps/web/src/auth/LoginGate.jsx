@@ -41,6 +41,8 @@ export default function LoginGate({ children }) {
   if (needLogin) return <LoginScreen onLogin={auth.login} />
   if (error) return <ErrorScreen message={error} onRetry={() => window.location.reload()} />
   if (data === undefined || data === null) return <LoadingScreen />
+  // FEATURE-001: bắt buộc đổi mật khẩu tạm trước khi dùng app
+  if (data.me.mustChangePassword) return <ChangePasswordScreen />
   return children(data.me, data.bootstrap)
 }
 
@@ -78,6 +80,8 @@ function LoginScreen({ onLogin }) {
             trong trình duyệt để đăng nhập trước.
           </p>
         )}
+        <div className="auth-divider"><span>hoặc đăng nhập nội bộ</span></div>
+        <LocalLoginForm />
         <p className="auth-foot">Chỉ dành cho tài khoản nội bộ @biahalong.com</p>
       </div>
     </div>
@@ -117,5 +121,91 @@ function MsLogo() {
       <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
       <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
     </svg>
+  )
+}
+
+
+/** FEATURE-001: đăng nhập nội bộ cho nhân viên không có M365. Lỗi hiển thị CHUNG. */
+function LocalLoginForm() {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!username.trim() || !password || busy) return
+    setBusy(true); setErr('')
+    try {
+      await apiFetch('/auth/local/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: username.trim(), password }),
+      })
+      window.location.reload() // LoginGate đọc session mới; mustChangePassword sẽ tự gate
+    } catch {
+      setErr('Tên đăng nhập hoặc mật khẩu không đúng')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className="local-login" onSubmit={submit}>
+      <input placeholder="Tên đăng nhập" autoComplete="username"
+        value={username} onChange={(e) => setUsername(e.target.value)} />
+      <input type="password" placeholder="Mật khẩu" autoComplete="current-password"
+        value={password} onChange={(e) => setPassword(e.target.value)} />
+      {err && <p className="form-error">{err}</p>}
+      <button className="btn btn-primary" type="submit" disabled={busy || !username.trim() || !password}>
+        {busy ? 'Đang đăng nhập…' : 'Đăng nhập'}
+      </button>
+    </form>
+  )
+}
+
+/** Màn đổi mật khẩu BẮT BUỘC (mustChangePassword) — không cho vào app trước khi đổi xong. */
+function ChangePasswordScreen() {
+  const [oldPassword, setOld] = useState('')
+  const [newPassword, setNew] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (newPassword.length < 8) { setErr('Mật khẩu mới phải từ 8 ký tự'); return }
+    if (newPassword !== confirm) { setErr('Xác nhận mật khẩu không khớp'); return }
+    setBusy(true); setErr('')
+    try {
+      await apiFetch('/auth/local/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ oldPassword, newPassword }),
+      })
+      window.location.reload()
+    } catch (e2) {
+      setErr(e2.status === 401 ? 'Mật khẩu hiện tại không đúng' : 'Đổi mật khẩu thất bại — kiểm tra lại')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="auth-screen">
+      <div className="auth-card">
+        <div className="auth-logo"><BrandLogo size={40} /></div>
+        <h1 className="auth-title">Đổi mật khẩu</h1>
+        <p className="auth-sub">Bạn đang dùng mật khẩu tạm — hãy đặt mật khẩu mới để tiếp tục.</p>
+        <form className="local-login" onSubmit={submit}>
+          <input type="password" placeholder="Mật khẩu tạm (hiện tại)" autoComplete="current-password"
+            value={oldPassword} onChange={(e) => setOld(e.target.value)} />
+          <input type="password" placeholder="Mật khẩu mới (≥ 8 ký tự)" autoComplete="new-password"
+            value={newPassword} onChange={(e) => setNew(e.target.value)} />
+          <input type="password" placeholder="Nhập lại mật khẩu mới" autoComplete="new-password"
+            value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+          {err && <p className="form-error">{err}</p>}
+          <button className="btn btn-primary" type="submit" disabled={busy}>
+            {busy ? 'Đang lưu…' : 'Đổi mật khẩu và tiếp tục'}
+          </button>
+        </form>
+      </div>
+    </div>
   )
 }

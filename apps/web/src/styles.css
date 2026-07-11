@@ -1067,3 +1067,12 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
   /* Safe left/right cho màn xoay ngang có notch */
   .mobile-nav { padding-left: calc(2px + var(--safe-left)); padding-right: calc(2px + var(--safe-right)); }
 }
+
+/* ── FEATURE-001: local login + admin users ── */
+.auth-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0 12px; color: var(--text-muted); font-size: 12px; }
+.auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.local-login { display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.local-login input { width: 100%; }
+.admin-users-table td { vertical-align: middle; }
+.admin-actions { white-space: nowrap; }
+.row-inactive { opacity: 0.55; }
