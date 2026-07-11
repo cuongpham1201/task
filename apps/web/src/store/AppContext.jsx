@@ -340,10 +340,10 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
       },
       // ── Nhật ký thực hiện task (item 12) ──
       fetchWorkLogs: (taskId) => apiFetch(`/tasks/${taskId}/worklogs`),
-      // Nhật ký thực hiện — kèm % thì đồng bộ luôn tiến độ task (nguồn cập nhật tiến độ DUY NHẤT)
+      // Nhật ký thực hiện — % cộng dồn; server trả taskProgress = tổng mới (cap 100)
       addWorkLog: (taskId, dto) => post(`/tasks/${taskId}/worklogs`, dto).then((w) => {
-        if (dto.progressValue != null) {
-          dispatch({ type: 'UPDATE_TASK_FIELD', id: taskId, at: now(), patch: { progress: dto.progressValue } })
+        if (w.taskProgress != null) {
+          dispatch({ type: 'UPDATE_TASK_FIELD', id: taskId, at: now(), patch: { progress: w.taskProgress } })
         }
         return w
       }),

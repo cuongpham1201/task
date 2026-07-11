@@ -593,9 +593,17 @@ function WorkLogSection({ task }) {
   const load = () => fetchWorkLogs(task.id).then(setItems).catch(() => {})
   useEffect(() => { load() /* eslint-disable-next-line */ }, [task.id])
 
+  // FEATURE-004: % mỗi nhật ký CỘNG DỒN vào tiến độ — tổng tối đa 100%
+  const usedProgress = items.reduce((sum, w) => sum + (w.progressValue || 0), 0)
+  const remaining = Math.max(0, 100 - usedProgress)
+
   const submit = async () => {
     const c = content.trim()
     if (!c || busy) return
+    if (progress !== '' && Number(progress) > remaining) {
+      toast(`Tổng tiến độ vượt 100% — chỉ còn nhập tối đa ${remaining}%`, 'warn')
+      return
+    }
     setBusy(true)
     const dto = { content: c }
     if (progress !== '') dto.progressValue = Number(progress)
@@ -611,10 +619,14 @@ function WorkLogSection({ task }) {
         <div className="worklog-add">
           <input placeholder="VD: Đã khảo sát hiện trường / Đang thi công…" value={content}
             onChange={(e) => setContent(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
-          <input type="number" min="0" max="100" placeholder="%" value={progress}
-            onChange={(e) => setProgressV(e.target.value)} style={{ width: 64 }} />
+          <input type="number" min="0" max={remaining} placeholder={remaining > 0 ? `+% (còn ${remaining})` : '100%'}
+            disabled={remaining <= 0} title={remaining <= 0 ? 'Tiến độ đã đạt 100% — chỉ ghi được nhật ký không kèm %' : `Còn lại ${remaining}%`}
+            value={progress} onChange={(e) => setProgressV(e.target.value)} style={{ width: 96 }} />
           <button className="btn btn-primary" disabled={busy || !content.trim()} onClick={submit}><Plus size={15} /></button>
         </div>
+      )}
+      {canWork && remaining <= 0 && (
+        <p className="muted" style={{ fontSize: 12, margin: '2px 0 0' }}>Tiến độ đã đạt 100% — nhật ký mới không được cộng thêm %.</p>
       )}
       {items.length === 0 && <p className="muted">Chưa có nhật ký thực hiện.</p>}
       <div className="worklog-list">

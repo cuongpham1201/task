@@ -397,15 +397,33 @@ export class TasksService {
     return rows.map((r) => ({ id: r.id, taskId: r.taskId, authorId: r.authorId, content: r.content, progressValue: r.progressValue, createdAt: r.createdAt }))
   }
 
+  /**
+   * Nhật ký thực hiện. % của MỖI nhật ký là phần đóng góp CỘNG DỒN vào tiến độ task
+   * (không phải giá trị tuyệt đối). Tổng các % không vượt 100 — kiểm tra TRONG
+   * transaction để 2 người ghi đồng thời không lách được.
+   */
   async addWorkLog(me: Me, id: string, dto: { content: string; progressValue?: number }) {
     const task = await this.load(id)
     this.policy.assert(await this.policy.canUpdateStatus(me, task), 'Không có quyền ghi nhật ký thực hiện')
-    const row = await this.prisma.$transaction(async (tx) => {
+    const { row, total } = await this.prisma.$transaction(async (tx) => {
+      let newTotal: number | null = null
+      if (dto.progressValue != null) {
+        const agg = await tx.taskWorkLog.aggregate({ where: { taskId: id }, _sum: { progressValue: true } })
+        const used = agg._sum.progressValue ?? 0
+        newTotal = used + dto.progressValue
+        if (newTotal > 100) {
+          throw new BadRequestException(`Tổng tiến độ vượt 100% — đã ghi nhận ${used}%, chỉ còn nhập tối đa ${100 - used}%`)
+        }
+      }
       const w = await tx.taskWorkLog.create({ data: { taskId: id, authorId: me.id, content: dto.content, progressValue: dto.progressValue ?? null } })
-      if (dto.progressValue != null) await tx.task.update({ where: { id }, data: { progress: dto.progressValue } })
-      return w
+      if (newTotal != null) await tx.task.update({ where: { id }, data: { progress: newTotal } })
+      return { row: w, total: newTotal }
     })
-    return { id: row.id, taskId: row.taskId, authorId: row.authorId, content: row.content, progressValue: row.progressValue, createdAt: row.createdAt }
+    return {
+      id: row.id, taskId: row.taskId, authorId: row.authorId, content: row.content,
+      progressValue: row.progressValue, createdAt: row.createdAt,
+      taskProgress: total, // tổng mới sau nhật ký này (null nếu không kèm %)
+    }
   }
 
   // ── Theo dõi (watcher) — ai xem được task đều theo dõi được ──
