@@ -6,10 +6,17 @@ import type { AuthClaims } from '../auth/auth.types'
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Field CÔNG KHAI của user — TUYỆT ĐỐI không passwordHash/lock counters
+  private static readonly PUBLIC_SELECT = {
+    id: true, email: true, displayName: true, orgUnitId: true,
+    role: true, jobTitle: true, avatarUrl: true, active: true,
+  } as const
+
   findAll() {
     return this.prisma.user.findMany({
       where: { active: true },
       orderBy: { displayName: 'asc' },
+      select: UsersService.PUBLIC_SELECT,
     })
   }
 
@@ -33,7 +40,7 @@ export class UsersService {
   }
 
   findOne(id: string) {
-    return this.prisma.user.findUnique({ where: { id } })
+    return this.prisma.user.findUnique({ where: { id }, select: UsersService.PUBLIC_SELECT })
   }
 
   /**

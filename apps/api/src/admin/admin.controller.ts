@@ -38,6 +38,8 @@ function tempPassword() {
 @Controller('admin')
 @UseGuards(AuthGuard)
 export class AdminController {
+  private static syncRunning = false
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
@@ -176,10 +178,20 @@ export class AdminController {
   @Post('hrm-sync/run')
   async syncRun(@AuthUser() c: AuthClaims) {
     const actor = await this.admin(c)
+    // FINAL-REVIEW: sync-hrm-dev đọc HRM DEV — CẤM chạy ở production (chỉ xem log).
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('Đồng bộ HRM dev bị khóa ở production — chỉ xem log')
+    }
+    // Concurrency lock: 2 admin bấm cùng lúc → chỉ 1 sync chạy
+    if (AdminController.syncRunning) {
+      throw new ForbiddenException('Đồng bộ đang chạy — chờ hoàn tất')
+    }
+    AdminController.syncRunning = true
     await this.audit(actor.id, null, 'hrm_sync_run', {})
     const script = join(process.cwd(), 'scripts', 'sync-hrm-dev.mjs')
     return new Promise((resolve) => {
       execFile('node', ['--env-file=.env', script], { cwd: process.cwd(), timeout: 180_000 }, (err, stdout, stderr) => {
+        AdminController.syncRunning = false
         resolve({ ok: !err, output: (stdout || '').slice(-2000), error: err ? (stderr || err.message).slice(-500) : null })
       })
     })
