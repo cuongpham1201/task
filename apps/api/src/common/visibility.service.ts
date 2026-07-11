@@ -47,6 +47,8 @@ export class VisibilityService {
       where: {
         userId: me.id,
         active: true,
+        // FEATURE-003 (PHẦN 1.7): org unit inactive → assignment không mở quyền dữ liệu
+        orgUnit: { active: true },
         ...(managingOnly ? { role: { not: 'viewer' as any } } : {}),
       },
     })
@@ -55,6 +57,42 @@ export class VisibilityService {
       else set.add(r.orgUnitId)
     }
     return set
+  }
+
+  /**
+   * FEATURE-003: mở rộng MỘT assignment (giả định) thành danh sách org unit — dùng cho
+   * preview ở admin. CÙNG thuật toán với engine — không duplicate ở frontend.
+   */
+  async expandScope(orgUnitId: string, scope: string): Promise<string[]> {
+    const { descendants } = await this.loadTree()
+    return scope === 'include_children' ? descendants(orgUnitId) : [orgUnitId]
+  }
+
+  /**
+   * FEATURE-003: permission hiệu lực cho frontend (bootstrap). FE CHỈ dùng để show/hide;
+   * backend vẫn enforce thật qua Policy/Visibility. Quyền nghiệp vụ suy từ org_unit_roles
+   * (KHÔNG từ users.role='manager', KHÔNG từ jobTitle).
+   */
+  async effectivePermissions(me: Me) {
+    const isAdmin = me.role === 'admin'
+    const activeRoles = isAdmin
+      ? []
+      : await this.prisma.orgUnitRole.findMany({
+          where: { userId: me.id, active: true, orgUnit: { active: true } },
+          select: { role: true },
+        })
+    const managed = await this.managedOrgUnitIds(me)
+    const hasOrgRole = activeRoles.length > 0
+    return {
+      isAdmin,
+      hasOrgRole: isAdmin || hasOrgRole,
+      // viewer được XEM Action Log/Reports trong phạm vi; role quản lý (≠viewer) mới tạo/sửa
+      canViewActionLog: isAdmin || hasOrgRole,
+      canManageActions: isAdmin || managed.length > 0,
+      canViewReports: isAdmin || hasOrgRole,
+      // org unit user QUẢN LÝ — FE gate nút sửa/nghiệm thu theo từng task/action
+      managedOrgUnitIds: managed,
+    }
   }
 
   /** Org units user được XEM (gồm phòng mình + phạm vi role). */

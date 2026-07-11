@@ -100,8 +100,11 @@ export class BootstrapController {
         : null,
     }))
 
+    // FEATURE-003: permission hiệu lực — FE CHỈ dùng show/hide, backend vẫn enforce thật
+    const permissions = await this.vis.effectivePermissions(me)
+
     // Counts tiện dụng (không thay việc scope FE)
-    const managed = await this.vis.managedOrgUnitIds(me)
+    const managed = permissions.managedOrgUnitIds
     const [pendingReviewCount, myActionCount] = await Promise.all([
       this.prisma.task.count({
         where: { archived: false, status: 'submitted', OR: [{ creatorId: me.id }, { orgUnitId: { in: managed } }] },
@@ -119,6 +122,7 @@ export class BootstrapController {
       comments,
       activities,
       actions,
+      permissions,
       counts: { pendingReviewCount, myActionCount },
       notifications: await this.notifications.listForUser(me),
     }

@@ -222,6 +222,7 @@ model User {
   workLogs              TaskWorkLog[]        @relation("WorkLogAuthor")
   adminActionsDone      AdminAuditLog[]      @relation("AuditActor")
   adminActionsReceived  AdminAuditLog[]      @relation("AuditTarget")
+  orgRolesGranted       OrgUnitRole[]        @relation("OrgRoleCreatedBy")
 
   @@map("users")
 }
@@ -259,14 +260,26 @@ model OrgUnitRole {
   orgUnitId String    @map("org_unit_id")
   role      OrgRole
   scope     RoleScope @default(self_only)
+  // MANUAL (admin UI) | HRM_SYNC (script sở hữu) | MANUAL_TEST (seed dev) | SEED
   source    String    @default("MANUAL")
   active    Boolean   @default(true)
+  // FEATURE-003: unique nghiệp vụ (userId+orgUnitId+role khi active) enforce Ở APP-LEVEL
+  // trong transaction — không partial-unique DB (prisma không model được → drift).
+  // Record inactive giữ làm lịch sử; tạo trùng tuple inactive → tái kích hoạt record cũ.
+  note        String?   @db.VarChar(300)
+  createdById String?   @map("created_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orgUnit OrgUnit @relation(fields: [orgUnitId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgUnit   OrgUnit @relation(fields: [orgUnitId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("OrgRoleCreatedBy", fields: [createdById], references: [id])
 
   @@index([userId])
   @@index([orgUnitId])
+  @@index([userId, active])
+  @@index([orgUnitId, active])
+  @@index([source])
   @@map("org_unit_roles")
 }
 

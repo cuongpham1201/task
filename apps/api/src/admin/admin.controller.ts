@@ -1,5 +1,5 @@
 import {
-  Body, Controller, ForbiddenException, Get, NotFoundException, Param, Patch, Post, UseGuards,
+  Body, ConflictException, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Patch, Post, UseGuards,
 } from '@nestjs/common'
 import { IsBoolean, IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator'
 import { randomBytes } from 'node:crypto'
@@ -11,6 +11,7 @@ import type { AuthClaims } from '../auth/auth.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { UsersService } from '../users/users.service'
 import { LocalAuthService } from '../auth/local-auth.service'
+import { VisibilityService } from '../common/visibility.service'
 
 class ProvisionDto {
   @IsOptional() @IsString() @Matches(/^[a-z0-9._-]{3,60}$/) username?: string
@@ -22,6 +23,39 @@ class AccessDto {
 }
 class RoleDto {
   @IsIn(['admin', 'manager', 'member']) role!: string
+}
+
+// ── FEATURE-003: vai trò tổ chức ──
+const ORG_ROLES = ['ceo', 'block_director', 'department_manager', 'viewer'] as const
+const ORG_SCOPES = ['self_only', 'include_children'] as const
+class OrgRoleCreateDto {
+  @IsString() orgUnitId!: string
+  @IsIn(ORG_ROLES as unknown as string[]) role!: string
+  @IsIn(ORG_SCOPES as unknown as string[]) scope!: string
+  @IsOptional() @IsString() @MaxLength(300) note?: string
+}
+class OrgRoleUpdateDto {
+  @IsOptional() @IsString() orgUnitId?: string
+  @IsOptional() @IsIn(ORG_ROLES as unknown as string[]) role?: string
+  @IsOptional() @IsIn(ORG_SCOPES as unknown as string[]) scope?: string
+  @IsOptional() @IsBoolean() active?: boolean
+  @IsOptional() @IsString() @MaxLength(300) note?: string
+}
+class OrgRolePreviewDto {
+  @IsString() userId!: string
+  @IsString() orgUnitId!: string
+  @IsIn(ORG_ROLES as unknown as string[]) role!: string
+  @IsIn(ORG_SCOPES as unknown as string[]) scope!: string
+}
+
+// Convention (KHÔNG chặn cứng — chỉ cảnh báo, PHẦN 3): role nào thường gắn loại đơn vị nào
+const ROLE_UNIT_CONVENTION: Record<string, string> = {
+  ceo: 'company',
+  block_director: 'block',
+  department_manager: 'department',
+}
+const ORG_ROLE_LABEL: Record<string, string> = {
+  ceo: 'Tổng giám đốc', block_director: 'Giám đốc khối', department_manager: 'Trưởng phòng/ban', viewer: 'Người xem',
 }
 
 /** Sinh mật khẩu tạm dễ đọc (12 ký tự, không ký tự dễ nhầm). Chỉ trả 1 LẦN, không lưu plaintext. */
@@ -44,6 +78,7 @@ export class AdminController {
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
     private readonly localAuth: LocalAuthService,
+    private readonly vis: VisibilityService,
   ) {}
 
   private async admin(claims: AuthClaims) {
@@ -166,6 +201,221 @@ export class AdminController {
       include: { actor: { select: { displayName: true } } },
     })
     return rows.map((r) => ({ id: r.id, action: r.action, metadata: r.metadata, actorName: r.actor.displayName, createdAt: r.createdAt }))
+  }
+
+  // ══ FEATURE-003: Vai trò tổ chức & phạm vi dữ liệu ══════════════════════
+  // App Giao việc TỰ quản quyền nghiệp vụ qua org_unit_roles — HRM chỉ là master
+  // danh tính/cây tổ chức. KHÔNG suy quyền từ jobTitle. DELETE = deactivate
+  // (archive, giữ lịch sử audit) — KHÔNG hard delete.
+
+  private orgRoleView(r: any) {
+    return {
+      id: r.id, role: r.role, scope: r.scope, source: r.source, active: r.active,
+      note: r.note, createdAt: r.createdAt, updatedAt: r.updatedAt,
+      orgUnit: r.orgUnit
+        ? { id: r.orgUnit.id, code: r.orgUnit.code, name: r.orgUnit.name, type: r.orgUnit.type, active: r.orgUnit.active }
+        : null,
+      createdByName: r.createdBy?.displayName ?? null,
+    }
+  }
+
+  private orgRoleWarnings(role: string, orgUnit: { type: string; name: string; active: boolean }, user?: { active: boolean }) {
+    const w: string[] = []
+    const expected = ROLE_UNIT_CONVENTION[role]
+    if (expected && orgUnit.type !== expected) {
+      w.push(`${ORG_ROLE_LABEL[role]} theo convention gắn đơn vị loại "${expected}" — đang chọn "${orgUnit.type}" (${orgUnit.name}). Cho phép nếu nghiệp vụ cần, hãy kiểm tra kỹ.`)
+    }
+    if (!orgUnit.active) w.push(`Đơn vị "${orgUnit.name}" đang INACTIVE — assignment sẽ KHÔNG mở quyền dữ liệu cho tới khi đơn vị active trở lại.`)
+    if (user && !user.active) w.push('Người dùng đang INACTIVE (nghỉ việc/khóa) — assignment được giữ để audit nhưng KHÔNG có hiệu lực.')
+    return w
+  }
+
+  /** Danh sách org unit cho picker admin (kèm inactive để cảnh báo — bootstrap chỉ có active). */
+  @Get('org-units')
+  async orgUnits(@AuthUser() c: AuthClaims) {
+    await this.admin(c)
+    const units = await this.prisma.orgUnit.findMany({
+      orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+      select: { id: true, code: true, name: true, type: true, parentId: true, active: true },
+    })
+    return units
+  }
+
+  @Get('users/:id/org-roles')
+  async orgRoles(@AuthUser() c: AuthClaims, @Param('id') id: string) {
+    await this.admin(c)
+    const u = await this.prisma.user.findUnique({ where: { id } })
+    if (!u) throw new NotFoundException('Không tìm thấy người dùng')
+    const rows = await this.prisma.orgUnitRole.findMany({
+      where: { userId: id },
+      orderBy: [{ active: 'desc' }, { createdAt: 'desc' }],
+      include: { orgUnit: true, createdBy: { select: { displayName: true } } },
+    })
+    return rows.map((r) => this.orgRoleView(r))
+  }
+
+  /** Thêm assignment. Trùng tuple active → 409; trùng tuple inactive → TÁI KÍCH HOẠT record cũ. */
+  @Post('users/:id/org-roles')
+  async orgRoleAdd(@AuthUser() c: AuthClaims, @Param('id') id: string, @Body() dto: OrgRoleCreateDto) {
+    const actor = await this.admin(c)
+    const u = await this.prisma.user.findUnique({ where: { id } })
+    if (!u) throw new NotFoundException('Không tìm thấy người dùng')
+    const org = await this.prisma.orgUnit.findUnique({ where: { id: dto.orgUnitId } })
+    if (!org) throw new NotFoundException('Không tìm thấy đơn vị tổ chức')
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const dup = await tx.orgUnitRole.findFirst({
+        where: { userId: id, orgUnitId: dto.orgUnitId, role: dto.role as any, active: true },
+      })
+      if (dup) throw new ConflictException('Assignment này đã tồn tại và đang active')
+      const inactive = await tx.orgUnitRole.findFirst({
+        where: { userId: id, orgUnitId: dto.orgUnitId, role: dto.role as any, active: false },
+        orderBy: { updatedAt: 'desc' },
+      })
+      let row
+      let auditAction = 'org_role_add'
+      let before: any = null
+      if (inactive) {
+        auditAction = 'org_role_reactivate'
+        before = { role: inactive.role, scope: inactive.scope, orgUnitId: inactive.orgUnitId, active: false, source: inactive.source }
+        row = await tx.orgUnitRole.update({
+          where: { id: inactive.id },
+          data: { active: true, scope: dto.scope as any, note: dto.note ?? inactive.note, source: 'MANUAL', createdById: actor.id },
+        })
+      } else {
+        row = await tx.orgUnitRole.create({
+          data: { userId: id, orgUnitId: dto.orgUnitId, role: dto.role as any, scope: dto.scope as any, note: dto.note ?? null, source: 'MANUAL', createdById: actor.id },
+        })
+      }
+      await tx.adminAuditLog.create({
+        data: {
+          actorId: actor.id, targetUserId: id, action: auditAction,
+          metadata: { roleAssignmentId: row.id, before, after: { role: row.role, scope: row.scope, orgUnitId: row.orgUnitId, active: true }, source: row.source, note: dto.note ?? null } as any,
+        },
+      })
+      return row
+    })
+    const full = await this.prisma.orgUnitRole.findUnique({
+      where: { id: result.id }, include: { orgUnit: true, createdBy: { select: { displayName: true } } },
+    })
+    return { assignment: this.orgRoleView(full), warnings: this.orgRoleWarnings(dto.role, org, u) }
+  }
+
+  /** Sửa assignment. Admin sửa record HRM_SYNC → App nhận quyền sở hữu (source→MANUAL) để sync không ghi đè. */
+  @Patch('users/:id/org-roles/:roleId')
+  async orgRoleUpdate(@AuthUser() c: AuthClaims, @Param('id') id: string, @Param('roleId') roleId: string, @Body() dto: OrgRoleUpdateDto) {
+    const actor = await this.admin(c)
+    const row = await this.prisma.orgUnitRole.findFirst({ where: { id: roleId, userId: id }, include: { orgUnit: true } })
+    if (!row) throw new NotFoundException('Không tìm thấy assignment')
+    const nextOrgId = dto.orgUnitId ?? row.orgUnitId
+    const nextRole = dto.role ?? row.role
+    const nextActive = dto.active ?? row.active
+    const org = await this.prisma.orgUnit.findUnique({ where: { id: nextOrgId } })
+    if (!org) throw new NotFoundException('Không tìm thấy đơn vị tổ chức')
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (nextActive) {
+        const dup = await tx.orgUnitRole.findFirst({
+          where: { userId: id, orgUnitId: nextOrgId, role: nextRole as any, active: true, NOT: { id: roleId } },
+        })
+        if (dup) throw new ConflictException('Đã có assignment active trùng (user + đơn vị + vai trò)')
+      }
+      const before = { role: row.role, scope: row.scope, orgUnitId: row.orgUnitId, active: row.active, source: row.source, note: row.note }
+      const r = await tx.orgUnitRole.update({
+        where: { id: roleId },
+        data: {
+          orgUnitId: nextOrgId, role: nextRole as any,
+          scope: (dto.scope ?? row.scope) as any, active: nextActive,
+          note: dto.note !== undefined ? dto.note : row.note,
+          source: 'MANUAL', // admin đã đụng tay → App sở hữu, HRM sync không quản record này nữa
+        },
+      })
+      const action = dto.active === false ? 'org_role_deactivate' : dto.active === true && !row.active ? 'org_role_reactivate' : 'org_role_update'
+      await tx.adminAuditLog.create({
+        data: {
+          actorId: actor.id, targetUserId: id, action,
+          metadata: { roleAssignmentId: roleId, before, after: { role: r.role, scope: r.scope, orgUnitId: r.orgUnitId, active: r.active, source: r.source, note: r.note } } as any,
+        },
+      })
+      return r
+    })
+    const full = await this.prisma.orgUnitRole.findUnique({
+      where: { id: updated.id }, include: { orgUnit: true, createdBy: { select: { displayName: true } } },
+    })
+    const u = await this.prisma.user.findUnique({ where: { id } })
+    return { assignment: this.orgRoleView(full), warnings: this.orgRoleWarnings(String(nextRole), org, u ?? undefined) }
+  }
+
+  /** DELETE = deactivate/archive (giữ lịch sử audit) — KHÔNG hard delete. */
+  @Delete('users/:id/org-roles/:roleId')
+  async orgRoleArchive(@AuthUser() c: AuthClaims, @Param('id') id: string, @Param('roleId') roleId: string) {
+    const actor = await this.admin(c)
+    const row = await this.prisma.orgUnitRole.findFirst({ where: { id: roleId, userId: id } })
+    if (!row) throw new NotFoundException('Không tìm thấy assignment')
+    await this.prisma.$transaction(async (tx) => {
+      await tx.orgUnitRole.update({ where: { id: roleId }, data: { active: false, source: 'MANUAL' } })
+      await tx.adminAuditLog.create({
+        data: {
+          actorId: actor.id, targetUserId: id, action: 'org_role_deactivate',
+          metadata: { roleAssignmentId: roleId, before: { role: row.role, scope: row.scope, orgUnitId: row.orgUnitId, active: row.active, source: row.source }, after: { active: false } } as any,
+        },
+      })
+    })
+    return { id: roleId, active: false, archived: true }
+  }
+
+  /** Phạm vi hiệu lực hiện tại của user (tính bằng ĐÚNG engine backend). */
+  @Get('users/:id/effective-scope')
+  async effectiveScope(@AuthUser() c: AuthClaims, @Param('id') id: string) {
+    await this.admin(c)
+    const u = await this.prisma.user.findUnique({ where: { id } })
+    if (!u) throw new NotFoundException('Không tìm thấy người dùng')
+    const warnings: string[] = []
+    if (!u.active) {
+      // PHẦN 11: user inactive → không có effective permission (assignment giữ để audit)
+      warnings.push('Người dùng INACTIVE — không đăng nhập được và mọi assignment KHÔNG có hiệu lực.')
+      return { visibleOrgUnitIds: [], manageableOrgUnitIds: [], orgUnits: [], permissions: { isAdmin: false, hasOrgRole: false, canViewActionLog: false, canManageActions: false, canViewReports: false, managedOrgUnitIds: [] }, warnings }
+    }
+    const me = { id: u.id, role: u.role, orgUnitId: u.orgUnitId }
+    const [visible, managed, permissions] = await Promise.all([
+      this.vis.visibleOrgUnitIds(me), this.vis.managedOrgUnitIds(me), this.vis.effectivePermissions(me),
+    ])
+    const units = await this.prisma.orgUnit.findMany({
+      where: { id: { in: visible } }, select: { id: true, code: true, name: true, type: true },
+      orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }],
+    })
+    return { visibleOrgUnitIds: visible, manageableOrgUnitIds: managed, orgUnits: units, permissions, warnings }
+  }
+
+  /** Preview phạm vi TRƯỚC KHI LƯU assignment — cùng thuật toán engine (không tính lại ở FE). */
+  @Post('org-role-preview')
+  async orgRolePreview(@AuthUser() c: AuthClaims, @Body() dto: OrgRolePreviewDto) {
+    await this.admin(c)
+    const u = await this.prisma.user.findUnique({ where: { id: dto.userId } })
+    if (!u) throw new NotFoundException('Không tìm thấy người dùng')
+    const org = await this.prisma.orgUnit.findUnique({ where: { id: dto.orgUnitId } })
+    if (!org) throw new NotFoundException('Không tìm thấy đơn vị tổ chức')
+
+    const me = { id: u.id, role: u.role, orgUnitId: u.orgUnitId }
+    const [currentVisible, currentManaged, addedIds] = await Promise.all([
+      this.vis.visibleOrgUnitIds(me),
+      this.vis.managedOrgUnitIds(me),
+      org.active ? this.vis.expandScope(dto.orgUnitId, dto.scope) : Promise.resolve([]),
+    ])
+    const visible = [...new Set([...currentVisible, ...addedIds])]
+    const manageable = dto.role === 'viewer' ? currentManaged : [...new Set([...currentManaged, ...addedIds])]
+    const units = await this.prisma.orgUnit.findMany({
+      where: { id: { in: [...new Set([...visible, ...manageable])] } },
+      select: { id: true, code: true, name: true, type: true },
+      orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }],
+    })
+    return {
+      visibleOrgUnitIds: visible,
+      manageableOrgUnitIds: manageable,
+      addedOrgUnitIds: addedIds,
+      orgUnits: units,
+      warnings: this.orgRoleWarnings(dto.role, org, u),
+    }
   }
 
   // ── HRM sync ──
