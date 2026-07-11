@@ -145,19 +145,45 @@ async function main() {
     if (!syncedDeptExt.has(o.externalHrmId)) { await prisma.orgUnit.update({ where: { id: o.id }, data: { active: false } }); report.deactivatedOrgs++ }
   }
 
-  // ── 7. Roles: từ HRM division head (data-driven) + MANUAL_TEST (ghi rõ) ──
-  await prisma.orgUnitRole.deleteMany({ where: { source: { in: ['HRM_SYNC', 'MANUAL_TEST'] } } })
+  // ── 7. Roles (FEATURE-003): sync CHỈ sở hữu source='HRM_SYNC' — reconcile, KHÔNG delete.
+  //    TUYỆT ĐỐI không đụng MANUAL/MANUAL_TEST/SEED (quyền do admin App quản trong UI).
+  //    Idempotent: chạy lại không tạo trùng; head_id mất/đổi → deactivate (giữ lịch sử).
+  const desiredHeads = new Set()
   for (const d of divisions) {
     if (d.head_id && userByHrmEmp[String(d.head_id)] && deptByHrmId[d.id]) {
-      await prisma.orgUnitRole.create({ data: { userId: userByHrmEmp[String(d.head_id)], orgUnitId: deptByHrmId[d.id], role: 'department_manager', scope: 'self_only', source: 'HRM_SYNC', active: true } })
-      report.rolesHrm++
+      desiredHeads.add(`${userByHrmEmp[String(d.head_id)]}|${deptByHrmId[d.id]}`)
     }
   }
+  const ownedRows = await prisma.orgUnitRole.findMany({ where: { source: 'HRM_SYNC' } })
+  const ownedByKey = new Map(ownedRows.map((r) => [`${r.userId}|${r.orgUnitId}`, r]))
+  for (const key of desiredHeads) {
+    const [userId, orgUnitId] = key.split('|')
+    const existing = ownedByKey.get(key)
+    if (existing) {
+      if (!existing.active) await prisma.orgUnitRole.update({ where: { id: existing.id }, data: { active: true } })
+      report.rolesHrm++
+      continue
+    }
+    // Admin đã gán tay assignment active trùng tuple → skip, không tạo bản sao HRM_SYNC
+    const manualDup = await prisma.orgUnitRole.findFirst({ where: { userId, orgUnitId, role: 'department_manager', active: true } })
+    if (manualDup) { report.rolesHrm++; continue }
+    await prisma.orgUnitRole.create({ data: { userId, orgUnitId, role: 'department_manager', scope: 'self_only', source: 'HRM_SYNC', active: true } })
+    report.rolesHrm++
+  }
+  for (const r of ownedRows) {
+    if (r.active && !desiredHeads.has(`${r.userId}|${r.orgUnitId}`)) {
+      await prisma.orgUnitRole.update({ where: { id: r.id }, data: { active: false } }) // head đổi → deactivate, KHÔNG xóa
+    }
+  }
+  // MANUAL_TEST seed dev: chỉ TẠO NẾU CHƯA CÓ — không sửa/xóa record sẵn có
   for (const r of MANUAL_TEST_ROLES) {
     const user = await prisma.user.findUnique({ where: { email: r.email } })
     const orgId = orgCodeToId[r.orgCode] || blockByCode[r.orgCode]
     if (user && orgId) {
-      await prisma.orgUnitRole.create({ data: { userId: user.id, orgUnitId: orgId, role: r.role, scope: r.scope, source: 'MANUAL_TEST', active: true } })
+      const exist = await prisma.orgUnitRole.findFirst({ where: { userId: user.id, orgUnitId: orgId, role: r.role } })
+      if (!exist) {
+        await prisma.orgUnitRole.create({ data: { userId: user.id, orgUnitId: orgId, role: r.role, scope: r.scope, source: 'MANUAL_TEST', active: true } })
+      }
       report.rolesManual++
     } else {
       console.warn(`⚠ MANUAL_TEST role bỏ qua: ${r.email} @ ${r.orgCode} (user/org không tìm thấy)`)
