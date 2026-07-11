@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { List, Kanban, CalendarDays, Plus } from 'lucide-react'
+import { List, Kanban, CalendarDays, BarChart3, Plus } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import TaskTable from '../components/task/TaskTable'
 import QuickAddTask from '../components/task/QuickAddTask'
@@ -11,11 +11,13 @@ import Breadcrumb from '../components/shared/Breadcrumb'
 import { isOverdue } from '../utils/date'
 import { deptColor } from '../utils/color'
 import { orgUnitDisplayName } from '../utils/org'
+import { TaskDashboard } from '../components/shared/charts'
 
 const VIEWS = [
   { key: 'list', label: 'Danh sách', icon: List },
   { key: 'board', label: 'Bảng', icon: Kanban },
   { key: 'calendar', label: 'Lịch', icon: CalendarDays },
+  { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
 ]
 
 export default function DepartmentPage() {
@@ -99,6 +101,7 @@ export default function DepartmentPage() {
       )}
       {view === 'board' && <KanbanBoard tasks={tasks} />}
       {view === 'calendar' && <CalendarView tasks={tasks} />}
+      {view === 'dashboard' && <TaskDashboard tasks={tasks} usersById={usersById} showSections />}
     </div>
   )
 }

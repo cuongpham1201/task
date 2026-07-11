@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Target, Plus, ChevronRight, Building2, Printer } from 'lucide-react'
+import { Target, Plus, ChevronRight, Building2, Printer, List, BarChart3 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import EmptyState from '../components/shared/EmptyState'
 import { ACTION_STATUS } from '../data/constants'
@@ -8,6 +8,7 @@ import { deptColor } from '../utils/color'
 import { formatDate, isOverdue } from '../utils/date'
 import { useLocalStorage } from '../utils/useLocalStorage'
 import { orgUnitDisplayName } from '../utils/org'
+import { ActionDashboard } from '../components/shared/charts'
 
 function ActionStatusBadge({ status }) {
   const s = ACTION_STATUS[status] || { label: status, tone: 'gray' }
@@ -26,12 +27,18 @@ function recentPeriods() {
 }
 
 export default function ActionLog() {
-  const { state, fetchActionLog, canManageActions, openCreateActionModal, usersById, channelsById } = useApp()
+  const { state, fetchActionLog, canManageActions, openCreateActionModal, usersById, channelsById, orgUnitsById } = useApp()
   const navigate = useNavigate()
   const periods = useMemo(recentPeriods, [])
   const [period, setPeriod] = useLocalStorage('actionlog.period', '') // '' = tất cả kỳ
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [view, setView] = useLocalStorage('actionlog.view', 'list') // list | charts
+  // Dashboard: actions đã scope trong state, lọc theo kỳ đang chọn
+  const chartActions = useMemo(
+    () => (state.actions || []).filter((a) => !period || a.period === period),
+    [state.actions, period],
+  )
 
   const load = () => {
     setLoading(true)
@@ -60,6 +67,10 @@ export default function ActionLog() {
           <p className="page-sub">Cam kết/mục tiêu quản lý theo đơn vị — cập nhật theo họp tác nghiệp.</p>
         </div>
         <div className="page-head-actions">
+          <div className="view-toggle no-print">
+            <button className={`btn ${view === 'list' ? 'btn-primary' : ''}`} title="Danh sách" onClick={() => setView('list')}><List size={15} /></button>
+            <button className={`btn ${view === 'charts' ? 'btn-primary' : ''}`} title="Biểu đồ" onClick={() => setView('charts')}><BarChart3 size={15} /></button>
+          </div>
           <select value={period} onChange={(e) => setPeriod(e.target.value)}>
             <option value="">Tất cả kỳ</option>
             {periods.map((p) => <option key={p} value={p}>Tháng {p.slice(5)}/{p.slice(0, 4)}</option>)}
@@ -75,7 +86,9 @@ export default function ActionLog() {
         </div>
       </div>
 
-      {loading ? (
+      {view === 'charts' ? (
+        <ActionDashboard actions={chartActions} usersById={usersById} orgUnitsById={orgUnitsById} />
+      ) : loading ? (
         <div className="card"><p className="muted" style={{ padding: 8 }}>Đang tải…</p></div>
       ) : !data || data.total === 0 ? (
         <EmptyState icon={Target} title="Chưa có Action nào" hint="Tạo Action để ghi nhận cam kết/mục tiêu của đơn vị." />

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  LayoutGrid, List, Kanban, Users, Activity, Plus, Hash, UserPlus, X, Pencil, Archive,
+  LayoutGrid, List, Kanban, Users, Activity, Plus, Hash, UserPlus, X, Pencil, Archive, BarChart3,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import TaskTable from '../components/task/TaskTable'
@@ -11,6 +11,7 @@ import Avatar, { AvatarGroup } from '../components/shared/Avatar'
 import EmptyState from '../components/shared/EmptyState'
 import Breadcrumb from '../components/shared/Breadcrumb'
 import SearchUser from '../components/shared/SearchUser'
+import { TaskDashboard } from '../components/shared/charts'
 import { STATUS, STATUS_ORDER } from '../data/constants'
 import { activityText } from '../utils/activity'
 import { timeAgo, isOverdue, isUpcoming } from '../utils/date'
@@ -19,6 +20,7 @@ import { pushRecent } from '../utils/useLocalStorage'
 const TABS = [
   { key: 'overview', label: 'Tổng quan', icon: LayoutGrid },
   { key: 'tasks', label: 'Công việc', icon: List },
+  { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { key: 'members', label: 'Thành viên', icon: Users },
   { key: 'activity', label: 'Hoạt động', icon: Activity },
 ]
@@ -139,6 +141,8 @@ export default function ChannelPage() {
             : <KanbanBoard tasks={filtered} />}
         </>
       )}
+
+      {tab === 'dashboard' && <TaskDashboard tasks={allTasks} usersById={usersById} />}
 
       {tab === 'members' && (
         <div className="card">
