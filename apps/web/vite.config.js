@@ -17,4 +17,18 @@ export default defineConfig({
       },
     },
   },
+  // UAT nhiều user thật: serve BẢN BUILD tĩnh qua `vite preview` (ổn định, không
+  // re-optimize deps giữa phiên như dev server → hết lỗi "2 bản React"/trang trắng).
+  // preview kế thừa proxy/allowedHosts khai báo tường minh dưới đây.
+  preview: {
+    host: '0.0.0.0',
+    port: 5173,
+    allowedHosts: ['task.biahalong.com'],
+    proxy: {
+      '/api': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
+    },
+  },
 })

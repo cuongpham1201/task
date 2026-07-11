@@ -16,7 +16,7 @@ module.exports = {
       name: 'giaoviec-web',
       cwd: '/data/dev/task-app/task/apps/web',
       script: 'npm',
-      args: 'run dev', // vite :5173, host 0.0.0.0, proxy /api → 4000, allowedHosts task.biahalong.com
+      args: 'run preview', // vite preview :5173 — serve dist TĨNH (UAT ổn định; build lại rồi restart khi có code mới)
       exec_mode: 'fork',
       autorestart: true,
       max_restarts: 10,
