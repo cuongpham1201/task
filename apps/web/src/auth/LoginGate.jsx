@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from './AuthProvider'
 import { apiFetch } from '../api/client'
 import BrandLogo from '../components/shared/BrandLogo'
+import { isInTeamsHostFast, authenticateInTeams } from '../utils/teams'
 
 /**
  * Cổng đăng nhập + bootstrap dữ liệu thật.
@@ -44,6 +45,20 @@ export default function LoginGate({ children }) {
 }
 
 function LoginScreen({ onLogin }) {
+  const [teamsBusy, setTeamsBusy] = useState(false)
+  const [teamsFail, setTeamsFail] = useState(false)
+  const inTeams = isInTeamsHostFast()
+
+  // Trong Teams iframe: OAuth redirect bị Entra chặn → dùng Teams auth POPUP
+  // (pattern approval). Thành công → reload để LoginGate đọc session mới.
+  const login = async () => {
+    if (!inTeams) return onLogin()
+    setTeamsBusy(true); setTeamsFail(false)
+    const ok = await authenticateInTeams()
+    if (ok) window.location.reload()
+    else { setTeamsBusy(false); setTeamsFail(true) }
+  }
+
   return (
     <div className="auth-screen">
       <div className="auth-card">
@@ -52,10 +67,17 @@ function LoginScreen({ onLogin }) {
         </div>
         <h1 className="auth-title">App Giao Việc</h1>
         <p className="auth-sub">Hệ thống giao việc nội bộ — Bia Hạ Long</p>
-        <button className="ms-btn" onClick={onLogin}>
+        <button className="ms-btn" onClick={login} disabled={teamsBusy}>
           <MsLogo />
-          <span>Đăng nhập với Microsoft 365</span>
+          <span>{teamsBusy ? 'Đang mở cửa sổ đăng nhập…' : 'Đăng nhập với Microsoft 365'}</span>
         </button>
+        {teamsFail && (
+          <p className="auth-foot" style={{ color: '#dd4b4b' }}>
+            Không đăng nhập được trong Teams. Hãy thử lại, hoặc mở{' '}
+            <a href={window.location.origin} target="_blank" rel="noreferrer">task.biahalong.com</a>{' '}
+            trong trình duyệt để đăng nhập trước.
+          </p>
+        )}
         <p className="auth-foot">Chỉ dành cho tài khoản nội bộ @biahalong.com</p>
       </div>
     </div>

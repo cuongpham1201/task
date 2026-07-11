@@ -4,6 +4,7 @@ import { isInTeamsHostFast, initTeams, getTeamsSubEntityId } from './utils/teams
 import { AppProvider, useApp } from './store/AppContext'
 import { AuthProvider } from './auth/AuthProvider'
 import LoginGate from './auth/LoginGate'
+import TeamsAuthComplete from './auth/TeamsAuthComplete'
 import Sidebar from './components/layout/Sidebar'
 import Topbar from './components/layout/Topbar'
 import MobileDrawer from './components/layout/MobileDrawer'
@@ -89,6 +90,10 @@ function AppShell() {
 }
 
 export default function App() {
+  // Trang popup Teams auth — render ĐỘC LẬP, trước LoginGate (popup chưa chắc có session)
+  if (window.location.pathname === '/auth/teams-complete') {
+    return <TeamsAuthComplete />
+  }
   return (
     <BrowserRouter>
       <AuthProvider>

@@ -59,3 +59,39 @@ export async function getTeamsSubEntityId() {
     return null
   }
 }
+
+/**
+ * Đăng nhập TRONG Teams: OAuth redirect trong iframe bị Entra chặn (X-Frame-Options)
+ * → mở qua Teams auth POPUP (top-level, first-party) — pattern approval-bhl.
+ * Popup: /api/v1/auth/login?teams=1 → M365 → callback set cookie → /auth/teams-complete
+ * → notifySuccess → promise resolve → caller reload app.
+ * Trả true nếu login xong; false nếu fail/cancel (caller hiện fallback).
+ */
+export async function authenticateInTeams() {
+  const ok = await initTeams()
+  if (!ok) return false
+  const sdk = await loadSdk()
+  try {
+    await sdk.authentication.authenticate({
+      url: `${window.location.origin}/api/v1/auth/login?teams=1`,
+      width: 600,
+      height: 640,
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Gọi từ trang /auth/teams-complete (chạy trong popup) để báo kết quả cho tab cha. */
+export async function notifyTeamsAuthResult(success) {
+  const sdk = await loadSdk()
+  try {
+    await sdk.app.initialize()
+    if (success) sdk.authentication.notifySuccess('ok')
+    else sdk.authentication.notifyFailure('no-session')
+    return true
+  } catch {
+    return false // không trong Teams popup → caller tự điều hướng
+  }
+}
