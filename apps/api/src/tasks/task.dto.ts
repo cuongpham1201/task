@@ -52,6 +52,14 @@ export class UpdateTaskDto {
   @IsOptional() @IsIn(SECTIONS) section?: string
   @IsOptional() @IsDateString() startDate?: string | null
 }
+// FEATURE-004: sửa người phối hợp sau khi tạo (client gửi TOÀN BỘ danh sách — server diff)
+export class CollaboratorsDto {
+  @IsArray() @IsString({ each: true }) collaboratorIds!: string[]
+}
+// FEATURE-004: chuyển đơn vị yêu cầu của task (org_unit — chiều duy nhất theo freeze)
+export class TaskOrgUnitDto {
+  @IsString() orgUnitId!: string
+}
 export class ReviewDto {
   @IsIn(['passed', 'returned']) decision!: string
   @IsOptional() @IsString() @MaxLength(2000) note?: string

@@ -7,7 +7,8 @@ import type { AuthClaims } from '../auth/auth.types'
 import { UsersService } from '../users/users.service'
 import { TasksService } from './tasks.service'
 import {
-  AssigneeDto, CreateTaskDto, DueDateDto, PriorityDto, ProgressDto, ReviewDto, StatusDto, UpdateTaskDto, WorkLogDto,
+  AssigneeDto, CollaboratorsDto, CreateTaskDto, DueDateDto, PriorityDto, ProgressDto, ReviewDto,
+  StatusDto, TaskOrgUnitDto, UpdateTaskDto, WorkLogDto,
 } from './task.dto'
 
 @Controller('tasks')
@@ -70,6 +71,18 @@ export class TasksController {
   @Patch(':id/assignee')
   async assignee(@AuthUser() c: AuthClaims, @Param('id') id: string, @Body() dto: AssigneeDto) {
     return this.tasks.setAssignee(await this.me(c), id, dto)
+  }
+
+  // FEATURE-004: sửa người phối hợp sau khi tạo
+  @Patch(':id/collaborators')
+  async setCollaborators(@AuthUser() c: AuthClaims, @Param('id') id: string, @Body() dto: CollaboratorsDto) {
+    return this.tasks.setCollaborators(await this.me(c), id, dto)
+  }
+
+  // FEATURE-004: chuyển đơn vị yêu cầu của task
+  @Patch(':id/org-unit')
+  async setOrgUnit(@AuthUser() c: AuthClaims, @Param('id') id: string, @Body() dto: TaskOrgUnitDto) {
+    return this.tasks.setOrgUnit(await this.me(c), id, dto)
   }
 
   @Patch(':id/due-date')

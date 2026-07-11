@@ -5,9 +5,10 @@ import {
 } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
+import SearchUser from '../shared/SearchUser'
+import { orgUnitLabel } from '../../utils/org'
 import MentionCommentBox from './MentionCommentBox'
 import { StatusBadge, PriorityBadge, StatusSelect, PrioritySelect } from '../shared/badges'
-import { SelectMenu } from '../shared/Dropdown'
 import { toInputDate, fromInputDate, timeAgo, formatDateFull } from '../../utils/date'
 import { activityText } from '../../utils/activity'
 
@@ -20,28 +21,25 @@ function Field({ label, children }) {
   )
 }
 
+// FEATURE-004: chọn người thực hiện bằng PICKER TÌM KIẾM (không dropdown 705 người)
 function AssigneeSelect({ value, onChange }) {
-  const { state, usersById } = useApp()
+  const { usersById } = useApp()
+  const [editing, setEditing] = useState(false)
   const user = usersById[value]
+  if (!editing) {
+    return (
+      <button className="detail-user-btn" onClick={() => setEditing(true)} title="Đổi người thực hiện">
+        {user ? (
+          <span className="cell-user"><Avatar user={user} size={24} /> {user.displayName}</span>
+        ) : 'Chọn người thực hiện'}
+      </button>
+    )
+  }
   return (
-    <SelectMenu
-      value={value}
-      onChange={onChange}
-      options={state.users.map((u) => ({
-        value: u.id,
-        node: (
-          <span className="cell-user">
-            <Avatar user={u} size={22} /> {u.displayName}
-          </span>
-        ),
-      }))}
-      renderTrigger={() => (
-        <button className="detail-user-btn">
-          {user ? (
-            <span className="cell-user"><Avatar user={user} size={24} /> {user.displayName}</span>
-          ) : 'Chọn người thực hiện'}
-        </button>
-      )}
+    <SearchUser
+      value={null}
+      onSelect={(id) => { if (id) onChange(id); setEditing(false) }}
+      placeholder="Tìm người thực hiện…"
     />
   )
 }
@@ -50,7 +48,7 @@ export default function TaskDetailPanel() {
   const {
     state, usersById, currentUser, perms, getTask, getSubtasks, getComments, getActivities,
     selectTask, updateTaskField, setStatus, setProgress, toggleComplete,
-    assignTask, setDueDate, setPriority, submitTask, reviewTask,
+    assignTask, setCollaborators, setTaskOrgUnit, setDueDate, setPriority, submitTask, reviewTask,
     addComment, toggleSubtask, addSubtask, taskContextLabel,
     archiveTask, updateSubtask, deleteSubtask, editComment, deleteComment,
     actionsById, channelsById, orgUnitName, watchTask, unwatchTask,
@@ -217,23 +215,51 @@ export default function TaskDetailPanel() {
               )}
             </Field>
             <Field label="Người phối hợp">
-              {task.collaboratorIds.length === 0 ? (
-                <span className="muted">Không có</span>
+              <span className="collab-list">
+                {task.collaboratorIds.length === 0 && !canManage && <span className="muted">Không có</span>}
+                {task.collaboratorIds.map((id) => {
+                  const u = usersById[id]
+                  return u && (
+                    <span key={id} className="cell-user small">
+                      <Avatar user={u} size={20} /> {u.displayName}
+                      {canManage && (
+                        <button className="btn btn-ghost" style={{ padding: '0 2px' }} title="Bỏ khỏi phối hợp"
+                          onClick={() => setCollaborators(task.id, task.collaboratorIds.filter((x) => x !== id))}>
+                          <X size={12} />
+                        </button>
+                      )}
+                    </span>
+                  )
+                })}
+                {canManage && (
+                  <SearchUser value={null} autoFocus={false} placeholder="+ Thêm người phối hợp…"
+                    onSelect={(id) => id && !task.collaboratorIds.includes(id) && id !== task.assigneeId &&
+                      setCollaborators(task.id, [...task.collaboratorIds, id])} />
+                )}
+              </span>
+            </Field>
+            <Field label="Đơn vị yêu cầu">
+              {canManage ? (
+                <select
+                  value={task.orgUnitId || ''}
+                  onChange={(e) => e.target.value && setTaskOrgUnit(task.id, e.target.value)}
+                >
+                  {task.orgUnitId && !state.departments.some((d) => d.id === task.orgUnitId) && (
+                    <option value={task.orgUnitId}>{task.orgUnitName || 'Đơn vị hiện tại'}</option>
+                  )}
+                  {!task.orgUnitId && <option value="">— Chọn đơn vị —</option>}
+                  {state.departments.map((d) => (
+                    <option key={d.id} value={d.id}>{orgUnitLabel(d)}</option>
+                  ))}
+                </select>
               ) : (
-                <span className="collab-list">
-                  {task.collaboratorIds.map((id) => {
-                    const u = usersById[id]
-                    return u && (
-                      <span key={id} className="cell-user small">
-                        <Avatar user={u} size={20} /> {u.displayName}
-                      </span>
-                    )
-                  })}
-                </span>
+                task.orgUnitName || taskContextLabel(task)
               )}
             </Field>
-            <Field label="Đơn vị yêu cầu">{task.orgUnitName || taskContextLabel(task)}</Field>
-            <Field label="Đơn vị thực hiện">{assignee?.orgUnitId ? (orgUnitName(assignee.orgUnitId) || '—') : '—'}</Field>
+            <Field label="Đơn vị thực hiện">
+              {assignee?.orgUnitId ? (orgUnitName(assignee.orgUnitId) || '—') : '—'}
+              <span className="muted" style={{ fontSize: 11, display: 'block' }}>tự động theo đơn vị biên chế của người thực hiện</span>
+            </Field>
             {task.projectId && (
               <Field label="Dự án">{channelsById[task.projectId]?.name || '—'}</Field>
             )}

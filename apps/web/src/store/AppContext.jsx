@@ -449,6 +449,26 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         persist(patch(`/tasks/${id}/assignee`, { assigneeId }), (t) => dispatch({ type: 'REPLACE_TASK', task: t }))
       },
 
+      // FEATURE-004: sửa người phối hợp sau khi tạo (gửi TOÀN BỘ danh sách — server diff)
+      setCollaborators: (id, collaboratorIds) => {
+        const task = findTask(id)
+        if (!task) return
+        if (!guard(canManageTask(currentUser, task, managedIds), 'sửa người phối hợp')) return
+        dispatch({ type: 'UPDATE_TASK_FIELD', id, at: now(), patch: { collaboratorIds } })
+        persist(patch(`/tasks/${id}/collaborators`, { collaboratorIds }), (t) => dispatch({ type: 'REPLACE_TASK', task: t }))
+      },
+
+      // FEATURE-004: chuyển đơn vị yêu cầu của task (backend kiểm quyền đích + chuyển workspace)
+      setTaskOrgUnit: (id, orgUnitId) => {
+        const task = findTask(id)
+        if (!task || task.orgUnitId === orgUnitId) return
+        if (!guard(canManageTask(currentUser, task, managedIds), 'chuyển đơn vị của việc')) return
+        persist(patch(`/tasks/${id}/org-unit`, { orgUnitId }), (t) => {
+          dispatch({ type: 'REPLACE_TASK', task: t })
+          toast('Đã chuyển đơn vị yêu cầu', 'success')
+        })
+      },
+
       setDueDate: (id, dueDate) => {
         const task = findTask(id)
         if (!task || task.dueDate === dueDate) return

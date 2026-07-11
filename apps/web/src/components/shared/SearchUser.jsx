@@ -10,7 +10,7 @@ import Avatar from './Avatar'
  *  - onSelect(userId, user|null)
  *  - orgUnitId?: giới hạn theo phòng
  */
-export default function SearchUser({ value, onSelect, orgUnitId, placeholder = 'Tìm người…' }) {
+export default function SearchUser({ value, onSelect, orgUnitId, placeholder = 'Tìm người…', autoFocus = true }) {
   const { searchUsers, usersById } = useApp()
   const selected = value ? usersById[value] : null
   const [q, setQ] = useState('')
@@ -49,7 +49,7 @@ export default function SearchUser({ value, onSelect, orgUnitId, placeholder = '
       <div className="searchuser-input">
         <Search size={15} className="muted" />
         <input
-          autoFocus
+          autoFocus={autoFocus}
           placeholder={placeholder}
           value={q}
           onChange={(e) => { setQ(e.target.value); setOpen(true) }}

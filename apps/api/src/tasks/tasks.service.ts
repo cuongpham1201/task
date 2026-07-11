@@ -5,7 +5,8 @@ import { VisibilityService, type Me } from '../common/visibility.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { TeamsActivityService } from '../teams/teams-activity.service'
 import type {
-  AssigneeDto, CreateTaskDto, DueDateDto, PriorityDto, ProgressDto, ReviewDto, UpdateTaskDto,
+  AssigneeDto, CollaboratorsDto, CreateTaskDto, DueDateDto, PriorityDto, ProgressDto, ReviewDto,
+  TaskOrgUnitDto, UpdateTaskDto,
 } from './task.dto'
 
 @Injectable()
@@ -278,6 +279,52 @@ export class TasksService {
       previewText: 'Bạn được giao một công việc', path: this.taskPath(id),
       eventSuffix: `assign-${Date.now()}`,
     }])
+    return this.withCollaborators(id)
+  }
+
+  /** FEATURE-004: sửa người phối hợp sau khi tạo — client gửi TOÀN BỘ danh sách, server diff. */
+  async setCollaborators(me: Me, id: string, dto: CollaboratorsDto) {
+    const task = await this.load(id)
+    this.policy.assert(await this.policy.canManage(me, task), 'Không có quyền sửa người phối hợp')
+    const ids = [...new Set(dto.collaboratorIds)].filter((u) => u !== task.assigneeId) // assignee không cần là collaborator
+    const found = await this.prisma.user.count({ where: { id: { in: ids }, active: true } })
+    if (found !== ids.length) throw new BadRequestException('Danh sách người phối hợp có người không hợp lệ')
+    const current = (await this.prisma.taskCollaborator.findMany({ where: { taskId: id }, select: { userId: true } })).map((c) => c.userId)
+    const added = ids.filter((u) => !current.includes(u))
+    await this.prisma.$transaction(async (tx) => {
+      await tx.taskCollaborator.deleteMany({ where: { taskId: id, userId: { notIn: ids } } }) // chỉ trong phạm vi task này
+      if (added.length) await tx.taskCollaborator.createMany({ data: added.map((userId) => ({ taskId: id, userId })), skipDuplicates: true })
+      await this.notifications.emit(tx, {
+        task, actorId: me.id, action: 'collaborator', metadata: { from: current, to: ids },
+        notifyType: added.length ? 'task_assigned' : null, extraRecipients: added,
+      })
+    })
+    return this.withCollaborators(id)
+  }
+
+  /** FEATURE-004: chuyển đơn vị yêu cầu (org_unit) của task — kèm chuyển workspace department tương ứng. */
+  async setOrgUnit(me: Me, id: string, dto: TaskOrgUnitDto) {
+    const task = await this.load(id)
+    this.policy.assert(await this.policy.canManage(me, task), 'Không có quyền chuyển đơn vị của việc này')
+    const org = await this.prisma.orgUnit.findUnique({ where: { id: dto.orgUnitId } })
+    if (!org || !org.active) throw new BadRequestException('Đơn vị không tồn tại hoặc đã ngưng hoạt động')
+    // Người chuyển phải có quyền tạo việc ở đơn vị ĐÍCH (thuộc biên chế hoặc quản lý nó)
+    this.policy.assert(
+      await this.policy.canCreate(me, { orgUnitId: dto.orgUnitId, projectId: task.projectId }),
+      'Không có quyền chuyển việc sang đơn vị này',
+    )
+    // Task phòng ban (workspace org_unit) → workspace phải đi theo org mới; task dự án/cá nhân giữ workspace
+    let workspaceId = task.workspaceId as string | null
+    if (!task.projectId && workspaceId) {
+      const ws = await this.prisma.workspace.findFirst({ where: { type: 'org_unit', orgUnitId: dto.orgUnitId } })
+      workspaceId = ws?.id ?? workspaceId
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.task.update({ where: { id }, data: { orgUnitId: dto.orgUnitId, workspaceId } })
+      await this.notifications.emit(tx, {
+        task, actorId: me.id, action: 'edit', metadata: { field: 'orgUnit', from: task.orgUnitId, to: dto.orgUnitId }, notifyType: null,
+      })
+    })
     return this.withCollaborators(id)
   }
 
