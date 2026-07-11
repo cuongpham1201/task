@@ -21,6 +21,13 @@ export default function LoginGate({ children }) {
     ;(async () => {
       try {
         const me = await apiFetch('/me')
+        // FEATURE-001: mật khẩu tạm → kiểm tra TRƯỚC khi gọi /bootstrap
+        // (AuthGuard chặn /bootstrap 403 khi mustChangePassword → nếu vẫn gọi sẽ rơi
+        // vào catch và hiện nhầm "Không kết nối được" thay vì màn đổi mật khẩu).
+        if (me.mustChangePassword) {
+          if (!cancelled) setData({ me, bootstrap: null })
+          return
+        }
         const bootstrap = await apiFetch('/bootstrap')
         if (!cancelled) setData({ me, bootstrap })
       } catch (e) {
