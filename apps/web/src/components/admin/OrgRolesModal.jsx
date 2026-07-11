@@ -89,7 +89,7 @@ export default function OrgRolesModal({ user, onClose }) {
 
   return (
     <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ width: 760, maxWidth: '95vw' }}>
+      <div className="modal" style={{ width: 980, maxWidth: '96vw' }}>
         <div className="modal-head">
           <h2><ShieldCheck size={17} style={{ verticalAlign: -3 }} /> Vai trò tổ chức — {user.displayName}</h2>
           <button className="btn btn-ghost" onClick={onClose}><X size={18} /></button>
@@ -127,9 +127,14 @@ export default function OrgRolesModal({ user, onClose }) {
                 Thống kê: {effective.permissions.canViewReports ? '✓' : '✗'}
               </p>
               {effective.orgUnits.length > 0 && (
-                <p className="muted" style={{ margin: '6px 0 0', fontSize: 12 }}>
-                  {effective.orgUnits.map((o) => `${o.name}${effective.manageableOrgUnitIds.includes(o.id) ? ' (quản lý)' : ''}`).join(' · ')}
-                </p>
+                <details style={{ marginTop: 6 }}>
+                  <summary className="muted" style={{ cursor: 'pointer', fontSize: 12 }}>
+                    Xem danh sách {effective.orgUnits.length} đơn vị
+                  </summary>
+                  <p className="muted" style={{ margin: '6px 0 0', fontSize: 12 }}>
+                    {effective.orgUnits.map((o) => `${o.name}${effective.manageableOrgUnitIds.includes(o.id) ? ' (quản lý)' : ''}`).join(' · ')}
+                  </p>
+                </details>
               )}
             </div>
           )}
@@ -144,22 +149,30 @@ export default function OrgRolesModal({ user, onClose }) {
             )}
           </div>
           <div className="table-wrap">
-            <table className="task-table settings-table">
+            {/* FEATURE-004: gộp cột (loại+mã vào Đơn vị; người gán+ngày chung cột) để bảng
+                rộng rãi, không vỡ dòng — modal 980px đủ hiển thị không cần cuộn ngang */}
+            <table className="task-table settings-table org-roles-table">
               <thead>
-                <tr><th>Vai trò</th><th>Đơn vị</th><th>Loại</th><th>Phạm vi</th><th>Nguồn</th><th>Trạng thái</th><th>Người gán</th><th>Ngày</th><th></th></tr>
+                <tr><th>Vai trò</th><th>Đơn vị</th><th>Phạm vi</th><th>Nguồn</th><th>Trạng thái</th><th>Gán bởi</th><th></th></tr>
               </thead>
               <tbody>
                 {(roles || []).map((r) => (
                   <tr key={r.id} className={r.active ? '' : 'row-inactive'}>
-                    <td><strong>{ROLE_LABEL[r.role] || r.role}</strong></td>
-                    <td>{r.orgUnit?.name || '—'}{r.orgUnit && !r.orgUnit.active && <span className="badge tone-red" style={{ marginLeft: 4 }}>ĐV ngưng</span>}</td>
-                    <td>{TYPE_LABEL[r.orgUnit?.type] || r.orgUnit?.type || '—'}</td>
-                    <td>{SCOPE_LABEL[r.scope]}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}><strong>{ROLE_LABEL[r.role] || r.role}</strong></td>
+                    <td style={{ minWidth: 220 }}>
+                      {r.orgUnit?.name || '—'}
+                      {r.orgUnit && !r.orgUnit.active && <span className="badge tone-red" style={{ marginLeft: 4 }}>ĐV ngưng</span>}
+                      <br />
+                      <small className="muted">{TYPE_LABEL[r.orgUnit?.type] || r.orgUnit?.type || ''}{r.orgUnit?.code ? ` · ${r.orgUnit.code}` : ''}</small>
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{SCOPE_LABEL[r.scope]}</td>
                     <td><span className="badge tone-gray">{SOURCE_LABEL[r.source] || r.source}</span></td>
                     <td>{r.active ? <span className="badge tone-green">Active</span> : <span className="badge tone-gray">Ngưng</span>}</td>
-                    <td className="muted">{r.createdByName || '—'}</td>
-                    <td className="muted">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi') : '—'}</td>
-                    <td className="admin-actions">
+                    <td className="muted" style={{ whiteSpace: 'nowrap' }}>
+                      {r.createdByName || '—'}
+                      <br /><small>{r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi') : ''}</small>
+                    </td>
+                    <td className="admin-actions" style={{ whiteSpace: 'nowrap' }}>
                       <button className="btn btn-ghost" disabled={busy} title="Sửa"
                         onClick={() => { setForm({ id: r.id, role: r.role, orgUnitId: r.orgUnit?.id || '', scope: r.scope, note: r.note || '' }); setPreview(null) }}>
                         <Pencil size={14} />
@@ -172,7 +185,7 @@ export default function OrgRolesModal({ user, onClose }) {
                   </tr>
                 ))}
                 {roles && roles.length === 0 && (
-                  <tr><td colSpan={9} className="muted">Chưa có vai trò tổ chức — user chỉ thấy việc cá nhân/phòng mình theo mặc định.</td></tr>
+                  <tr><td colSpan={7} className="muted">Chưa có vai trò tổ chức — user chỉ thấy việc cá nhân/phòng mình theo mặc định.</td></tr>
                 )}
               </tbody>
             </table>
