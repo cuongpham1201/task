@@ -7,6 +7,7 @@ import { deptColor } from '../../utils/color'
 import Avatar from '../shared/Avatar'
 import BrandLogo from '../shared/BrandLogo'
 import { roleLabel } from '../../data/constants'
+import { orgUnitDisplayName } from '../../utils/org'
 
 export default function Sidebar() {
   const { currentUser, unreadCount: unread, blocks, visibleDepartments, visibleChannels, canViewActionLog, openCreateProjectModal } = useApp()
@@ -51,7 +52,7 @@ export default function Sidebar() {
             {g.depts.map((d) => (
               <NavLink key={d.id} to={`/departments/${d.id}`} className={linkClass}>
                 <span className="side-dot" style={{ background: deptColor(d.code) }} />
-                <span className="side-link-text">{d.name}</span>
+                <span className="side-link-text">{orgUnitDisplayName(d, visibleDepartments)}</span>
               </NavLink>
             ))}
           </div>
@@ -62,7 +63,7 @@ export default function Sidebar() {
             {ungrouped.map((d) => (
               <NavLink key={d.id} to={`/departments/${d.id}`} className={linkClass}>
                 <span className="side-dot" style={{ background: deptColor(d.code) }} />
-                <span className="side-link-text">{d.name}</span>
+                <span className="side-link-text">{orgUnitDisplayName(d, visibleDepartments)}</span>
               </NavLink>
             ))}
           </div>

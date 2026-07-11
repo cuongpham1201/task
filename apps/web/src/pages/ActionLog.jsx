@@ -7,6 +7,7 @@ import { ACTION_STATUS } from '../data/constants'
 import { deptColor } from '../utils/color'
 import { formatDate, isOverdue } from '../utils/date'
 import { useLocalStorage } from '../utils/useLocalStorage'
+import { orgUnitDisplayName } from '../utils/org'
 
 function ActionStatusBadge({ status }) {
   const s = ACTION_STATUS[status] || { label: status, tone: 'gray' }
@@ -85,7 +86,7 @@ export default function ActionLog() {
             {b.departments.map((d) => (
               <div className="actlog-dept" key={d.id}>
                 <div className="actlog-dept-head">
-                  <span className="side-dot" style={{ background: deptColor(d.code) }} /> {d.name}
+                  <span className="side-dot" style={{ background: deptColor(d.code) }} /> {orgUnitDisplayName(d, state.departments)}
                   <span className="actlog-dept-count">{d.actions.length}</span>
                 </div>
                 <div className="actlog-list">

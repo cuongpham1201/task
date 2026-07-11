@@ -12,6 +12,7 @@ import {
 } from '../data/constants'
 import { formatDate, formatDateFull, timeAgo, isOverdue } from '../utils/date'
 import { pushRecent } from '../utils/useLocalStorage'
+import { orgUnitDisplayName } from '../utils/org'
 
 export default function ActionDetail() {
   const { id } = useParams()
@@ -76,7 +77,7 @@ export default function ActionDetail() {
       <Breadcrumb items={[
         { label: 'Action Log', to: '/action-log' },
         block && { label: block.name },
-        dept && { label: dept.name, to: `/departments/${dept.id}` },
+        dept && { label: orgUnitDisplayName(dept, state.departments), to: `/departments/${dept.id}` },
         { label: detail.title },
       ]} />
 

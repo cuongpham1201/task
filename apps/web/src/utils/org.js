@@ -30,3 +30,13 @@ export function orgUnitShortLabel(o) {
   const entity = legalEntityLabel(o.legalEntity)
   return `${o.name}${entity ? ` (${entity})` : ''}`
 }
+
+/**
+ * Tên hiển thị trong danh sách (sidebar/menu/thẻ): giữ tên gọn, CHỈ kèm pháp nhân
+ * khi trong danh sách có đơn vị khác TRÙNG TÊN (VD 2 "Ban Điều Hành" HALONG/DONGMAI).
+ */
+export function orgUnitDisplayName(o, list = []) {
+  if (!o) return '—'
+  const dup = list.some((x) => x.id !== o.id && x.name === o.name)
+  return dup ? orgUnitShortLabel(o) : o.name
+}

@@ -6,6 +6,7 @@ import {
 import { useApp } from '../../store/AppContext'
 import { deptColor } from '../../utils/color'
 import { useAuth } from '../../auth/AuthProvider'
+import { orgUnitDisplayName } from '../../utils/org'
 
 /** Sheet trượt từ đáy màn hình (mobile action sheet). */
 function MobileActionSheet({ title, onClose, children }) {
@@ -78,7 +79,7 @@ export default function MobileNav() {
           <div className="sheet-group-title"><Building2 size={13} /> Phòng ban</div>
           {visibleDepartments.map((d) => (
             <Link key={d.id} to={`/departments/${d.id}`} className="sheet-item">
-              <span className="side-dot" style={{ background: deptColor(d.code) }} /> {d.name}
+              <span className="side-dot" style={{ background: deptColor(d.code) }} /> {orgUnitDisplayName(d, visibleDepartments)}
             </Link>
           ))}
           <div className="sheet-divider" />

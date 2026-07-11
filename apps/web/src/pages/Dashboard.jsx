@@ -10,6 +10,7 @@ import { StatusBadge } from '../components/shared/badges'
 import {
   greetingByHour, todayLabel, isOverdue, isDueToday, isUpcoming, dueLabel,
 } from '../utils/date'
+import { orgUnitDisplayName } from '../utils/org'
 
 function StatCard({ icon: Icon, label, value, tone }) {
   return (
@@ -179,7 +180,7 @@ export default function Dashboard() {
                 <Link key={d.id} to={`/departments/${d.id}`} className="dash-dept">
                   <span className="side-dot" style={{ background: deptColor(d.code) }} />
                   <span className="dash-dept-col">
-                    <span className="dash-dept-name">{d.name}</span>
+                    <span className="dash-dept-name">{orgUnitDisplayName(d, visibleDepartments)}</span>
                     <span className="dash-dept-sub muted">
                       {open} đang mở
                       {submitted > 0 && <> · {submitted} chờ nghiệm thu</>}

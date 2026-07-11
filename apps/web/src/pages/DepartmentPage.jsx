@@ -10,6 +10,7 @@ import { AvatarGroup } from '../components/shared/Avatar'
 import Breadcrumb from '../components/shared/Breadcrumb'
 import { isOverdue } from '../utils/date'
 import { deptColor } from '../utils/color'
+import { orgUnitDisplayName } from '../utils/org'
 
 const VIEWS = [
   { key: 'list', label: 'Danh sách', icon: List },
@@ -38,11 +39,11 @@ export default function DepartmentPage() {
 
   return (
     <div className="page">
-      <Breadcrumb items={[block && { label: block.name }, { label: dept.name }]} />
+      <Breadcrumb items={[block && { label: block.name }, { label: orgUnitDisplayName(dept, state.departments) }]} />
       <div className="page-head">
         <div>
           <h1>
-            <span className="side-dot big" style={{ background: deptColor(dept.code) }} /> {dept.name}
+            <span className="side-dot big" style={{ background: deptColor(dept.code) }} /> {orgUnitDisplayName(dept, state.departments)}
           </h1>
           <p className="page-sub">
             Trưởng đơn vị: <strong>{managerName || '—'}</strong>
