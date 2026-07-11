@@ -81,6 +81,9 @@ export class PolicyService {
   /** Có được tạo task với org_unit/project này không (freeze §7). */
   async canCreate(me: Me, dims: { orgUnitId: string | null; projectId: string | null }): Promise<boolean> {
     if (me.role === 'admin') return true
+    // Task CÁ NHÂN (không org, không project — vd user chưa gắn phòng ban): luôn được.
+    // Khôi phục hành vi trước A2 (if !workspaceId → true); visibility chỉ creator/assignee.
+    if (!dims.orgUnitId && !dims.projectId) return true
     if (dims.projectId) {
       if (await this.isProjectMember(me, dims.projectId)) return true
     }
