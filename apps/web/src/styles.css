@@ -402,14 +402,18 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
   padding: 16px 20px; border-bottom: 1px solid var(--border);
 }
 .modal-head h2 { font-size: 17px; }
-.modal-body { padding: 18px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+.modal-body { padding: 18px 20px; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 14px; }
 .modal-foot {
   display: flex; justify-content: flex-end; gap: 10px;
   padding: 14px 20px; border-top: 1px solid var(--border);
 }
-.form-field { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.form-field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
 .form-field > span { font-size: 13px; font-weight: 600; color: var(--text-soft); }
+/* FEATURE-004: option/select dài (tên đơn vị kèm pháp nhân + mã) KHÔNG được đẩy tràn
+   ngang modal — control luôn ôm theo cột, chữ trong select tự cắt bớt */
+.form-field select, .form-field input, .form-field textarea { width: 100%; max-width: 100%; text-overflow: ellipsis; }
 .form-row { display: flex; gap: 14px; }
+.form-row > .form-field { flex: 1 1 0; }
 .form-error { color: var(--red); font-size: 12.5px; font-weight: 500; }
 .scope-options { display: flex; gap: 8px; }
 .scope-option {
