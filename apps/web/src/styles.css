@@ -1124,3 +1124,25 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .stat-card.clickable { cursor: pointer; border: 1px solid var(--border); background: var(--surface); text-align: left; font: inherit; color: inherit; transition: box-shadow .15s, transform .15s, border-color .15s; text-decoration: none; }
 .stat-card.clickable:hover { transform: translateY(-1px); box-shadow: var(--shadow-lg); border-color: var(--accent); }
 .stat-card.clickable.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+
+/* FEATURE-004: lịch thanh kéo dài (start → deadline) */
+.cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--border); border-bottom: none; background: var(--bg); }
+.cal-week { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--border); border-top: none; }
+.cal-week:first-of-type { border-top: 1px solid var(--border); }
+.cal-day { border-right: 1px solid var(--border); padding: 5px 7px; background: var(--surface); }
+.cal-day:last-child { border-right: none; }
+.cal-day.other-month { background: #fbfbfc; }
+.cal-day.other-month .calendar-daynum { color: var(--border-strong); }
+.cal-day.today { background: var(--accent-soft); }
+.cal-day.today .calendar-daynum { color: var(--accent); font-weight: 700; }
+.cal-bar {
+  position: absolute; height: 20px; border: none; cursor: pointer;
+  font-size: 11px; font-weight: 600; color: #fff; text-align: left;
+  padding: 2px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border-radius: 0; opacity: .92; transition: opacity .12s, transform .12s;
+}
+.cal-bar:hover { opacity: 1; transform: translateY(-1px); z-index: 3; }
+.cal-bar.is-start { border-top-left-radius: 10px; border-bottom-left-radius: 10px; }
+.cal-bar.is-end { border-top-right-radius: 10px; border-bottom-right-radius: 10px; }
+.cal-bar.is-done { opacity: .45; text-decoration: line-through; }
+.cal-hidden { position: absolute; right: 8px; bottom: 3px; font-size: 11px; color: var(--text-muted); }
