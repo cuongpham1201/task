@@ -13,18 +13,20 @@ const TABS = [
   { key: 'upcoming', label: 'Sắp đến hạn' },
   { key: 'overdue', label: 'Quá hạn' },
   { key: 'review', label: 'Nghiệm thu' },
+  { key: 'assigned', label: 'Tôi giao' },
   { key: 'done', label: 'Đã hoàn thành' },
 ]
 const PRANK = { urgent: 0, high: 1, normal: 2, low: 3 }
 const inReview = (t) => t.status === 'submitted' || t.status === 'returned'
 
 export default function MyTasks() {
-  const { myTasks, openCreateModal, channelsById } = useApp()
+  const { myTasks, tasksIAssigned, openCreateModal, channelsById } = useApp()
   const [tab, setTab] = useLocalStorage('mytasks.tab', 'all')
   const [sortBy, setSortBy] = useLocalStorage('mytasks.sort', 'due')
   const [groupBy, setGroupBy] = useLocalStorage('mytasks.group', 'none')
 
   const all = myTasks()
+  const iAssigned = tasksIAssigned()
   const filtered = useMemo(() => {
     const list = (() => {
       switch (tab) {
@@ -32,6 +34,7 @@ export default function MyTasks() {
         case 'upcoming': return all.filter((t) => isUpcoming(t))
         case 'overdue': return all.filter(isOverdue)
         case 'review': return all.filter(inReview)
+        case 'assigned': return iAssigned // việc tôi giao người khác
         case 'done': return all.filter((t) => t.status === 'done')
         default: return all
       }
@@ -45,7 +48,7 @@ export default function MyTasks() {
       if ((a.status === 'done') !== (b.status === 'done')) return a.status === 'done' ? 1 : -1
       return (sorters[sortBy] || sorters.due)(a, b)
     })
-  }, [tab, all, sortBy])
+  }, [tab, all, iAssigned, sortBy])
 
   const counts = {
     all: all.length,
@@ -53,6 +56,7 @@ export default function MyTasks() {
     upcoming: all.filter((t) => isUpcoming(t)).length,
     overdue: all.filter(isOverdue).length,
     review: all.filter(inReview).length,
+    assigned: iAssigned.length,
     done: all.filter((t) => t.status === 'done').length,
   }
 

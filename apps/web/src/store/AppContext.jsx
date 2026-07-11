@@ -301,6 +301,9 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
           .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)),
       myTasks: () =>
         state.tasks.filter((t) => t.assigneeId === me || t.collaboratorIds.includes(me)),
+      // Việc TÔI GIAO người khác (A tạo giao B → A vẫn theo dõi được ở giao diện của A)
+      tasksIAssigned: () =>
+        state.tasks.filter((t) => t.creatorId === me && t.assigneeId !== me),
       departmentTasks: (departmentId) => state.tasks.filter((t) => t.departmentId === departmentId),
       channelTasks: (channelId) => state.tasks.filter((t) => t.channelId === channelId),
       taskContextLabel: (task) => {

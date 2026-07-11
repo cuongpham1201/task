@@ -46,10 +46,11 @@ function Bucket({ title, tasks, tone, selectTask }) {
 }
 
 export default function Dashboard() {
-  const { currentUser, myTasks, perms, selectTask, visibleDepartments, state, canManageActions } = useApp()
+  const { currentUser, myTasks, tasksIAssigned, perms, selectTask, visibleDepartments, state, canManageActions } = useApp()
   const me = currentUser?.id
 
   const mine = myTasks()
+  const iAssignedOpen = tasksIAssigned().filter((t) => t.status !== 'done')
   const recent = getRecent()
   const buckets = useMemo(() => {
     // Phân hoạch TOÀN BỘ việc CHƯA XONG của tôi vào đúng một nhóm (không bỏ sót):
@@ -113,7 +114,8 @@ export default function Dashboard() {
 
   const nothingPersonal =
     buckets.overdue.length + buckets.today.length + buckets.week.length + buckets.later.length +
-    buckets.returned.length + buckets.submittedMine.length + buckets.toReview.length + buckets.recentDone.length === 0
+    buckets.returned.length + buckets.submittedMine.length + buckets.toReview.length +
+    iAssignedOpen.length + buckets.recentDone.length === 0
 
   return (
     <div className="page">
@@ -146,6 +148,7 @@ export default function Dashboard() {
               <Bucket title="Bị trả lại — chờ tôi xử lý" tone="t-red" tasks={buckets.returned} selectTask={selectTask} />
               <Bucket title="Đã nộp — chờ nghiệm thu" tone="t-amber" tasks={buckets.submittedMine} selectTask={selectTask} />
               <Bucket title="Chờ tôi nghiệm thu" tone="t-amber" tasks={buckets.toReview} selectTask={selectTask} />
+              <Bucket title="Tôi giao — đang mở" tasks={iAssignedOpen} selectTask={selectTask} />
               <Bucket title="Hoàn thành gần đây" tasks={buckets.recentDone} selectTask={selectTask} />
             </>
           )}
