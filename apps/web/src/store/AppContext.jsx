@@ -340,7 +340,13 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
       },
       // ── Nhật ký thực hiện task (item 12) ──
       fetchWorkLogs: (taskId) => apiFetch(`/tasks/${taskId}/worklogs`),
-      addWorkLog: (taskId, dto) => post(`/tasks/${taskId}/worklogs`, dto),
+      // Nhật ký thực hiện — kèm % thì đồng bộ luôn tiến độ task (nguồn cập nhật tiến độ DUY NHẤT)
+      addWorkLog: (taskId, dto) => post(`/tasks/${taskId}/worklogs`, dto).then((w) => {
+        if (dto.progressValue != null) {
+          dispatch({ type: 'UPDATE_TASK_FIELD', id: taskId, at: now(), patch: { progress: dto.progressValue } })
+        }
+        return w
+      }),
 
       // ── Đính kèm tệp (P0-1) ──
       fetchAttachments: (taskId) => apiFetch(`/tasks/${taskId}/attachments`),

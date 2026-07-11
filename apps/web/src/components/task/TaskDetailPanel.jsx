@@ -47,7 +47,7 @@ function AssigneeSelect({ value, onChange }) {
 export default function TaskDetailPanel() {
   const {
     state, usersById, currentUser, perms, getTask, getSubtasks, getComments, getActivities,
-    selectTask, updateTaskField, setStatus, setProgress, toggleComplete,
+    selectTask, updateTaskField, setStatus, toggleComplete,
     assignTask, setCollaborators, setTaskOrgUnit, setDueDate, setPriority, submitTask, reviewTask,
     addComment, toggleSubtask, addSubtask, taskContextLabel,
     archiveTask, updateSubtask, deleteSubtask, editComment, deleteComment,
@@ -57,7 +57,6 @@ export default function TaskDetailPanel() {
   const task = state.selectedTaskId ? getTask(state.selectedTaskId) : null
   const [description, setDescription] = useState('')
   const [expectedLocal, setExpectedLocal] = useState('')
-  const [progressLocal, setProgressLocal] = useState(0)
   const [commentText, setCommentText] = useState('')
   const [newSubtask, setNewSubtask] = useState('')
   const [tab, setTab] = useState('comments')
@@ -66,7 +65,6 @@ export default function TaskDetailPanel() {
     if (task) {
       setDescription(task.description || '')
       setExpectedLocal(task.expectedOutput || '')
-      setProgressLocal(task.progress || 0)
       setCommentText('')
       setNewSubtask('')
       setTab('comments')
@@ -74,12 +72,6 @@ export default function TaskDetailPanel() {
     // Chỉ reset khi mở task khác
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id])
-
-  // Đồng bộ progress hiển thị khi task đổi từ nơi khác (VD: tick hoàn thành)
-  useEffect(() => {
-    if (task) setProgressLocal(task.progress || 0)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task?.progress])
 
   if (!task) return null
 
@@ -323,18 +315,16 @@ export default function TaskDetailPanel() {
               </span>
             </Field>
             <Field label="Tiến độ">
+              {/* FEATURE-004: tiến độ KHÔNG kéo tay — chỉ cập nhật qua Nhật ký thực hiện
+                  (có nội dung + % đi kèm → truy vết được ai báo, báo lúc nào) */}
               <span className="progress-edit">
-                <input
-                  type="range"
-                  min="0" max="100" step="5"
-                  disabled={!canStatus}
-                  value={progressLocal}
-                  onChange={(e) => setProgressLocal(Number(e.target.value))}
-                  onMouseUp={() => setProgress(task.id, progressLocal)}
-                  onTouchEnd={() => setProgress(task.id, progressLocal)}
-                  onKeyUp={() => setProgress(task.id, progressLocal)}
-                />
-                <span className="progress-label">{progressLocal}%</span>
+                <span className="progress-track" style={{ flex: 1 }}>
+                  <span className="progress-fill" style={{ width: `${task.progress || 0}%` }} />
+                </span>
+                <span className="progress-label">{task.progress || 0}%</span>
+              </span>
+              <span className="muted" style={{ fontSize: 11, display: 'block' }}>
+                cập nhật % trong "Nhật ký thực hiện" bên dưới
               </span>
             </Field>
           </div>
