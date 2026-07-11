@@ -65,9 +65,11 @@ export default function SearchUser({ value, onSelect, orgUnitId, placeholder = '
           {!loading && results.length === 0 && <div className="searchuser-empty">Không tìm thấy</div>}
           {results.map((u) => (
             <button type="button" key={u.id} className="searchuser-item" onClick={() => { onSelect(u.id, u); setQ(''); setOpen(false) }}>
-              <Avatar user={u} size={22} />
-              <span className="searchuser-name">{u.displayName}</span>
-              <span className="muted searchuser-mail">{u.email}</span>
+              <Avatar user={u} size={26} />
+              <span className="searchuser-col">
+                <span className="searchuser-name">{u.displayName}</span>
+                <span className="muted searchuser-sub">{u.jobTitle || u.email}</span>
+              </span>
             </button>
           ))}
         </div>
