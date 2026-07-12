@@ -123,6 +123,13 @@ enum NotificationType {
   overdue
   task_returned
   task_accepted
+  // P1-3 Reminder Engine
+  task_not_started
+  review_waiting // task chờ nghiệm thu quá lâu → nhắc reviewer
+  returned_pending // bị trả lại chưa gửi lại → nhắc assignee
+  action_due_soon
+  action_overdue
+  action_empty // action tạo lâu nhưng chưa có task
 
   @@map("notification_type")
 }
@@ -478,14 +485,60 @@ model Notification {
   type       NotificationType
   activityId BigInt?          @map("activity_id")
   taskId     String?          @map("task_id")
+  // P1-3: reminder có thể trỏ Action (deep-link) + payload nội dung cụ thể
+  // ({message, stage, days} — "Công việc đã quá hạn 3 ngày" thay vì text chung chung)
+  actionId   String?          @map("action_id")
+  payload    Json?
   readAt     DateTime?        @map("read_at")
   createdAt  DateTime         @default(now()) @map("created_at")
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   activity Activity? @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  action   Action?   @relation(fields: [actionId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt])
   @@map("notifications")
+}
+
+// ── P1-3 Reminder Engine: dedupe + audit log ─────────────────────────
+// MỖI (rule, entity, người nhận, stage[, mốc hạn]) chỉ gửi ĐÚNG 1 lần —
+// dedupeKey UNIQUE; chạy lại/retry/manual+cron/2 instance đều không trùng.
+// dueDay nằm trong dedupeKey của rule theo deadline → đổi deadline tính lại đúng.
+model ReminderDelivery {
+  id          String   @id @default(uuid())
+  ruleKey     String   @map("rule_key") // TASK_DUE_SOON | TASK_OVERDUE | ...
+  entityType  String   @map("entity_type") // task | action
+  entityId    String   @map("entity_id")
+  recipientId String   @map("recipient_id")
+  stageKey    String   @map("stage_key") // D3/D1/D0/OD1/OD3/OD7/OD14.../NS2/W1/R1/AE2...
+  dedupeKey   String   @unique @map("dedupe_key")
+  channel     String   @default("inapp")
+  status      String   @default("sent")
+  runId       String?  @map("run_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([recipientId, createdAt])
+  @@map("reminder_deliveries")
+}
+
+model ReminderRun {
+  id         String    @id @default(uuid())
+  dryRun     Boolean   @default(false) @map("dry_run")
+  trigger    String    @default("cron") // cron | manual
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  scanned    Int       @default(0)
+  candidates Int       @default(0)
+  delivered  Int       @default(0)
+  skipped    Int       @default(0)
+  duplicate  Int       @default(0)
+  failed     Int       @default(0)
+  durationMs Int       @default(0) @map("duration_ms")
+  error      String?
+
+  @@index([startedAt])
+  @@map("reminder_runs")
 }
 
 model Attachment {
@@ -659,6 +712,7 @@ model Action {
   tasks     Task[]
   updates   ActionUpdate[]
 
+  reminderNotifications Notification[]
   @@index([orgUnitId, period])
   @@index([projectId])
   @@index([status])
