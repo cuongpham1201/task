@@ -13,6 +13,7 @@ import { ProjectsModule } from './projects/projects.module'
 import { ActionsModule } from './actions/actions.module'
 import { AttachmentsModule } from './attachments/attachments.module'
 import { ReportsModule } from './reports/reports.module'
+import { RemindersModule } from './reminders/reminders.module'
 import { TeamsModule } from './teams/teams.module'
 import { AdminModule } from './admin/admin.module'
 import { BootstrapModule } from './bootstrap/bootstrap.module'
@@ -32,6 +33,7 @@ import { BootstrapModule } from './bootstrap/bootstrap.module'
     ActionsModule,
     AttachmentsModule,
     ReportsModule,
+    RemindersModule,
     TeamsModule,
     AdminModule,
     BootstrapModule,
