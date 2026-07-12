@@ -10,7 +10,7 @@ import { roleLabel } from '../../data/constants'
 import { orgUnitDisplayName } from '../../utils/org'
 
 export default function Sidebar() {
-  const { currentUser, unreadCount: unread, blocks, visibleDepartments, visibleChannels, canViewActionLog, openCreateProjectModal } = useApp()
+  const { currentUser, unreadCount: unread, blocks, visibleDepartments, visibleChannels, canViewActionLog, permissions, openCreateProjectModal } = useApp()
   // Nhóm phòng ban theo khối (chỉ khối có phòng đang thấy)
   const deptGroups = (blocks || [])
     .map((b) => ({ block: b, depts: visibleDepartments.filter((d) => d.blockId === b.id) }))
@@ -42,9 +42,11 @@ export default function Sidebar() {
           <Inbox size={17} /> Thông báo
           {unread > 0 && <span className="side-badge">{unread}</span>}
         </NavLink>
-        <NavLink to="/reports" className={linkClass}>
-          <BarChart3 size={17} /> Thống kê
-        </NavLink>
+        {permissions.canViewReports && (
+          <NavLink to="/reports" className={linkClass}>
+            <BarChart3 size={17} /> Báo cáo
+          </NavLink>
+        )}
 
         {deptGroups.map((g) => (
           <div className="side-section" key={g.block.id}>

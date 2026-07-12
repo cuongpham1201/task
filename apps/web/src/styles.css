@@ -1171,3 +1171,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .chart-hbar-track { flex: 1; height: 10px; background: var(--gray-soft, #eceef1); border-radius: 5px; overflow: hidden; }
 .chart-hbar-fill { display: block; height: 100%; border-radius: 5px; }
 .chart-hbar-value { width: 28px; text-align: right; font-weight: 700; font-size: 12.5px; }
+
+/* P1-1: báo cáo tổng hợp */
+.link-btn { border: none; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.link-btn:hover { opacity: .8; }
+.link-btn.text-overdue { color: var(--red); }
+.row-overdue td:first-child { border-left: 2px solid var(--red); }
