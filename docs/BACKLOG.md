@@ -39,13 +39,22 @@
 - **Bằng chứng code**: bảng `Action` + `ActionUpdate` (nhật ký điều hành 7 loại, append-only); API `/actions` CRUD + log; UI ActionLog (nhóm khối→phòng, lọc kỳ, in), ActionDetail (BUG2 refetch), dashboard biểu đồ Action (12/07 phase trước); `actionWhere` theo cây tổ chức; task gắn action qua `actionId` — tạo + sửa đều validate action cùng đơn vị chịu trách nhiệm.
 - **Phần còn lại (không thuộc P0)**: giao diện tổng hợp riêng cho Ban lãnh đạo (drill-down toàn công ty) — xem P1-1.
 
-## P1-1 — Màn hình tổng hợp Action toàn công ty cho Ban lãnh đạo
+## P1-1 — Báo cáo tổng hợp Ban lãnh đạo (Task / Action Log / Phòng ban)
 
-- **Mục tiêu**: TGĐ/GĐ khối xem Action Log toàn công ty → khối → phòng → Action → Task, lọc theo kỳ (số hóa "Họp Tác nghiệp" — freeze §"Giám đốc khối/TGĐ").
-- **Trạng thái**: **PARTIAL** — Action Log hiện nhóm theo khối/phòng + dashboard biểu đồ; CHƯA có drill-down chuyên biệt + so sánh kỳ.
-- **Đã có**: ActionLog group by khối/phòng, lọc kỳ, quyền theo scope; ActionDashboard (theo trạng thái/đơn vị/owner).
-- **Còn thiếu**: view so sánh kỳ trước/sau, tỷ lệ hoàn thành action theo khối, export.
-- **Dependency**: P0-3 (done). **Ưu tiên**: P1.
+- **Mục tiêu**: khu vực báo cáo cho TGĐ/GĐ khối/Trưởng đơn vị/Viewer/Admin — 3 góc nhìn độc lập (Task · Action Log · Phòng ban), không đếm trùng task đa chiều, drill-down về danh sách task nguồn.
+- **Trạng thái**: **DONE** (12/07/2026).
+- **Bằng chứng code**:
+  - Quy tắc số liệu TẬP TRUNG: `apps/api/src/reports/report-rules.ts` (active/overdue/dueSoon N=3/completed/waitingReview/completionRate 0-không-NaN; thời gian: tập chính theo createdAt, hoàn thành trong kỳ theo completedAt, quá hạn tính tại hiện tại; Action trong kỳ = createdAt ∈ kỳ ∨ period ∈ kỳ).
+  - API: `GET /reports/overview` (aggregate 100% backend — Prisma groupBy/count set-based, raw SQL tham số hóa CHỈ cho trend date_trunc; ~22 query, 0 N+1, ~10ms/6.5KB dev) + `GET /reports/tasks` (drill-down paginate ≤50, CÙNG where-builder → khớp summary tuyệt đối). Scope server-side: orgUnitId ∈ visibleOrgUnitIds; gate `canViewReports`; orgUnitId ngoài quyền → 403.
+  - UI `/reports` "Báo cáo tổng hợp": filter chung (kỳ hôm nay/tuần/tháng/quý/năm/tùy chọn + đơn vị + dự án + action[gồm "không thuộc Action"] + trạng thái + người thực hiện), filter đồng bộ URL; 3 tab; drill-down mở danh sách task nguồn giữ nguyên filter; menu "Báo cáo" chỉ hiện với canViewReports.
+  - So sánh kỳ (tab Action): kỳ trước liền kề cùng độ dài — chênh lệch số Action/quá hạn/tỷ lệ task xong.
+  - Test: 25 case O PASS (`docs/p1-test-report-12.07.md`) — chống double-count, drill khớp summary, scope TGĐ/GĐ khối/TP/member, chống lộ dữ liệu, KPI không đổi. Ghi chú O10: task của một Action bắt buộc CÙNG đơn vị (server validate từ P0) → "Action nhiều đơn vị" không tồn tại theo thiết kế.
+- **Không phải KPI** — chỉ thống kê vận hành.
+
+## P1-2 — Export báo cáo tổng hợp (XLSX/CSV)
+
+- **Mục tiêu**: xuất báo cáo theo đúng filter + permission backend hiện tại (sheet Task/Action/Phòng ban/chi tiết task nguồn; tên file gồm loại + kỳ + thời điểm xuất).
+- **Trạng thái**: **READY** — repo CHƯA có thư viện xuất Excel/CSV; không cài package mới trong phiên P1-1 theo nguyên tắc. Dependency: P1-1 (done). Không xuất KPI.
 
 ## P2-1 — Biên bản bàn giao / nghiệm thu PDF
 
