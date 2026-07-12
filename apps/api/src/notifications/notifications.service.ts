@@ -80,6 +80,8 @@ export class NotificationsService {
       id: String(n.id),
       type: n.type,
       taskId: n.taskId,
+      actionId: (n as any).actionId ?? null, // P1-3: reminder Action → deep-link /actions/:id
+      payload: (n as any).payload ?? null, // P1-3: nội dung cụ thể ("quá hạn 3 ngày"…)
       readAt: n.readAt,
       createdAt: n.createdAt,
       actorId: n.activity?.userId ?? null,

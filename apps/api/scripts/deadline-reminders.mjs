@@ -1,4 +1,9 @@
 /**
+ * ⚠ DEPRECATED (P1-3, 12/07/2026): thay bằng REMINDER ENGINE trong app
+ * (apps/api/src/reminders/ — bật REMINDER_ENGINE_ENABLED=true). Chạy script này
+ * song song với engine có thể tạo notification gần-trùng (dedupe khác nhau).
+ * Giữ file để tham khảo port Teams; KHÔNG đặt cron cho script này nữa.
+ *
  * Nhắc deadline (cơ bản): quét task sắp đến hạn / quá hạn → tạo notification cho assignee.
  * Idempotent: không tạo trùng nếu đã có notif cùng (user, task, type) trong ~18h.
  * Chạy: npm run reminders  (có thể đặt cron ngoài; KHÔNG email/Teams).

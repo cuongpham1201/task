@@ -51,6 +51,29 @@
   - Test: 25 case O PASS (`docs/p1-test-report-12.07.md`) — chống double-count, drill khớp summary, scope TGĐ/GĐ khối/TP/member, chống lộ dữ liệu, KPI không đổi. Ghi chú O10: task của một Action bắt buộc CÙNG đơn vị (server validate từ P0) → "Action nhiều đơn vị" không tồn tại theo thiết kế.
 - **Không phải KPI** — chỉ thống kê vận hành.
 
+## P1-3 — Reminder Engine (Task / Action / Nghiệm thu)
+
+- **Mục tiêu**: nhắc việc tự động in-app — task sắp/quá hạn, chưa bắt đầu, chờ nghiệm thu, bị trả lại; action sắp/quá deadline, chưa có task — idempotent, không spam, không gửi user inactive.
+- **Trạng thái**: **DONE** (12/07/2026).
+- **Bằng chứng code**:
+  - Rule tập trung `apps/api/src/reminders/reminder-rules.ts`: TZ Asia/Bangkok (env), mốc DUE_SOON D3/D1/D0 · OVERDUE OD1/OD3/OD7 rồi mỗi 7 ngày (không spam hằng ngày) · NOT_STARTED NS(2d)/NS7 · WAITING_REVIEW W1/W3/mỗi 3 ngày (tính từ lúc NỘP — lấy activity) · RETURNED R1/R3/mỗi 3 ngày · ACTION AD3/AD1/AD0, AOD1/AOD7/mỗi 7, AE(2d)/AE7. Loại trừ: done/paused/archived, submitted không tính overdue, user inactive.
+  - Idempotency: bảng `reminder_deliveries` — `dedupe_key` UNIQUE (`RULE:{entity}:{recipient}[:{mốc hạn}]:{stage}`; mốc hạn nằm trong key → đổi deadline tính lại đúng). Chạy lại/retry/manual+cron/2 instance không trùng (PG advisory lock, không lock bộ nhớ).
+  - Scheduler: setInterval nội bộ (KHÔNG package mới), `REMINDER_ENGINE_ENABLED` mặc định **OFF**; env đủ: INTERVAL_MINUTES/TIMEZONE/DUE_SOON_DAYS/NOT_STARTED_DAYS/REVIEW_WAIT_DAYS/RETURNED_WAIT_DAYS.
+  - Vận hành: `GET /admin/reminders/status` (config + 10 run gần nhất) + `POST /admin/reminders/run {dryRun}` — chỉ Admin; dry-run không ghi notification; log run đủ runId/scanned/candidates/delivered/duplicate/skipped/failed/durationMs (bảng `reminder_runs`).
+  - Kênh: in-app notification hiện có + `payload.message` cụ thể ("Công việc đã quá hạn 3 ngày") + deep-link task/Action (cột `action_id` mới); Inbox render + badge unread như cũ.
+  - Người nhận: assignee (+creator ở D0/overdue), reviewer (+creator từ ngày 3), action owner (+creator). Escalation tầng 3 (quản lý theo scope): KHÔNG làm — xem P1-5.
+  - Test: 35 case O (`docs/p1-3-test-report-12.07.md`); script cũ `deadline-reminders.mjs` đánh dấu DEPRECATED.
+
+## P1-4 — Reminder Settings UI (admin chỉnh ngưỡng trong app)
+
+- **Mục tiêu**: tab cấu hình Reminder trong Cài đặt (bật/tắt, interval, các ngưỡng, escalation) thay vì env.
+- **Trạng thái**: **READY** — engine đọc config qua env; UI + bảng settings làm sau. Dependency: P1-3 (done).
+
+## P1-5 — Escalation nhắc việc tới quản lý theo scope tổ chức
+
+- **Mục tiêu**: quá hạn vượt ngưỡng (VD 7 ngày) → nhắc thêm quản lý đơn vị (org_unit_roles department_manager/scope), có cờ bật/tắt; không gửi diện rộng.
+- **Trạng thái**: **READY** — chưa làm theo nguyên tắc "không suy đoán manager"; nguồn quản lý = org_unit_roles đã có. Dependency: P1-3 (done).
+
 ## P1-2 — Export báo cáo tổng hợp (XLSX/CSV)
 
 - **Mục tiêu**: xuất báo cáo theo đúng filter + permission backend hiện tại (sheet Task/Action/Phòng ban/chi tiết task nguồn; tên file gồm loại + kỳ + thời điểm xuất).

@@ -1,6 +1,8 @@
 import {
   CheckCheck, Inbox as InboxIcon, UserPlus, MessageSquare, AtSign, ThumbsUp, Undo2, Clock, AlertTriangle,
+  Hourglass, PlayCircle, Target,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
 import Avatar from '../components/shared/Avatar'
 import EmptyState from '../components/shared/EmptyState'
@@ -16,25 +18,38 @@ const TYPE_META = {
   overdue: { text: 'công việc đã quá hạn', icon: AlertTriangle, tone: 'red' },
   task_returned: { text: 'đã trả lại công việc', icon: Undo2, tone: 'red' },
   task_accepted: { text: 'đã nghiệm thu công việc', icon: ThumbsUp, tone: 'green' },
+  // P1-3 Reminder Engine — nội dung cụ thể lấy từ n.payload.message
+  task_not_started: { text: 'công việc chưa được bắt đầu', icon: PlayCircle, tone: 'amber' },
+  review_waiting: { text: 'có công việc chờ bạn nghiệm thu', icon: Hourglass, tone: 'amber' },
+  returned_pending: { text: 'công việc bị trả lại chưa gửi lại', icon: Undo2, tone: 'red' },
+  action_due_soon: { text: 'Action sắp đến deadline', icon: Target, tone: 'amber' },
+  action_overdue: { text: 'Action đã quá deadline', icon: Target, tone: 'red' },
+  action_empty: { text: 'Action chưa có công việc triển khai', icon: Target, tone: 'gray' },
 }
 
-function Row({ n, getTask, usersById, selectTask, markNotificationRead }) {
+function Row({ n, getTask, usersById, selectTask, markNotificationRead, navigate }) {
   const task = getTask(n.taskId)
   const actor = n.actorId ? usersById[n.actorId] : null
   const meta = TYPE_META[n.type] || { text: 'có cập nhật mới', icon: InboxIcon, tone: 'gray' }
   const Icon = meta.icon
-  const text = n.action ? activityText({ action: n.action, metadata: n.metadata }, usersById) : meta.text
+  // Ưu tiên nội dung CỤ THỂ từ reminder ("Công việc đã quá hạn 3 ngày") — không text chung chung
+  const text = n.payload?.message
+    ? n.payload.message
+    : n.action ? activityText({ action: n.action, metadata: n.metadata }, usersById) : meta.text
+  const entityTitle = task?.title || n.payload?.entityTitle || '(Công việc đã lưu trữ)'
   const unread = !n.readAt
+  const open = () => {
+    if (unread) markNotificationRead(n.id)
+    if (n.actionId) navigate(`/actions/${n.actionId}`) // P1-3: deep-link Action
+    else if (task) selectTask(task.id)
+  }
   return (
-    <button
-      className={`inbox-item ${unread ? 'unread' : ''}`}
-      onClick={() => { if (unread) markNotificationRead(n.id); if (task) selectTask(task.id) }}
-    >
+    <button className={`inbox-item ${unread ? 'unread' : ''}`} onClick={open}>
       <span className={`inbox-type-icon tone-${meta.tone}`}><Icon size={15} /></span>
       <Avatar user={actor} size={30} />
       <span className="inbox-content">
         <span>{actor ? <strong>{actor.displayName}</strong> : <strong>Hệ thống</strong>} {text}</span>
-        <span className="inbox-task">{task?.title || '(Công việc đã lưu trữ)'}</span>
+        <span className="inbox-task">{entityTitle}</span>
       </span>
       <span className="inbox-time">{timeAgo(n.createdAt)}</span>
       {unread && <span className="inbox-dot" />}
@@ -46,6 +61,7 @@ export default function Inbox() {
   const {
     notifications, unreadCount, usersById, getTask, selectTask, markInboxRead, markNotificationRead,
   } = useApp()
+  const navigate = useNavigate()
 
   const unread = notifications.filter((n) => !n.readAt)
   const read = notifications.filter((n) => n.readAt)
@@ -74,7 +90,7 @@ export default function Inbox() {
             <>
               <h3 className="inbox-group">Chưa đọc</h3>
               <div className="inbox-list">
-                {unread.map((n) => <Row key={n.id} n={n} {...{ getTask, usersById, selectTask, markNotificationRead }} />)}
+                {unread.map((n) => <Row key={n.id} n={n} {...{ getTask, usersById, selectTask, markNotificationRead }} navigate={navigate} />)}
               </div>
             </>
           )}
@@ -82,7 +98,7 @@ export default function Inbox() {
             <>
               <h3 className="inbox-group">Trước đó</h3>
               <div className="inbox-list">
-                {read.map((n) => <Row key={n.id} n={n} {...{ getTask, usersById, selectTask, markNotificationRead }} />)}
+                {read.map((n) => <Row key={n.id} n={n} {...{ getTask, usersById, selectTask, markNotificationRead }} navigate={navigate} />)}
               </div>
             </>
           )}
