@@ -66,8 +66,21 @@
 
 ## P1-4 — Reminder Settings UI (admin chỉnh ngưỡng trong app)
 
-- **Mục tiêu**: tab cấu hình Reminder trong Cài đặt (bật/tắt, interval, các ngưỡng, escalation) thay vì env.
-- **Trạng thái**: **READY** — engine đọc config qua env; UI + bảng settings làm sau. Dependency: P1-3 (done).
+- **Mục tiêu**: giao diện quản trị an toàn cho Reminder Engine — xem trạng thái, chỉnh ngưỡng, bật/tắt, dry-run/run, lịch sử chạy, audit.
+- **Trạng thái**: **DONE** (12/07/2026).
+- **Bằng chứng code**:
+  - Config resolver tập trung (`reminder-rules.ts#resolveConfig` + `RemindersService#getConfig`): ưu tiên **DB override > ENV > default**, source từng field trả qua API; cache 60s, invalidate khi lưu; bảng `reminder_settings` (1 dòng JSON, updatedBy) — migration additive.
+  - Runtime apply: `applyTimer` LUÔN hủy timer cũ trước khi tạo → không thể 2 timer; mọi field áp dụng NGAY (restartRequired=false — rule đọc config đầu mỗi run); apply lỗi → response `restartRequired:true`, không giả đã áp dụng.
+  - API: GET/PATCH `/admin/reminders/settings` (DTO whitelist + range 5–1440 phút/1–30 ngày + timezone whitelist; field lạ 400 nhờ forbidNonWhitelisted global) + status mở rộng (sources/nextRunAt/timerActive/updatedBy) — chỉ Admin, member 403.
+  - Audit: admin_audit_logs action `reminder_settings` (before/after/updatedBy) — không secret.
+  - UI: Cài đặt → tab "Nhắc việc" — status card (ON/OFF, chu kỳ, lần chạy kế tiếp, số liệu run gần nhất), form (source badge DB/ENV/DEFAULT, min–max, dirty-state, Lưu disabled khi không đổi, Hoàn tác), thao tác Dry-run / Chạy ngay (confirm bắt buộc khi bật engine + khi chạy thật; chạy thật lúc OFF = confirm đặc biệt), lịch sử 20 run (Dry-run/Thủ công/Tự động + OK/Một phần/Lỗi), cảnh báo production OFF; Lưu và Chạy tách biệt.
+  - actionEmptyDays dùng CHUNG notStartedDays (ghi rõ trên UI); escalation hiển thị "Chưa triển khai (P1-5)".
+  - Test 35 case P (`docs/p1-4-test-report-12.07.md`); production/DEV mặc định OFF, override test đã dọn.
+
+## P1-4A — Run detail breakdown theo rule
+
+- **Mục tiêu**: xem chi tiết 1 lần chạy (số candidate/delivered THEO TỪNG RULE, lỗi từng delivery).
+- **Trạng thái**: **READY** — reminder_runs hiện lưu tổng; cần thêm cột breakdown JSON nhẹ khi cần. Dependency: P1-4 (done).
 
 ## P1-5 — Escalation nhắc việc tới quản lý theo scope tổ chức
 
