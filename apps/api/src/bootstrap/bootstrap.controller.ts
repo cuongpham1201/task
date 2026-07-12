@@ -21,11 +21,10 @@ export class BootstrapController {
 
   private serializeTask(t: any) {
     const { collaborators, watchers, workspace, orgUnit, action, ...rest } = t
-    let scope = 'personal'
-    let departmentId: string | null = null
-    let channelId: string | null = null
-    if (workspace?.type === 'org_unit') { scope = 'department'; departmentId = workspace.orgUnitId }
-    else if (workspace?.type === 'project') { scope = 'channel'; channelId = workspace.id }
+    // P0-1: 3 chiều là nguồn chính (khớp tasks.service#serialize) — workspace chỉ fallback
+    const departmentId = t.orgUnitId ?? (workspace?.type === 'org_unit' ? workspace.orgUnitId : null)
+    const channelId = t.projectId ?? (workspace?.type === 'project' ? workspace.id : null)
+    const scope = channelId ? 'channel' : (workspace?.type === 'org_unit' ? 'department' : 'personal')
     return { ...rest, scope, departmentId, channelId, collaboratorIds: collaborators.map((c: any) => c.userId), watcherIds: (watchers ?? []).map((w: any) => w.userId), orgUnitName: orgUnit?.name ?? null, actionTitle: action?.title ?? null }
   }
 
@@ -107,7 +106,14 @@ export class BootstrapController {
     const managed = permissions.managedOrgUnitIds
     const [pendingReviewCount, myActionCount] = await Promise.all([
       this.prisma.task.count({
-        where: { archived: false, status: 'submitted', OR: [{ creatorId: me.id }, { orgUnitId: { in: managed } }] },
+        // P0-2: "chờ tôi nghiệm thu" = reviewer chỉ định; task cũ chưa có reviewer → rule cũ
+        where: {
+          archived: false, status: 'submitted',
+          OR: [
+            { reviewerId: me.id },
+            { AND: [{ reviewerId: null }, { OR: [{ creatorId: me.id }, { orgUnitId: { in: managed } }] }] },
+          ],
+        },
       }),
       this.prisma.action.count({ where: { archived: false, ownerId: me.id } }),
     ])

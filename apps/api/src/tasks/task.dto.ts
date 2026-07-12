@@ -28,6 +28,8 @@ export class CreateTaskDto {
   @IsOptional() @IsDateString() dueDate?: string
   @IsOptional() @IsArray() @IsString({ each: true }) collaboratorIds?: string[]
   @IsOptional() @IsArray() @IsString({ each: true }) subtasks?: string[]
+  // P0-2: người nghiệm thu chỉ định — BẮT BUỘC khi reviewRequired=true (validate ở service)
+  @IsOptional() @IsString() reviewerId?: string
 }
 
 export class StatusDto {
@@ -51,6 +53,12 @@ export class UpdateTaskDto {
   @IsOptional() @IsString() @MaxLength(2000) expectedOutput?: string
   @IsOptional() @IsIn(SECTIONS) section?: string
   @IsOptional() @IsDateString() startDate?: string | null
+  // P0: sửa 2 chiều phân loại sau khi tạo (null = gỡ) — validate ở service
+  @IsOptional() projectId?: string | null
+  @IsOptional() actionId?: string | null
+  // P0-2: bật/tắt cần nghiệm thu + đổi người nghiệm thu (null = gỡ, chỉ khi reviewRequired=false)
+  @IsOptional() @IsBoolean() reviewRequired?: boolean
+  @IsOptional() reviewerId?: string | null
 }
 // FEATURE-004: sửa người phối hợp sau khi tạo (client gửi TOÀN BỘ danh sách — server diff)
 export class CollaboratorsDto {

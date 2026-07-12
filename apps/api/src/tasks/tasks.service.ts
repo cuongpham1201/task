@@ -39,15 +39,31 @@ export class TasksService {
   // + phơi chiều tường minh mới (orgUnitId/projectId/actionId + KPI) + tên đơn vị/action cho FE.
   private serialize(task: any, collaboratorIds: string[]) {
     const { collaborators, watchers, workspace, orgUnit, action, ...rest } = task
-    let scope = 'personal'
-    let departmentId: string | null = null
-    let channelId: string | null = null
-    if (workspace?.type === 'org_unit') { scope = 'department'; departmentId = workspace.orgUnitId }
-    else if (workspace?.type === 'project') { scope = 'channel'; channelId = workspace.id }
+    // P0-1 (Task 3 chiều): departmentId/channelId lấy TRỰC TIẾP từ orgUnitId/projectId —
+    // dashboard Phòng ban thấy cả task dự án/cá nhân thuộc đơn vị mình, KHÔNG nhân bản task.
+    // workspace chỉ còn là fallback cho dữ liệu rất cũ + label scope.
+    const departmentId = task.orgUnitId ?? (workspace?.type === 'org_unit' ? workspace.orgUnitId : null)
+    const channelId = task.projectId ?? (workspace?.type === 'project' ? workspace.id : null)
+    const scope = channelId ? 'channel' : (workspace?.type === 'org_unit' ? 'department' : 'personal')
     return {
       ...rest, scope, departmentId, channelId, collaboratorIds,
       watcherIds: (watchers ?? []).map((w: any) => w.userId),
       orgUnitName: orgUnit?.name ?? null, actionTitle: action?.title ?? null,
+    }
+  }
+
+  /** P0-2: reviewer phải là user active. */
+  private async validateReviewer(reviewerId: string) {
+    const u = await this.prisma.user.findUnique({ where: { id: reviewerId }, select: { active: true } })
+    if (!u || !u.active) throw new BadRequestException('Người nghiệm thu không hợp lệ hoặc đã ngưng hoạt động')
+  }
+
+  /** P0-1/P0-3: Action gắn vào task phải tồn tại, chưa lưu trữ và CÙNG đơn vị chịu trách nhiệm. */
+  private async validateActionForOrg(actionId: string, orgUnitId: string | null) {
+    const act = await this.prisma.action.findUnique({ where: { id: actionId } })
+    if (!act || act.archived) throw new BadRequestException('Action không tồn tại')
+    if (!orgUnitId || act.orgUnitId !== orgUnitId) {
+      throw new BadRequestException('Action phải thuộc cùng đơn vị chịu trách nhiệm với công việc')
     }
   }
 
@@ -112,9 +128,14 @@ export class TasksService {
       if (!dto.kpiDefinitionId) throw new BadRequestException('Task tính KPI phải chọn KPI definition')
       if (dto.kpiWeight == null) throw new BadRequestException('Task tính KPI phải có trọng số (kpi_weight)')
     }
-    if (dto.actionId) {
-      const act = await this.prisma.action.findUnique({ where: { id: dto.actionId } })
-      if (!act || act.archived) throw new BadRequestException('Action không tồn tại')
+    if (dto.actionId) await this.validateActionForOrg(dto.actionId, dims.orgUnitId)
+
+    // P0-2: cần nghiệm thu ⇒ phải chỉ định người nghiệm thu (user active)
+    let reviewerId: string | null = null
+    if (reviewRequired) {
+      if (!dto.reviewerId) throw new BadRequestException('Công việc cần nghiệm thu phải chọn người nghiệm thu')
+      await this.validateReviewer(dto.reviewerId)
+      reviewerId = dto.reviewerId
     }
 
     this.policy.assert(
@@ -138,6 +159,7 @@ export class TasksService {
           priority: (dto.priority as any) ?? 'normal',
           completionMode: (reviewRequired ? 'review_required' : 'self') as any,
           reviewRequired,
+          reviewerId,
           isScorable,
           kpiDefinitionId: isScorable ? dto.kpiDefinitionId : null,
           kpiWeight: isScorable ? dto.kpiWeight : null,
@@ -156,7 +178,10 @@ export class TasksService {
           data: dto.subtasks.map((title, i) => ({ taskId: created.id, title, assigneeId: created.assigneeId, sortOrder: i })),
         })
       }
-      await this.notifications.emit(tx, { task: created, actorId: me.id, action: 'create', notifyType: 'task_assigned' })
+      await this.notifications.emit(tx, {
+        task: created, actorId: me.id, action: 'create', notifyType: 'task_assigned',
+        extraRecipients: reviewerId ? [reviewerId] : [], // báo người được chỉ định nghiệm thu
+      })
       return created
     })
     // Teams Activity (fire-and-forget, SAU commit): giao việc cho assignee
@@ -200,7 +225,8 @@ export class TasksService {
     this.policy.assert(task.assigneeId === me.id || (await this.policy.canManage(me, task)), 'Chỉ người được giao mới nộp nghiệm thu')
     await this.prisma.$transaction(async (tx) => {
       await tx.task.update({ where: { id }, data: { status: 'submitted' as any } })
-      await this.notifications.emit(tx, { task, actorId: me.id, action: 'review', metadata: { to: 'submitted' }, notifyType: 'task_assigned', extraRecipients: [task.creatorId] })
+      // P0-2: nộp/nộp lại nghiệm thu → báo NGƯỜI NGHIỆM THU (task cũ chưa có reviewer → creator)
+      await this.notifications.emit(tx, { task, actorId: me.id, action: 'review', metadata: { to: 'submitted' }, notifyType: 'task_assigned', extraRecipients: [(task as any).reviewerId ?? task.creatorId] })
     })
     return this.withCollaborators(id)
   }
@@ -366,6 +392,58 @@ export class TasksService {
       : await this.policy.canManage(me, task)
     this.policy.assert(allowed, 'Không có quyền sửa công việc')
     const fields = Object.keys(dto)
+
+    // ── P0-1: đổi/gỡ 2 chiều phân loại (org_unit là chiều gốc — KHÔNG bị thay thế) ──
+    let projectPatch: any = {}
+    if (dto.projectId !== undefined) {
+      if (dto.projectId === null) {
+        // Gỡ dự án → workspace quay về container org_unit (giữ tương thích dữ liệu cũ)
+        const ws = task.orgUnitId
+          ? await this.prisma.workspace.findFirst({ where: { type: 'org_unit', orgUnitId: task.orgUnitId } })
+          : null
+        projectPatch = { projectId: null, workspaceId: ws?.id ?? null }
+      } else {
+        const proj = await this.prisma.workspace.findUnique({ where: { id: dto.projectId } })
+        if (!proj || proj.type !== 'project' || proj.archived) throw new BadRequestException('Dự án không tồn tại')
+        this.policy.assert(
+          await this.policy.canCreate(me, { orgUnitId: null, projectId: dto.projectId }),
+          'Bạn không phải thành viên dự án này',
+        )
+        projectPatch = { projectId: dto.projectId, workspaceId: dto.projectId }
+      }
+    }
+    let actionPatch: any = {}
+    if (dto.actionId !== undefined) {
+      if (dto.actionId === null) actionPatch = { actionId: null }
+      else {
+        await this.validateActionForOrg(dto.actionId, task.orgUnitId)
+        actionPatch = { actionId: dto.actionId }
+      }
+    }
+
+    // ── P0-2: cần nghiệm thu + người nghiệm thu ──
+    const nextReviewRequired = dto.reviewRequired ?? task.reviewRequired
+    let reviewPatch: any = {}
+    if (dto.reviewRequired !== undefined) {
+      reviewPatch.reviewRequired = dto.reviewRequired
+      reviewPatch.completionMode = dto.reviewRequired ? 'review_required' : 'self'
+      if (!dto.reviewRequired) reviewPatch.reviewerId = null // tắt nghiệm thu → xóa reviewer CÓ CHỦ ĐÍCH
+    }
+    let newReviewer: string | null = null
+    if (dto.reviewerId !== undefined) {
+      if (dto.reviewerId === null) {
+        if (nextReviewRequired) throw new BadRequestException('Công việc cần nghiệm thu phải có người nghiệm thu')
+        reviewPatch.reviewerId = null
+      } else {
+        await this.validateReviewer(dto.reviewerId)
+        reviewPatch.reviewerId = dto.reviewerId
+        if (dto.reviewerId !== (task as any).reviewerId) newReviewer = dto.reviewerId
+      }
+    }
+    if (nextReviewRequired && reviewPatch.reviewerId === undefined && !(task as any).reviewerId && dto.reviewRequired === true) {
+      throw new BadRequestException('Bật nghiệm thu phải chọn người nghiệm thu')
+    }
+
     await this.prisma.$transaction(async (tx) => {
       await tx.task.update({
         where: { id },
@@ -375,9 +453,17 @@ export class TasksService {
           ...(dto.expectedOutput !== undefined ? { expectedOutput: dto.expectedOutput } : {}),
           ...(dto.section !== undefined ? { section: dto.section as any } : {}),
           ...(dto.startDate !== undefined ? { startDate: dto.startDate ? new Date(dto.startDate) : null } : {}),
+          ...projectPatch,
+          ...actionPatch,
+          ...reviewPatch,
         },
       })
-      await this.notifications.emit(tx, { task, actorId: me.id, action: 'edit', metadata: { fields }, notifyType: null })
+      await this.notifications.emit(tx, {
+        task, actorId: me.id, action: 'edit', metadata: { fields },
+        // đổi người nghiệm thu → báo người mới (không tạo notification trùng: emit gom theo Set)
+        notifyType: newReviewer ? 'task_assigned' : null,
+        extraRecipients: newReviewer ? [newReviewer] : [],
+      })
     })
     return this.withCollaborators(id)
   }

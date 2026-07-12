@@ -122,6 +122,7 @@ export class VisibilityService {
       OR: [
         { creatorId: me.id },
         { assigneeId: me.id },
+        { reviewerId: me.id }, // P0-2: người nghiệm thu chỉ định thấy task của mình
         { collaborators: { some: { userId: me.id } } },
         { watchers: { some: { userId: me.id } } },
         { orgUnitId: { in: orgIds } },

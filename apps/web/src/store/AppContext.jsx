@@ -229,12 +229,13 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
     const orgPerms = state.permissions || {}
     const managedIds = orgPerms.managedOrgUnitIds || []
 
-    // Nghiệm thu: admin / người giao (creator) / người quản lý org_unit của task
+    // P0-2: nghiệm thu = admin / NGƯỜI NGHIỆM THU CHỈ ĐỊNH; task cũ chưa có reviewer → rule cũ
     const canReview = (task) =>
       !!currentUser &&
       (currentUser.role === 'admin' ||
-        task.creatorId === me ||
-        (task.departmentId && managedIds.includes(task.departmentId)))
+        (task.reviewerId
+          ? task.reviewerId === me
+          : (task.creatorId === me || (task.departmentId && managedIds.includes(task.departmentId)))))
 
     // Toast nhẹ thay alert
     const toast = (message, type = 'error') => {
@@ -316,6 +317,8 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
       tasksIAssigned: () =>
         state.tasks.filter((t) => t.creatorId === me && t.assigneeId !== me),
       departmentTasks: (departmentId) => state.tasks.filter((t) => t.departmentId === departmentId),
+      // P0-2: hàng đợi "Cần nghiệm thu" của TÔI (reviewer chỉ định; task cũ null → rule cũ)
+      tasksToReview: () => state.tasks.filter((t) => t.status === 'submitted' && canReview(t)),
       channelTasks: (channelId) => state.tasks.filter((t) => t.channelId === channelId),
       taskContextLabel: (task) => {
         if (task.scope === 'department') return departmentsById[task.departmentId]?.name || '—'
@@ -409,7 +412,8 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
           section: scope === 'department' ? input.section || undefined : undefined,
           assigneeId: input.assigneeId || me,
           priority: input.priority || 'normal',
-          reviewRequired: isScorable ? true : (input.completionMode === 'review_required'),
+          reviewRequired: isScorable ? true : (input.reviewRequired ?? input.completionMode === 'review_required'),
+          reviewerId: input.reviewerId || undefined,
           isScorable: isScorable || undefined,
           kpiDefinitionId: isScorable ? input.kpiDefinitionId : undefined,
           kpiWeight: isScorable ? input.kpiWeight : undefined,
@@ -506,7 +510,7 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         const task = findTask(id)
         if (!task) return
         const needManage = Object.keys(fieldPatch).some((k) => k !== 'description')
-        const allowed = needManage ? canManageTask(currentUser, task) : canUpdateStatus(currentUser, task)
+        const allowed = needManage ? canManageTask(currentUser, task, managedIds) : canUpdateStatus(currentUser, task, managedIds)
         if (!guard(allowed, 'cập nhật thông tin công việc')) return
         dispatch({
           type: 'UPDATE_TASK_FIELD', id, at: now(), patch: fieldPatch,

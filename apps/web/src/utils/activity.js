@@ -40,7 +40,7 @@ export function activityText(activity, usersById) {
       if (meta.decision === 'returned') return 'đã trả lại công việc'
       return 'đã cập nhật nghiệm thu'
     case 'edit': {
-      const map = { title: 'tên', description: 'mô tả', section: 'nhóm', startDate: 'ngày bắt đầu' }
+      const map = { title: 'tên', description: 'mô tả', section: 'nhóm', startDate: 'ngày bắt đầu', projectId: 'dự án', actionId: 'Action', reviewRequired: 'chế độ nghiệm thu', reviewerId: 'người nghiệm thu', orgUnit: 'đơn vị' }
       const names = (meta.fields || []).map((f) => map[f] || f).join(', ')
       return names ? `đã sửa ${names}` : 'đã sửa thông tin công việc'
     }

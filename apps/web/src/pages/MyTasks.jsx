@@ -13,15 +13,14 @@ const TABS = [
   { key: 'today', label: 'Hôm nay' },
   { key: 'upcoming', label: 'Sắp đến hạn' },
   { key: 'overdue', label: 'Quá hạn' },
-  { key: 'review', label: 'Nghiệm thu' },
+  { key: 'review', label: 'Cần nghiệm thu' }, // P0-2: task chờ TÔI nghiệm thu (reviewer chỉ định)
   { key: 'assigned', label: 'Tôi giao' },
   { key: 'done', label: 'Đã hoàn thành' },
 ]
 const PRANK = { urgent: 0, high: 1, normal: 2, low: 3 }
-const inReview = (t) => t.status === 'submitted' || t.status === 'returned'
 
 export default function MyTasks() {
-  const { myTasks, tasksIAssigned, openCreateModal, channelsById } = useApp()
+  const { myTasks, tasksIAssigned, tasksToReview, openCreateModal, channelsById } = useApp()
   const [tab, setTab] = useLocalStorage('mytasks.tab', 'all')
   // FEATURE-004: deep-link ?tab= (thẻ thống kê Trang chủ trỏ thẳng tab tương ứng)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -38,13 +37,14 @@ export default function MyTasks() {
 
   const all = myTasks()
   const iAssigned = tasksIAssigned()
+  const toReview = tasksToReview()
   const filtered = useMemo(() => {
     const list = (() => {
       switch (tab) {
         case 'today': return all.filter(isDueToday)
         case 'upcoming': return all.filter((t) => isUpcoming(t))
         case 'overdue': return all.filter(isOverdue)
-        case 'review': return all.filter(inReview)
+        case 'review': return toReview // chờ tôi duyệt (đã nộp); việc MÌNH bị trả lại vẫn ở tab Tất cả
         case 'assigned': return iAssigned // việc tôi giao người khác
         case 'done': return all.filter((t) => t.status === 'done')
         default: return all
@@ -59,14 +59,14 @@ export default function MyTasks() {
       if ((a.status === 'done') !== (b.status === 'done')) return a.status === 'done' ? 1 : -1
       return (sorters[sortBy] || sorters.due)(a, b)
     })
-  }, [tab, all, iAssigned, sortBy])
+  }, [tab, all, iAssigned, toReview, sortBy])
 
   const counts = {
     all: all.length,
     today: all.filter(isDueToday).length,
     upcoming: all.filter((t) => isUpcoming(t)).length,
     overdue: all.filter(isOverdue).length,
-    review: all.filter(inReview).length,
+    review: toReview.length,
     assigned: iAssigned.length,
     done: all.filter((t) => t.status === 'done').length,
   }

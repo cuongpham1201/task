@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { VisibilityService, type Me } from './visibility.service'
 
 // Task chỉ cần các chiều này để xét quyền (freeze §7/§8).
-type TaskLike = { id?: string; creatorId: string; assigneeId: string; orgUnitId: string | null; projectId: string | null }
+type TaskLike = { id?: string; creatorId: string; assigneeId: string; orgUnitId: string | null; projectId: string | null; reviewerId?: string | null }
 type ActionLike = { orgUnitId: string; ownerId: string; createdById: string }
 
 /**
@@ -54,7 +54,11 @@ export class PolicyService {
   }
 
   async canReview(me: Me, task: TaskLike): Promise<boolean> {
-    if (me.role === 'admin' || task.creatorId === me.id) return true
+    if (me.role === 'admin') return true
+    // P0-2: có reviewer CHỈ ĐỊNH → chỉ reviewer đó (hoặc admin) được nghiệm thu.
+    if (task.reviewerId) return task.reviewerId === me.id
+    // Task cũ chưa có reviewer (dữ liệu trước backfill/không reviewRequired): rule cũ.
+    if (task.creatorId === me.id) return true
     if (await this.managesOrgUnit(me, task.orgUnitId)) return true
     return this.managesProject(me, task.projectId)
   }
@@ -66,6 +70,8 @@ export class PolicyService {
   async canView(me: Me, task: TaskLike): Promise<boolean> {
     if (me.role === 'admin') return true
     if (task.creatorId === me.id || task.assigneeId === me.id) return true
+    // P0-2: reviewer chỉ định xem được task cần mình nghiệm thu (KHÔNG mở rộng sang cả dự án/phòng)
+    if (task.reviewerId === me.id) return true
     if (task.orgUnitId) {
       const orgIds = await this.vis.visibleOrgUnitIds(me)
       if (orgIds.includes(task.orgUnitId)) return true

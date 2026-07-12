@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { X, Plus, Trash2, Target } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
 import SearchUser from '../shared/SearchUser'
-import { PRIORITY, PRIORITY_ORDER, SECTIONS, SECTION_ORDER, SCOPES } from '../../data/constants'
+import { PRIORITY, PRIORITY_ORDER, SECTIONS, SECTION_ORDER } from '../../data/constants'
 import { fromInputDate } from '../../utils/date'
 import { orgUnitLabel } from '../../utils/org'
 
@@ -21,29 +21,19 @@ export default function CreateTaskModal() {
 
   // Phòng ban chọn được = các phòng user đang thấy (server đã scope theo quyền).
   const deptOptions = visibleDepartments
-  const canDeptScope = deptOptions.length > 0
   const channelOptions = visibleChannels
 
-  const scopeAllowed = (s) =>
-    s === 'personal' ||
-    (s === 'department' ? canDeptScope && deptOptions.length > 0 : channelOptions.length > 0)
-
+  // P0-1 (Task 3 chiều): Đơn vị chịu trách nhiệm + Dự án + Action là 3 lựa chọn ĐỘC LẬP,
+  // không loại trừ nhau. Không ép chọn Dự án/Action; đơn vị mặc định = phòng của tôi.
   const [form, setForm] = useState(() => {
-    const scope = defaults.scope && scopeAllowed(defaults.scope)
-      ? defaults.scope
-      : (canDeptScope ? 'department' : 'personal')
     return {
       title: '',
       description: '',
-      scope,
       departmentId:
         deptOptions.some((d) => d.id === defaults.departmentId)
           ? defaults.departmentId
           : (deptOptions.find((d) => d.id === currentUser.orgUnitId)?.id || deptOptions[0]?.id || null),
-      channelId:
-        channelOptions.some((c) => c.id === defaults.channelId)
-          ? defaults.channelId
-          : (channelOptions[0]?.id || null),
+      channelId: channelOptions.some((c) => c.id === defaults.channelId) ? defaults.channelId : '',
       section: defaults.section || 'suvu',
       assigneeId: currentUser.id,
       collaboratorIds: [],
@@ -51,6 +41,7 @@ export default function CreateTaskModal() {
       dueDate: '',
       priority: 'normal',
       completionMode: 'self', // 'review_required' = phải nộp nghiệm thu mới đóng được
+      reviewerId: '', // P0-2: bắt buộc khi cần nghiệm thu
       expectedOutput: '',
       actionId: defaults.actionId || '',
       isScorable: false,
@@ -64,28 +55,10 @@ export default function CreateTaskModal() {
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }))
 
-  // Người thực hiện giới hạn theo phạm vi đã chọn
-  const assigneePool = useMemo(() => {
-    if (form.scope === 'department') {
-      return state.users.filter((u) => u.orgUnitId === form.departmentId)
-    }
-    if (form.scope === 'channel') {
-      const channel = state.channels.find((c) => c.id === form.channelId)
-      return (channel?.members || []).map((id) => state.users.find((u) => u.id === id)).filter(Boolean)
-    }
-    return [currentUser] // personal: tự phụ trách
-  }, [form.scope, form.departmentId, form.channelId, state.users, state.channels, currentUser])
-
-  // Personal → tự phụ trách (các scope khác dùng SearchUser, cho phép giao chéo phòng)
-  useEffect(() => {
-    if (form.scope === 'personal' && form.assigneeId !== currentUser.id) set({ assigneeId: currentUser.id })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.scope])
-
-  // Org chịu trách nhiệm để lọc Action: phòng (nếu scope=department) hoặc org của người thực hiện
-  const responsibleOrg = form.scope === 'department'
-    ? form.departmentId
-    : (state.users.find((u) => u.id === form.assigneeId)?.orgUnitId || currentUser.orgUnitId)
+  // Đơn vị chịu trách nhiệm quyết định danh sách Action gắn được (Action cùng đơn vị)
+  const responsibleOrg = form.departmentId
+    || state.users.find((u) => u.id === form.assigneeId)?.orgUnitId
+    || currentUser.orgUnitId
   const actionOptions = responsibleOrg ? actionsForOrg(responsibleOrg) : []
   const hasKpiDefs = kpiDefinitions.length > 0
 
@@ -115,15 +88,23 @@ export default function CreateTaskModal() {
       if (!form.kpiDefinitionId) { setError('Chọn KPI definition'); return }
       if (form.kpiWeight === '' || Number.isNaN(Number(form.kpiWeight))) { setError('Nhập trọng số KPI'); return }
     }
+    const reviewRequired = form.isScorable || form.completionMode === 'review_required'
+    if (reviewRequired && !form.reviewerId) {
+      setError('Công việc cần nghiệm thu phải chọn người nghiệm thu')
+      return
+    }
     createTask(
       {
         title: form.title.trim(),
         description: form.description.trim(),
         expectedOutput: form.expectedOutput.trim(),
-        scope: form.scope,
-        departmentId: form.scope === 'department' ? form.departmentId : null,
-        channelId: form.scope === 'channel' ? form.channelId : null,
-        section: form.scope === 'department' ? form.section : null,
+        // 3 chiều độc lập: đơn vị luôn có; dự án tùy chọn (scope chỉ còn là nhãn tương thích)
+        scope: form.channelId ? 'channel' : (form.departmentId ? 'department' : 'personal'),
+        departmentId: form.departmentId || null,
+        orgUnitId: form.departmentId || undefined,
+        channelId: form.channelId || null,
+        projectId: form.channelId || undefined,
+        section: form.departmentId ? form.section : null,
         assigneeId: form.assigneeId,
         collaboratorIds: form.collaboratorIds.filter((id) => id !== form.assigneeId),
         startDate: fromInputDate(form.startDate),
@@ -131,7 +112,9 @@ export default function CreateTaskModal() {
         priority: form.priority,
         completionMode: form.completionMode,
         actionId: form.actionId || null,
-        ...(fromAction && defaults.projectId ? { projectId: defaults.projectId } : {}),
+        reviewerId: reviewRequired ? form.reviewerId : null,
+        reviewRequired,
+        ...(fromAction && defaults.projectId ? { projectId: defaults.projectId, channelId: defaults.projectId } : {}),
         isScorable: form.isScorable,
         kpiDefinitionId: form.isScorable ? form.kpiDefinitionId : null,
         kpiWeight: form.isScorable ? Number(form.kpiWeight) : null,
@@ -139,10 +122,6 @@ export default function CreateTaskModal() {
       subtaskTitles
     )
   }
-
-  // Người phối hợp: cùng pool với người phụ trách (personal: mời ai cũng được)
-  const collaboratorOptions = (form.scope === 'personal' ? state.users : assigneePool)
-    .filter((u) => u.id !== form.assigneeId)
 
   return (
     <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && closeCreateModal()}>
@@ -191,57 +170,38 @@ export default function CreateTaskModal() {
             </div>
           )}
 
+          {/* P0-1: 3 chiều ĐỘC LẬP — đơn vị chịu trách nhiệm luôn có; Dự án/Action tùy chọn */}
           {!fromAction && (
-            <div className="form-field">
-              <span>Loại công việc</span>
-              <div className="scope-options">
-                {Object.entries(SCOPES)
-                  .filter(([key]) => scopeAllowed(key))
-                  .map(([key, label]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      className={`scope-option ${form.scope === key ? 'active' : ''}`}
-                      onClick={() => set({ scope: key })}
-                    >
-                      {label}
-                    </button>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {form.scope === 'department' && !fromAction && (
             <div className="form-row">
               <label className="form-field">
-                <span>Phòng ban</span>
+                <span>Đơn vị chịu trách nhiệm</span>
                 <select
                   value={form.departmentId || ''}
-                  disabled={deptOptions.length <= 1}
-                  onChange={(e) => set({ departmentId: e.target.value })}
+                  onChange={(e) => set({ departmentId: e.target.value || null, actionId: '' })}
                 >
+                  {deptOptions.length === 0 && <option value="">— Cá nhân (theo người thực hiện) —</option>}
                   {deptOptions.map((d) => (
                     <option key={d.id} value={d.id}>{orgUnitLabel(d)}</option>
                   ))}
                 </select>
               </label>
               <label className="form-field">
-                <span>Section</span>
-                <select value={form.section} onChange={(e) => set({ section: e.target.value })}>
-                  {SECTION_ORDER.map((s) => (
-                    <option key={s} value={s}>{SECTIONS[s]}</option>
+                <span>Dự án (tùy chọn)</span>
+                <select value={form.channelId || ''} onChange={(e) => set({ channelId: e.target.value })}>
+                  <option value="">— Không thuộc dự án —</option>
+                  {channelOptions.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
               </label>
             </div>
           )}
-
-          {form.scope === 'channel' && (
+          {!fromAction && form.departmentId && (
             <label className="form-field">
-              <span>Dự án</span>
-              <select value={form.channelId || ''} onChange={(e) => set({ channelId: e.target.value })}>
-                {channelOptions.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+              <span>Section</span>
+              <select value={form.section} onChange={(e) => set({ section: e.target.value })}>
+                {SECTION_ORDER.map((s) => (
+                  <option key={s} value={s}>{SECTIONS[s]}</option>
                 ))}
               </select>
             </label>
@@ -250,11 +210,7 @@ export default function CreateTaskModal() {
           <div className="form-row">
             <div className="form-field">
               <span>Người thực hiện</span>
-              {form.scope === 'personal' ? (
-                <div className="searchuser-selected"><span className="cell-user"><Avatar user={currentUser} size={22} /> {currentUser.displayName}</span></div>
-              ) : (
-                <SearchUser value={form.assigneeId} onSelect={(id) => set({ assigneeId: id || currentUser.id })} placeholder="Tìm người thực hiện…" />
-              )}
+              <SearchUser value={form.assigneeId} onSelect={(id) => set({ assigneeId: id || currentUser.id })} placeholder="Tìm người thực hiện…" />
             </div>
             <label className="form-field">
               <span>Ưu tiên</span>
@@ -306,9 +262,16 @@ export default function CreateTaskModal() {
             />
             <span>
               <strong>Cần nghiệm thu khi hoàn thành</strong>
-              <small>Người nhận phải "Nộp nghiệm thu"; người giao duyệt Đạt/Trả lại trước khi đóng việc.</small>
+              <small>Người nhận phải "Nộp nghiệm thu"; NGƯỜI NGHIỆM THU duyệt Đạt/Trả lại trước khi đóng việc.</small>
             </span>
           </label>
+
+          {(form.isScorable || form.completionMode === 'review_required') && (
+            <div className="form-field">
+              <span>Người nghiệm thu *</span>
+              <SearchUser value={form.reviewerId || null} onSelect={(id) => { set({ reviewerId: id || '' }); setError('') }} placeholder="Tìm người nghiệm thu…" />
+            </div>
+          )}
 
           <label className="review-toggle">
             <input

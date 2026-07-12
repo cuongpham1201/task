@@ -223,6 +223,7 @@ model User {
   adminActionsDone      AdminAuditLog[]      @relation("AuditActor")
   adminActionsReceived  AdminAuditLog[]      @relation("AuditTarget")
   orgRolesGranted       OrgUnitRole[]        @relation("OrgRoleCreatedBy")
+  tasksToReview         Task[]               @relation("TaskDesignatedReviewer")
 
   @@map("users")
 }
@@ -336,6 +337,10 @@ model Task {
   status          TaskStatus     @default(todo)
   completionMode  CompletionMode @default(self) @map("completion_mode") // DEPRECATED — dùng reviewRequired
   reviewRequired  Boolean        @default(false) @map("review_required")
+  // P0-2 (12/07/2026): người nghiệm thu CHỈ ĐỊNH — bắt buộc khi reviewRequired=true.
+  // 1 reviewer (không bảng quan hệ) vì TaskReview là quyết định đơn 1-1.
+  // Task cũ backfill reviewer = creator (đúng người duyệt mặc định của rule cũ).
+  reviewerId      String?        @map("reviewer_id")
   priority        TaskPriority   @default(normal)
   startDate       DateTime?      @map("start_date") @db.Date
   dueDate         DateTime?      @map("due_date") @db.Date
@@ -355,6 +360,7 @@ model Task {
   workspace     Workspace?     @relation(fields: [workspaceId], references: [id])
   orgUnit       OrgUnit?       @relation("TaskOrgUnit", fields: [orgUnitId], references: [id])
   action        Action?        @relation(fields: [actionId], references: [id])
+  reviewer      User?          @relation("TaskDesignatedReviewer", fields: [reviewerId], references: [id])
   kpiDefinition KpiDefinition? @relation(fields: [kpiDefinitionId], references: [id])
   creator       User           @relation("TaskCreator", fields: [creatorId], references: [id])
   assignee      User           @relation("TaskAssignee", fields: [assigneeId], references: [id])
@@ -371,6 +377,7 @@ model Task {
   workLogs      TaskWorkLog[]
 
   @@index([assigneeId])
+  @@index([reviewerId])
   @@index([workspaceId, status])
   @@index([orgUnitId, status])
   @@index([projectId, status])

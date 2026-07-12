@@ -51,7 +51,7 @@ export default function TaskDetailPanel() {
     assignTask, setCollaborators, setTaskOrgUnit, setDueDate, setPriority, submitTask, reviewTask,
     addComment, toggleSubtask, addSubtask, taskContextLabel,
     archiveTask, updateSubtask, deleteSubtask, editComment, deleteComment,
-    actionsById, channelsById, orgUnitName, watchTask, unwatchTask,
+    actionsById, channelsById, actionsForOrg, orgUnitName, watchTask, unwatchTask,
   } = useApp()
 
   const task = state.selectedTaskId ? getTask(state.selectedTaskId) : null
@@ -60,6 +60,7 @@ export default function TaskDetailPanel() {
   const [commentText, setCommentText] = useState('')
   const [newSubtask, setNewSubtask] = useState('')
   const [tab, setTab] = useState('comments')
+  const [pickingReviewer, setPickingReviewer] = useState(false)
 
   useEffect(() => {
     if (task) {
@@ -68,6 +69,7 @@ export default function TaskDetailPanel() {
       setCommentText('')
       setNewSubtask('')
       setTab('comments')
+      setPickingReviewer(false)
     }
     // Chỉ reset khi mở task khác
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -252,21 +254,86 @@ export default function TaskDetailPanel() {
               {assignee?.orgUnitId ? (orgUnitName(assignee.orgUnitId) || '—') : '—'}
               <span className="muted" style={{ fontSize: 11, display: 'block' }}>tự động theo đơn vị biên chế của người thực hiện</span>
             </Field>
-            {task.projectId && (
-              <Field label="Dự án">{channelsById[task.projectId]?.name || '—'}</Field>
-            )}
-            {task.actionId && (
-              <Field label="Action">
+            <Field label="Dự án">
+              {canManage ? (
+                <select value={task.projectId || ''} onChange={(e) => updateTaskField(task.id, { projectId: e.target.value || null })}>
+                  <option value="">— Không thuộc dự án —</option>
+                  {task.projectId && !state.channels.some((c) => c.id === task.projectId) && (
+                    <option value={task.projectId}>{channelsById[task.projectId]?.name || 'Dự án hiện tại'}</option>
+                  )}
+                  {state.channels.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              ) : (
+                task.projectId ? (channelsById[task.projectId]?.name || '—') : <span className="muted">Không</span>
+              )}
+            </Field>
+            <Field label="Action">
+              {canManage ? (
+                <select value={task.actionId || ''} onChange={(e) => updateTaskField(task.id, { actionId: e.target.value || null })}>
+                  <option value="">— Không thuộc Action —</option>
+                  {task.actionId && !actionsForOrg(task.departmentId).some((a) => a.id === task.actionId) && (
+                    <option value={task.actionId}>{task.actionTitle || 'Action hiện tại'}</option>
+                  )}
+                  {actionsForOrg(task.departmentId).map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
+                </select>
+              ) : task.actionId ? (
                 <Link className="link" to={`/actions/${task.actionId}`} onClick={() => selectTask(null)}>
                   {task.actionTitle || actionsById[task.actionId]?.title || 'Xem Action'}
                 </Link>
-              </Field>
-            )}
+              ) : (
+                <span className="muted">Không</span>
+              )}
+            </Field>
           </div>
 
           <h3 className="detail-group-title">Chi tiết công việc</h3>
           <div className="detail-fields">
-            <Field label="Nghiệm thu">{reviewRequired ? 'Cần nghiệm thu' : 'Tự hoàn thành'}</Field>
+            <Field label="Nghiệm thu">
+              {canManage && !task.isScorable ? (
+                <select
+                  value={reviewRequired ? 'yes' : 'no'}
+                  onChange={(e) => {
+                    if (e.target.value === 'no') updateTaskField(task.id, { reviewRequired: false })
+                    else if (task.reviewerId) updateTaskField(task.id, { reviewRequired: true })
+                    else setPickingReviewer(true) // bật nghiệm thu phải chọn reviewer trước
+                  }}
+                >
+                  <option value="no">Tự hoàn thành</option>
+                  <option value="yes">Cần nghiệm thu</option>
+                </select>
+              ) : (
+                reviewRequired ? 'Cần nghiệm thu' : 'Tự hoàn thành'
+              )}
+            </Field>
+            {(reviewRequired || pickingReviewer) && (
+              <Field label="Người nghiệm thu">
+                {canManage ? (
+                  pickingReviewer || !task.reviewerId ? (
+                    <SearchUser
+                      value={null}
+                      autoFocus={false}
+                      placeholder="Chọn người nghiệm thu…"
+                      onSelect={(id) => {
+                        if (!id) return
+                        updateTaskField(task.id, { reviewRequired: true, reviewerId: id })
+                        setPickingReviewer(false)
+                      }}
+                    />
+                  ) : (
+                    <span className="cell-user">
+                      <Avatar user={usersById[task.reviewerId]} size={22} /> {usersById[task.reviewerId]?.displayName || '—'}
+                      <button className="btn btn-ghost" style={{ padding: '0 4px' }} title="Đổi người nghiệm thu" onClick={() => setPickingReviewer(true)}>
+                        <Pencil size={12} />
+                      </button>
+                    </span>
+                  )
+                ) : (
+                  task.reviewerId ? (
+                    <span className="cell-user"><Avatar user={usersById[task.reviewerId]} size={22} /> {usersById[task.reviewerId]?.displayName || '—'}</span>
+                  ) : <span className="muted">Chưa chỉ định (người giao/quản lý duyệt)</span>
+                )}
+              </Field>
+            )}
             {task.isScorable && (
               <Field label="KPI">
                 <span className="badge tone-purple">Tính KPI</span>
