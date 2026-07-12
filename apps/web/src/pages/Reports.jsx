@@ -179,6 +179,12 @@ export default function Reports() {
         </div>
       </div>
 
+      <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>
+        Quy tắc số liệu: task <strong>phát sinh</strong> tính theo ngày tạo · <strong>hoàn thành trong kỳ</strong> theo
+        ngày hoàn thành · <strong>đang quá hạn / sắp đến hạn</strong> theo deadline và trạng thái tại thời điểm hiện tại.
+        Task thuộc đồng thời Phòng ban + Dự án + Action chỉ được đếm MỘT lần.
+      </p>
+
       <div className="tabs">
         {TABS.map((t) => (
           <button key={t.key} className={`tab ${tab === t.key ? 'active' : ''}`} onClick={() => setParam({ tab: t.key })}>{t.label}</button>
@@ -197,7 +203,7 @@ export default function Reports() {
         </div>
       )}
 
-      {!loading && !error && data && tab === 'task' && <TaskTab data={data} openDrill={openDrill} />}
+      {!loading && !error && data && tab === 'task' && <TaskTab data={data} hasRange={!!data.range.from} openDrill={openDrill} />}
       {!loading && !error && data && tab === 'action' && <ActionTab data={data} prev={prev} openDrill={openDrill} />}
       {!loading && !error && data && tab === 'org' && <OrgTab data={data} openDrill={openDrill} />}
 
@@ -225,7 +231,7 @@ function Card({ value, label, tone = '', onClick, sub }) {
 }
 
 /* ══ TAB 1 — CÔNG VIỆC ══ */
-function TaskTab({ data, openDrill }) {
+function TaskTab({ data, hasRange, openDrill }) {
   const t = data.task
   const statusData = Object.entries(STATUS).map(([k, v]) => ({ label: v.label, value: t.byStatus[k] || 0, color: STATUS_COLORS[k] }))
   const topOrgOpen = data.byOrgUnit.map((o) => ({ label: orgUnitShortLabel({ name: o.orgUnitName, legalEntity: o.legalEntity }), value: o.total - o.done })).filter((x) => x.value > 0).sort((a, b) => b.value - a.value).slice(0, 10)
@@ -234,16 +240,16 @@ function TaskTab({ data, openDrill }) {
   return (
     <>
       <div className="stat-grid">
-        <Card value={t.total} label="Tổng công việc" tone="tone-blue" onClick={() => openDrill('Tổng công việc', 'all')} />
+        <Card value={t.total} label={hasRange ? 'Task phát sinh trong kỳ' : 'Tổng task'} sub={hasRange ? 'theo ngày tạo' : null} tone="tone-blue" onClick={() => openDrill(hasRange ? 'Task phát sinh trong kỳ' : 'Tổng task', 'all')} />
         <Card value={t.active} label="Đang mở" tone="tone-amber" onClick={() => openDrill('Đang mở', 'active')} />
-        <Card value={t.overdue} label="Quá hạn" tone="tone-red" onClick={() => openDrill('Quá hạn', 'overdue')} />
+        <Card value={t.overdue} label="Đang quá hạn" sub="tại thời điểm hiện tại" tone="tone-red" onClick={() => openDrill('Đang quá hạn', 'overdue')} />
         <Card value={t.dueSoon} label={`Sắp đến hạn (${t.dueSoonDays} ngày)`} onClick={() => openDrill('Sắp đến hạn', 'dueSoon')} />
       </div>
       <div className="stat-grid" style={{ marginTop: 10 }}>
         <Card value={t.byStatus.submitted} label="Chờ nghiệm thu" onClick={() => openDrill('Chờ nghiệm thu', 'submitted')} />
         <Card value={t.byStatus.returned} label="Bị trả lại" onClick={() => openDrill('Bị trả lại', 'returned')} />
         <Card value={t.byStatus.done} label="Hoàn thành" tone="tone-green" onClick={() => openDrill('Hoàn thành', 'done')} />
-        <Card value={t.completedInRange} label="Hoàn thành trong kỳ" sub="theo completedAt" onClick={() => openDrill('Hoàn thành trong kỳ', 'completedInRange')} />
+        <Card value={t.completedInRange} label="Hoàn thành trong kỳ" sub="theo ngày hoàn thành" onClick={() => openDrill('Hoàn thành trong kỳ', 'completedInRange')} />
       </div>
       <div className="stat-grid" style={{ marginTop: 10 }}>
         <Card value={t.withProject} label="Có dự án" onClick={() => openDrill('Task có dự án', 'withProject')} />
@@ -257,7 +263,7 @@ function TaskTab({ data, openDrill }) {
         <div className="card chart-card"><div className="card-head"><h2>Xu hướng theo ngày</h2></div><TrendChart data={data.trend} /></div>
         <div className="card chart-card"><div className="card-head"><h2>Top người thực hiện (đang mở)</h2></div><HBarList data={topAssignees} emptyText="Không có việc đang mở" /></div>
         <div className="card chart-card"><div className="card-head"><h2>Top đơn vị — việc đang mở</h2></div><HBarList data={topOrgOpen} emptyText="Không có việc đang mở" /></div>
-        <div className="card chart-card"><div className="card-head"><h2>Top đơn vị — quá hạn</h2></div><HBarList data={topOrgOverdue} color="#e05b5b" emptyText="Không đơn vị nào quá hạn 🎉" /></div>
+        <div className="card chart-card"><div className="card-head"><h2>Top đơn vị — đang quá hạn</h2></div><HBarList data={topOrgOverdue} color="#e05b5b" emptyText="Không đơn vị nào quá hạn 🎉" /></div>
       </div>
     </>
   )
@@ -338,7 +344,7 @@ function OrgTab({ data, openDrill }) {
           <table className="task-table settings-table">
             <thead>
               <tr><th>Đơn vị</th><th>Khối/Pháp nhân</th><th>Tổng</th><th>Chưa BĐ</th><th>Đang làm</th><th>Chờ NT</th>
-                <th>Trả lại</th><th>Xong</th><th>Quá hạn</th><th>Có DA</th><th>Có Action</th><th>%</th><th>Người mở</th><th>Action</th></tr>
+                <th>Trả lại</th><th>Xong</th><th title='dueDate < hiện tại & chưa hoàn thành'>Đang quá hạn</th><th>Có DA</th><th>Có Action</th><th>%</th><th>Người mở</th><th>Action</th></tr>
             </thead>
             <tbody>
               {data.byOrgUnit.map((o) => {
