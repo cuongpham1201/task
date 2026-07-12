@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { apiFetch } from '../api/client'
 import Avatar from '../components/shared/Avatar'
 import AdminUsers from '../components/admin/AdminUsers'
+import ReminderSettings from '../components/admin/ReminderSettings'
 import { roleLabel } from '../data/constants'
 import { legalEntityLabel, orgUnitShortLabel, ORG_TYPE } from '../utils/org'
 
@@ -20,6 +21,7 @@ export default function Settings() {
     ...(isAdmin ? [
       { key: 'users', label: 'Người dùng' },
       { key: 'departments', label: 'Phòng ban' },
+      { key: 'reminders', label: 'Nhắc việc' },
       { key: 'hrm', label: 'Đồng bộ HRM' },
     ] : []),
   ]
@@ -60,6 +62,8 @@ export default function Settings() {
       )}
 
       {tab === 'departments' && isAdmin && <DepartmentsTab state={state} />}
+
+      {tab === 'reminders' && isAdmin && <ReminderSettings />}
 
       {tab === 'hrm' && isAdmin && <HrmSyncTab />}
     </div>
