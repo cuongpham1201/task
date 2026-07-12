@@ -31,6 +31,51 @@ export interface ReminderConfig {
   returnedWaitDays: number
 }
 
+/**
+ * P1-4 — metadata từng field config: default trong code, env fallback, giới hạn an toàn.
+ * actionEmptyDays DÙNG CHUNG notStartedDays (UI ghi rõ — không tách config khi chưa cần).
+ */
+export const CONFIG_FIELDS = {
+  enabled: { env: 'REMINDER_ENGINE_ENABLED', def: false, type: 'boolean' as const, label: 'Bật Reminder Engine' },
+  intervalMinutes: { env: 'REMINDER_INTERVAL_MINUTES', def: 30, min: 5, max: 1440, type: 'int' as const, label: 'Chu kỳ chạy (phút)' },
+  timezone: { env: 'REMINDER_TIMEZONE', def: 'Asia/Bangkok', type: 'tz' as const, allowed: ['Asia/Bangkok', 'Asia/Ho_Chi_Minh', 'UTC'], label: 'Múi giờ' },
+  dueSoonDays: { env: 'REMINDER_DUE_SOON_DAYS', def: 3, min: 1, max: 14, type: 'int' as const, label: 'Ngưỡng sắp đến hạn (ngày)' },
+  notStartedDays: { env: 'REMINDER_NOT_STARTED_DAYS', def: 2, min: 1, max: 30, type: 'int' as const, label: 'Ngưỡng chưa bắt đầu / Action trống (ngày)' },
+  reviewWaitDays: { env: 'REMINDER_REVIEW_WAIT_DAYS', def: 1, min: 1, max: 30, type: 'int' as const, label: 'Ngưỡng chờ nghiệm thu (ngày)' },
+  returnedWaitDays: { env: 'REMINDER_RETURNED_WAIT_DAYS', def: 1, min: 1, max: 30, type: 'int' as const, label: 'Ngưỡng bị trả lại (ngày)' },
+} as const
+export type ConfigKey = keyof typeof CONFIG_FIELDS
+
+function envValueOf(key: ConfigKey): unknown {
+  const meta = CONFIG_FIELDS[key]
+  const raw = process.env[meta.env]
+  if (raw === undefined || raw === '') return undefined
+  if (meta.type === 'boolean') return raw === 'true'
+  if (meta.type === 'int') {
+    const n = Number(raw)
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined
+  }
+  return raw
+}
+
+/** Resolve config hiệu lực: DB override > env > default. Trả kèm nguồn từng field. */
+export function resolveConfig(dbOverrides: Record<string, unknown> | null | undefined): {
+  cfg: ReminderConfig
+  sources: Record<ConfigKey, 'database' | 'env' | 'default'>
+} {
+  const cfg: any = {}
+  const sources: any = {}
+  for (const key of Object.keys(CONFIG_FIELDS) as ConfigKey[]) {
+    const meta = CONFIG_FIELDS[key]
+    const db = dbOverrides?.[key]
+    const env = envValueOf(key)
+    if (db !== undefined && db !== null) { cfg[key] = db; sources[key] = 'database' }
+    else if (env !== undefined) { cfg[key] = env; sources[key] = 'env' }
+    else { cfg[key] = meta.def; sources[key] = 'default' }
+  }
+  return { cfg, sources }
+}
+
 export function loadReminderConfig(): ReminderConfig {
   const num = (v: string | undefined, d: number) => {
     const n = Number(v)

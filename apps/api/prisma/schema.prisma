@@ -231,6 +231,7 @@ model User {
   adminActionsReceived  AdminAuditLog[]      @relation("AuditTarget")
   orgRolesGranted       OrgUnitRole[]        @relation("OrgRoleCreatedBy")
   tasksToReview         Task[]               @relation("TaskDesignatedReviewer")
+  reminderSettingsEdits ReminderSetting[]    @relation("ReminderSettingUpdatedBy")
 
   @@map("users")
 }
@@ -520,6 +521,19 @@ model ReminderDelivery {
   @@index([entityType, entityId])
   @@index([recipientId, createdAt])
   @@map("reminder_deliveries")
+}
+
+// P1-4: override cấu hình reminder từ Admin UI — 1 dòng JSON (key='engine').
+// Ưu tiên: DB override > env > default trong code. Không lưu secret.
+model ReminderSetting {
+  key         String   @id
+  value       Json
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedById String?  @map("updated_by_id")
+
+  updatedBy User? @relation("ReminderSettingUpdatedBy", fields: [updatedById], references: [id])
+
+  @@map("reminder_settings")
 }
 
 model ReminderRun {

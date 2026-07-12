@@ -2,8 +2,9 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { randomUUID } from 'node:crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import {
-  loadReminderConfig, dayKey, dayDiff, dueSoonStage, overdueStage, waitStage,
-  actionOverdueStage, TASK_ACTIVE_STATUSES, ACTION_OPEN_STATUSES, type ReminderConfig,
+  resolveConfig, CONFIG_FIELDS, dayKey, dayDiff, dueSoonStage, overdueStage, waitStage,
+  actionOverdueStage, TASK_ACTIVE_STATUSES, ACTION_OPEN_STATUSES,
+  type ReminderConfig, type ConfigKey,
 } from './reminder-rules'
 
 /**
@@ -35,38 +36,133 @@ interface Candidate {
   payload: Record<string, unknown>
 }
 
+const SETTING_KEY = 'engine'
+const CACHE_MS = 60_000
+
 @Injectable()
 export class RemindersService implements OnModuleInit {
   private readonly log = new Logger('Reminders')
   private timer: ReturnType<typeof setInterval> | null = null
   private running = false
-  readonly cfg: ReminderConfig = loadReminderConfig()
+  // P1-4: config hiệu lực resolve tập trung (DB override > env > default), cache ngắn,
+  // invalidate khi Admin lưu. Rule đọc this.cfg — được nạp lại Ở ĐẦU MỖI RUN.
+  private cfg!: ReminderConfig
+  private cache: { cfg: ReminderConfig; sources: Record<ConfigKey, string>; at: number } | null = null
+  private meta: { updatedAt: Date | null; updatedByName: string | null } = { updatedAt: null, updatedByName: null }
+  private nextRunAt: Date | null = null
 
   constructor(private readonly prisma: PrismaService) {}
 
-  onModuleInit() {
-    if (!this.cfg.enabled) {
-      this.log.log('Reminder engine OFF (REMINDER_ENGINE_ENABLED != true)')
+  /** Config hiệu lực + nguồn từng field. force=true bỏ cache (sau khi lưu). */
+  async getConfig(force = false) {
+    if (!force && this.cache && Date.now() - this.cache.at < CACHE_MS) return this.cache
+    const row = await this.prisma.reminderSetting.findUnique({
+      where: { key: SETTING_KEY },
+      include: { updatedBy: { select: { displayName: true } } },
+    })
+    const { cfg, sources } = resolveConfig((row?.value as Record<string, unknown>) ?? null)
+    this.meta = { updatedAt: row?.updatedAt ?? null, updatedByName: row?.updatedBy?.displayName ?? null }
+    this.cache = { cfg, sources, at: Date.now() }
+    return this.cache
+  }
+
+  /**
+   * Áp config vào runtime: LUÔN hủy timer cũ trước khi tạo mới → không bao giờ
+   * có 2 timer. Mọi field áp dụng NGAY (restartRequired=false) vì rule đọc config
+   * ở đầu mỗi run; riêng interval/enabled xử lý tại đây.
+   */
+  private applyTimer(cfg: ReminderConfig) {
+    if (this.timer) { clearInterval(this.timer); this.timer = null }
+    this.nextRunAt = null
+    if (!cfg.enabled) {
+      this.log.log('Reminder engine OFF (config hiệu lực)')
       return
     }
-    const ms = this.cfg.intervalMinutes * 60_000
+    const ms = cfg.intervalMinutes * 60_000
     this.timer = setInterval(() => {
+      this.nextRunAt = new Date(Date.now() + ms)
       this.run({ dryRun: false, trigger: 'cron' }).catch((e) => this.log.error(`cron run lỗi: ${e.message}`))
     }, ms)
-    this.log.log(`Reminder engine ON — mỗi ${this.cfg.intervalMinutes} phút · TZ ${this.cfg.timezone}`)
+    this.nextRunAt = new Date(Date.now() + ms)
+    this.log.log(`Reminder engine ON — mỗi ${cfg.intervalMinutes} phút · TZ ${cfg.timezone}`)
+  }
+
+  async onModuleInit() {
+    const { cfg } = await this.getConfig(true)
+    this.applyTimer(cfg)
   }
 
   async status() {
-    const lastRuns = await this.prisma.reminderRun.findMany({ orderBy: { startedAt: 'desc' }, take: 10 })
+    const { cfg, sources } = await this.getConfig()
+    const lastRuns = await this.prisma.reminderRun.findMany({ orderBy: { startedAt: 'desc' }, take: 20 })
     return {
-      enabled: this.cfg.enabled,
-      config: {
-        intervalMinutes: this.cfg.intervalMinutes, timezone: this.cfg.timezone,
-        dueSoonDays: this.cfg.dueSoonDays, notStartedDays: this.cfg.notStartedDays,
-        reviewWaitDays: this.cfg.reviewWaitDays, returnedWaitDays: this.cfg.returnedWaitDays,
-      },
+      enabled: cfg.enabled,
+      config: cfg,
+      sources, // database | env | default — từng field
+      restartRequired: false, // mọi field áp dụng runtime (timer hủy-tạo lại khi lưu)
+      timerActive: !!this.timer,
+      nextRunAt: this.nextRunAt,
       runningNow: this.running,
+      updatedAt: this.meta.updatedAt,
+      updatedBy: this.meta.updatedByName,
       lastRuns,
+    }
+  }
+
+  /** P1-4: metadata form settings — value/source/default/giới hạn từng field (không expose env raw khác). */
+  async settings() {
+    const { cfg, sources } = await this.getConfig(true)
+    const fields = Object.fromEntries(
+      (Object.keys(CONFIG_FIELDS) as ConfigKey[]).map((k) => {
+        const m = CONFIG_FIELDS[k] as any
+        return [k, {
+          value: (cfg as any)[k], source: sources[k], default: m.def, label: m.label,
+          type: m.type, min: m.min ?? null, max: m.max ?? null, allowed: m.allowed ?? null,
+          restartRequired: false,
+        }]
+      }),
+    )
+    return {
+      fields,
+      updatedAt: this.meta.updatedAt,
+      updatedBy: this.meta.updatedByName,
+      notes: {
+        actionEmpty: 'Ngưỡng "Action trống" dùng CHUNG với "chưa bắt đầu" (notStartedDays).',
+        escalation: 'Escalation tới quản lý theo scope: CHƯA triển khai (backlog P1-5).',
+        runWhenOff: 'Khi engine OFF: dry-run luôn được phép; chạy thật thủ công vẫn cho phép với xác nhận đặc biệt (idempotent).',
+      },
+    }
+  }
+
+  /** Lưu override (merge), audit before/after, áp runtime ngay. Atomic + không nhận field lạ (DTO whitelist). */
+  async updateSettings(actorId: string, dto: Partial<ReminderConfig>) {
+    const patch: Record<string, unknown> = {}
+    for (const k of Object.keys(CONFIG_FIELDS) as ConfigKey[]) {
+      if ((dto as any)[k] !== undefined) patch[k] = (dto as any)[k]
+    }
+    if (Object.keys(patch).length === 0) return { applied: false, reason: 'Không có thay đổi' }
+    const result = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.reminderSetting.findUnique({ where: { key: SETTING_KEY } })
+      const before = (row?.value as Record<string, unknown>) ?? {}
+      const after = { ...before, ...patch }
+      await tx.reminderSetting.upsert({
+        where: { key: SETTING_KEY },
+        create: { key: SETTING_KEY, value: after as any, updatedById: actorId },
+        update: { value: after as any, updatedById: actorId },
+      })
+      await tx.adminAuditLog.create({
+        data: { actorId, targetUserId: null, action: 'reminder_settings', metadata: { before, after } as any },
+      })
+      return { before, after }
+    })
+    const { cfg, sources } = await this.getConfig(true) // invalidate cache
+    try {
+      this.applyTimer(cfg) // hủy timer cũ + tạo mới — không thể có 2 timer
+      return { applied: true, restartRequired: false, config: cfg, sources, changed: Object.keys(patch), audit: result }
+    } catch (e: any) {
+      // timer apply lỗi (hiếm): config đã lưu — báo cần restart, KHÔNG giả đã áp dụng
+      this.log.error(`applyTimer lỗi: ${e.message}`)
+      return { applied: false, restartRequired: true, config: cfg, sources, changed: Object.keys(patch) }
     }
   }
 
@@ -74,6 +170,7 @@ export class RemindersService implements OnModuleInit {
   async run(opts: { dryRun: boolean; trigger: 'cron' | 'manual' }) {
     if (this.running) return { skipped: true, reason: 'đang có run khác trong process' }
     this.running = true
+    this.cfg = (await this.getConfig()).cfg // config hiệu lực tại thời điểm chạy
     const runId = randomUUID()
     const startedAt = new Date()
     const stats = { scanned: 0, candidates: 0, delivered: 0, skipped: 0, duplicate: 0, failed: 0 }
