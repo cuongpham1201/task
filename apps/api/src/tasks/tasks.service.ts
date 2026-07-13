@@ -415,9 +415,16 @@ export class TasksService {
     this.policy.assert(allowed, 'Không có quyền sửa công việc')
     const fields = Object.keys(dto)
 
+    // A/B: chuyển task về CÁ NHÂN riêng tư — gỡ hết đơn vị/dự án/action (chỉ người liên
+    // quan thấy). Ưu tiên trước, bỏ qua projectId/actionId lẻ nếu cùng gửi.
+    let personalPatch: any = {}
+    if (dto.personal === true) {
+      personalPatch = { orgUnitId: null, projectId: null, workspaceId: null, actionId: null, section: null }
+    }
+
     // ── P0-1: đổi/gỡ 2 chiều phân loại (org_unit là chiều gốc — KHÔNG bị thay thế) ──
     let projectPatch: any = {}
-    if (dto.projectId !== undefined) {
+    if (!dto.personal && dto.projectId !== undefined) {
       if (dto.projectId === null) {
         // Gỡ dự án → workspace quay về container org_unit (giữ tương thích dữ liệu cũ)
         const ws = task.orgUnitId
@@ -435,7 +442,7 @@ export class TasksService {
       }
     }
     let actionPatch: any = {}
-    if (dto.actionId !== undefined) {
+    if (!dto.personal && dto.actionId !== undefined) {
       if (dto.actionId === null) actionPatch = { actionId: null }
       else {
         await this.validateActionForOrg(dto.actionId, task.orgUnitId)
@@ -477,6 +484,7 @@ export class TasksService {
           ...(dto.startDate !== undefined ? { startDate: dto.startDate ? new Date(dto.startDate) : null } : {}),
           ...projectPatch,
           ...actionPatch,
+          ...personalPatch,
           ...reviewPatch,
         },
       })

@@ -63,6 +63,8 @@ export class UpdateTaskDto {
   // P0-2: bật/tắt cần nghiệm thu + đổi người nghiệm thu (null = gỡ, chỉ khi reviewRequired=false)
   @IsOptional() @IsBoolean() reviewRequired?: boolean
   @IsOptional() reviewerId?: string | null
+  // A/B (13/07): chuyển task về CÁ NHÂN riêng tư → gỡ đơn vị/dự án/action
+  @IsOptional() @IsBoolean() personal?: boolean
 }
 // FEATURE-004: sửa người phối hợp sau khi tạo (client gửi TOÀN BỘ danh sách — server diff)
 export class CollaboratorsDto {

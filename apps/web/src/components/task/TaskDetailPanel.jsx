@@ -254,13 +254,19 @@ export default function TaskDetailPanel() {
             <Field label="Đơn vị yêu cầu">
               {canManage ? (
                 <select
-                  value={task.orgUnitId || ''}
-                  onChange={(e) => e.target.value && setTaskOrgUnit(task.id, e.target.value)}
+                  value={task.orgUnitId || '__personal__'}
+                  onChange={(e) => {
+                    if (e.target.value === '__personal__') {
+                      if (window.confirm('Chuyển thành việc CÁ NHÂN riêng tư? Task sẽ gỡ khỏi phòng ban/dự án và chỉ bạn + người được giao (người phối hợp/theo dõi) nhìn thấy.')) {
+                        updateTaskField(task.id, { personal: true })
+                      }
+                    } else setTaskOrgUnit(task.id, e.target.value)
+                  }}
                 >
+                  <option value="__personal__">— Cá nhân (riêng tư) —</option>
                   {task.orgUnitId && !state.departments.some((d) => d.id === task.orgUnitId) && (
                     <option value={task.orgUnitId}>{task.orgUnitName || 'Đơn vị hiện tại'}</option>
                   )}
-                  {!task.orgUnitId && <option value="">— Chọn đơn vị —</option>}
                   {state.departments.map((d) => (
                     <option key={d.id} value={d.id}>{orgUnitLabel(d)}</option>
                   ))}
