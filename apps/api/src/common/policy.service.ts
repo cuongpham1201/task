@@ -112,6 +112,24 @@ export class PolicyService {
     return this.managesOrgUnit(me, orgUnitId)
   }
 
+  /**
+   * P (hướng 1&3): trong danh sách userIds, trả về tập user CÒN QUYỀN XEM task
+   * (active + canView). Dùng để chặn @mention ngoài phạm vi và lọc kênh Teams.
+   */
+  async filterCanView(task: TaskLike, userIds: string[]): Promise<Set<string>> {
+    const ids = [...new Set(userIds.filter(Boolean))]
+    if (ids.length === 0) return new Set()
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: ids }, active: true },
+      select: { id: true, role: true, orgUnitId: true },
+    })
+    const ok = new Set<string>()
+    for (const u of users) {
+      if (await this.canView({ id: u.id, role: u.role, orgUnitId: u.orgUnitId }, task)) ok.add(u.id)
+    }
+    return ok
+  }
+
   assert(cond: boolean, msg = 'Bạn không có quyền thực hiện thao tác này'): void {
     if (!cond) throw new ForbiddenException(msg)
   }

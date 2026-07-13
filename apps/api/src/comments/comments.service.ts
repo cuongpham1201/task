@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { ForbiddenException, Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { PolicyService } from '../common/policy.service'
 import { NotificationsService } from '../notifications/notifications.service'
@@ -19,13 +19,26 @@ export class CommentsService {
     const task = await this.prisma.task.findUnique({ where: { id: taskId }, include: { workspace: true } })
     if (!task || task.archived) throw new NotFoundException('Không tìm thấy công việc')
     this.policy.assert(await this.policy.canComment(me, task), 'Không có quyền bình luận')
+
+    // Hướng 3: CHẶN @mention người ngoài phạm vi xem task — chống rò rỉ nội dung/ping mồ côi.
+    let ids = [...new Set((mentionIds || []).filter((id) => id && id !== me.id))]
+    if (ids.length) {
+      const viewable = await this.policy.filterCanView(task, ids)
+      const blocked = ids.filter((id) => !viewable.has(id))
+      if (blocked.length) {
+        const names = await this.prisma.user.findMany({ where: { id: { in: blocked } }, select: { displayName: true } })
+        throw new BadRequestException(
+          `Không thể nhắc ${names.map((n) => n.displayName).join(', ')} — họ không có quyền xem công việc này`,
+        )
+      }
+    }
+
     const comment = await this.prisma.$transaction(async (tx) => {
       const c = await tx.comment.create({ data: { taskId, userId: me.id, content } })
       const activity = await this.notifications.emit(tx, {
         task, actorId: me.id, action: 'comment', notifyType: 'comment_added',
       })
-      // @Mention: thông báo riêng cho người được nhắc (listForUser vẫn lọc theo quyền xem task)
-      const ids = [...new Set((mentionIds || []).filter((id) => id && id !== me.id))]
+      // @Mention: người nhắc đã được xác thực quyền xem ở trên
       if (ids.length) {
         await tx.notification.createMany({
           data: ids.map((userId) => ({ userId, type: 'mentioned' as any, activityId: activity.id, taskId })),
@@ -45,8 +58,12 @@ export class CommentsService {
       ...collaborators.map((c) => c.userId), ...watchers.map((w) => w.userId),
     ])
     const preview = content.length > 120 ? content.slice(0, 117) + '…' : content
+    // Hướng 1: chỉ gửi Teams cho người CÒN QUYỀN XEM task (đồng bộ với lọc in-app)
+    const allTargets = [...new Set([...mentionSet, ...commentRecipients])]
+    const canSee = await this.policy.filterCanView(task, allTargets)
     const events = []
     for (const uid of mentionSet) {
+      if (!canSee.has(uid)) continue
       events.push({
         type: 'taskMentioned' as const, recipientUserId: uid, actorUserId: me.id,
         targetType: 'task' as const, targetId: taskId, taskInfo: task.title,
@@ -55,6 +72,7 @@ export class CommentsService {
     }
     for (const uid of commentRecipients) {
       if (mentionSet.has(uid)) continue // đã nhận mention — không gửi kép
+      if (!canSee.has(uid)) continue // hướng 1: không gửi Teams cho người không xem được task
       events.push({
         type: 'taskCommented' as const, recipientUserId: uid, actorUserId: me.id,
         targetType: 'task' as const, targetId: taskId, taskInfo: task.title,

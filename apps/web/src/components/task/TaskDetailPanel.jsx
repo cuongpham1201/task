@@ -92,6 +92,17 @@ export default function TaskDetailPanel() {
   const reviewRequired = task.reviewRequired ?? (task.completionMode === 'review_required')
   const canReview = perms.review(task)
 
+  // Hướng 3: ứng viên @mention = người trong phạm vi xem task (luôn ⊆ người xem được →
+  // không gây 400 từ backend). Gồm: người liên quan trực tiếp + thành viên dự án +
+  // biên chế phòng phụ trách.
+  const mentionCandidates = (() => {
+    const ids = new Set([task.creatorId, task.assigneeId, task.reviewerId,
+      ...(task.collaboratorIds || []), ...(task.watcherIds || [])].filter(Boolean))
+    if (task.channelId) (channelsById[task.channelId]?.members || []).forEach((id) => ids.add(id))
+    if (task.departmentId) state.users.forEach((u) => { if (u.orgUnitId === task.departmentId) ids.add(u.id) })
+    return [...ids].map((id) => usersById[id]).filter(Boolean)
+  })()
+
   const submitComment = () => {
     const text = commentText.trim()
     if (!text) return
@@ -572,7 +583,7 @@ export default function TaskDetailPanel() {
         </div>
 
         {canCmt ? (
-          <MentionCommentBox disabled={!canCmt} onSubmit={(t, ids) => addComment(task.id, t, ids)} />
+          <MentionCommentBox disabled={!canCmt} candidates={mentionCandidates} onSubmit={(t, ids) => addComment(task.id, t, ids)} />
         ) : (
           <div className="comment-input">
             <p className="muted">Bạn không tham gia công việc này nên không thể bình luận.</p>

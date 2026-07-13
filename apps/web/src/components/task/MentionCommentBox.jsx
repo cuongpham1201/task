@@ -1,14 +1,15 @@
 import { useRef, useState } from 'react'
 import { Send } from 'lucide-react'
-import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
+import { deaccent } from '../../utils/text'
 
 /**
- * Ô bình luận có @mention: gõ "@" + tên → gợi ý người dùng (autocomplete theo quyền);
- * chọn để chèn "@Tên" và lưu mention. onSubmit(text, mentionIds).
+ * Ô bình luận có @mention. Hướng 3: CHỈ gợi ý người TRONG PHẠM VI xem task
+ * (candidates truyền từ TaskDetailPanel — người thực hiện/giao/phối hợp/theo dõi/
+ * nghiệm thu + thành viên dự án + biên chế phòng phụ trách). Không tra toàn bộ user
+ * → không tag được người ngoài quyền (backend cũng chặn, đây là lớp UX). onSubmit(text, mentionIds).
  */
-export default function MentionCommentBox({ onSubmit, disabled }) {
-  const { searchUsers } = useApp()
+export default function MentionCommentBox({ onSubmit, disabled, candidates = [] }) {
   const [text, setText] = useState('')
   const [mentions, setMentions] = useState([]) // [{id,name}]
   const [menu, setMenu] = useState(null) // {at, results}
@@ -21,8 +22,12 @@ export default function MentionCommentBox({ onSubmit, disabled }) {
     if (at >= 0 && !/\s/.test(after) && after.length <= 30) {
       clearTimeout(timer.current)
       timer.current = setTimeout(() => {
-        searchUsers(after, { limit: 6 }).then((r) => setMenu({ at, results: r || [] })).catch(() => setMenu(null))
-      }, 200)
+        const q = deaccent(after)
+        const results = candidates
+          .filter((u) => !q || deaccent(`${u.displayName} ${u.email || ''}`).includes(q))
+          .slice(0, 6)
+        setMenu({ at, results })
+      }, 150)
     } else setMenu(null)
   }
   const pick = (u) => {
