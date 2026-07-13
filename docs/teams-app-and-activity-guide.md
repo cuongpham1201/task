@@ -98,3 +98,27 @@ Xem lỗi chi tiết: cột `last_error` trong `teams_activity_deliveries` + log
 ## 10. Rollback
 `TEAMS_ACTIVITY_ENABLED=false` + `pm2 restart giaoviec-api` — dừng gửi ngay, không ảnh hưởng
 nghiệp vụ/in-app notification. Gỡ app khỏi Teams: Admin Center → Manage apps → Block/Delete.
+
+## Install-then-send (13/07/2026) — user chưa mở app vẫn nhận Teams Activity
+
+Trước đây chỉ user đã login M365 + đã tự mở/cài app trong Teams mới nhận được
+Activity (còn lại lỗi 403 "not authorized ... to the recipient"). Đã đổi cơ chế:
+
+Mỗi lần gửi, `TeamsActivityService` làm 3 bước:
+1. **Resolve Entra Object ID**: `users.entra_id` → mapping → *fallback tra Graph
+   `GET /users/{email}?$select=id`* (email @biahalong.com) rồi cache lại `entra_id`.
+2. **ensureInstalled**: `GET /users/{id}/teamwork/installedApps?$filter=teamsApp/id eq '{catalog}'`;
+   nếu chưa có → `POST /users/{id}/teamwork/installedApps` cài app âm thầm (409 = đã có).
+3. **sendActivityNotification** như cũ; nếu vẫn 403 "recipient" → cài lại rồi thử LẠI 1 lần.
+
+**Quyền Graph (Application, admin consent) — BẮT BUỘC:**
+`TeamsActivity.Send` · `TeamsAppInstallation.ReadWriteForUser.All` · `User.Read.All`.
+
+**Env cần đặt (cả production khi bật):**
+- `TEAMS_ACTIVITY_ENABLED=true`
+- `TEAMS_AUTO_INSTALL=true` (bật install-then-send; tắt → chỉ gửi, không tự cài)
+- `TEAMS_CATALOG_APP_ID=450458dd-9afb-4156-83e1-8de9299a9289` (id app trong catalog
+  tổ chức — KHÁC manifest `TEAMS_APP_ID`; lấy qua installedApps của 1 user đã cài).
+
+Đã kiểm chứng: cài + gửi cho `dunglt@biahalong.com` (Lưu Tiến Dũng) → HTTP 204,
+delivery `sent`; và người phối hợp mới thêm giờ cũng nhận Teams (trước đây chỉ in-app).

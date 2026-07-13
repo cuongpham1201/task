@@ -69,13 +69,75 @@ export class TeamsActivityService {
     return `https://teams.microsoft.com/l/entity/${appId}/${TAB_ENTITY_ID}?${params.toString()}`
   }
 
-  /** Resolve Entra Object ID: user.entra_id → external_user_mappings (bỏ placeholder hrm-emp-*). */
+  /**
+   * Resolve Entra Object ID:
+   *  1. users.entra_id (đã login M365) → 2. external_user_mappings (bỏ placeholder hrm-emp-*)
+   *  3. NEW: tra Graph theo email công ty (GET /users/{email}) — cho user CHƯA từng login app.
+   *     Kết quả ghi lại users.entra_id để lần sau khỏi gọi Graph.
+   * Cần Application permission User.Read.All.
+   */
   private async resolveEntraId(userId: string): Promise<string | null> {
-    const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { entraId: true } })
+    const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { entraId: true, email: true } })
     if (u?.entraId && GUID.test(u.entraId)) return u.entraId
     const m = await this.prisma.externalUserMapping.findUnique({ where: { userId }, select: { entraObjectId: true } })
     if (m?.entraObjectId && GUID.test(m.entraObjectId)) return m.entraObjectId // placeholder 'hrm-emp-*' fail GUID → bỏ
+    // Fallback Graph: chỉ email M365 công ty (tránh gọi Graph cho email cá nhân test)
+    const email = u?.email?.trim()
+    if (!email || !email.toLowerCase().endsWith('@biahalong.com')) return null
+    try {
+      const token = await this.graphToken.getToken()
+      const res = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(email)}?$select=id`, {
+        headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+      })
+      if (!res.ok) { this.log.debug?.(`resolve oid theo email ${email} → HTTP ${res.status}`); return null }
+      const j: any = await res.json()
+      const oid = j?.id
+      if (oid && GUID.test(oid)) {
+        // Ghi cache vào users.entra_id (best-effort; không fail nếu trùng unique)
+        await this.prisma.user.update({ where: { id: userId }, data: { entraId: oid } }).catch(() => {})
+        return oid
+      }
+    } catch (e: any) {
+      this.log.warn(`resolve oid Graph lỗi (${email}): ${e?.message}`)
+    }
     return null
+  }
+
+  /**
+   * Đảm bảo app Giao việc ĐÃ được cài trong Teams cá nhân của người nhận (install-then-send).
+   * Cho phép user CHƯA từng mở app vẫn nhận Activity — không cần họ tự cài.
+   * Cần TEAMS_CATALOG_APP_ID + Application permission TeamsAppInstallation.ReadWriteForUser.All.
+   * Idempotent: đã cài (hoặc 409 Conflict) → coi như thành công.
+   */
+  private async ensureInstalled(entraId: string): Promise<boolean> {
+    const catalogId = process.env.TEAMS_CATALOG_APP_ID?.trim()
+    if (process.env.TEAMS_AUTO_INSTALL !== 'true' || !catalogId) return true // tắt cờ → bỏ qua, để send tự xử 403
+    try {
+      const token = await this.graphToken.getToken()
+      const auth = { Authorization: `Bearer ${token}` }
+      // Đã cài chưa? lọc theo teamsApp/id (catalog app id)
+      const check = await fetch(
+        `https://graph.microsoft.com/v1.0/users/${entraId}/teamwork/installedApps?$expand=teamsApp&$filter=teamsApp/id+eq+'${catalogId}'`,
+        { headers: auth, signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS) },
+      )
+      if (check.ok) {
+        const j: any = await check.json()
+        if (Array.isArray(j.value) && j.value.length > 0) return true // đã cài
+      }
+      // Cài app cho user (âm thầm, không popup)
+      const inst = await fetch(`https://graph.microsoft.com/v1.0/users/${entraId}/teamwork/installedApps`, {
+        method: 'POST',
+        headers: { ...auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 'teamsApp@odata.bind': `https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/${catalogId}` }),
+        signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+      })
+      if (inst.status === 201 || inst.status === 409) return true // cài mới / đã có sẵn
+      this.log.warn(`cài app cho ${entraId} → HTTP ${inst.status}: ${(await inst.text().catch(() => '')).slice(0, 200)}`)
+      return false
+    } catch (e: any) {
+      this.log.warn(`ensureInstalled lỗi (${entraId}): ${e?.message}`)
+      return false
+    }
   }
 
   /** Gửi 1 event (fire-and-forget từ call site — KHÔNG await trong transaction nghiệp vụ). */
@@ -116,7 +178,11 @@ export class TeamsActivityService {
       }
       const path = `/users/${encodeURIComponent(entraId)}/teamwork/sendActivityNotification`
 
+      // install-then-send: đảm bảo app đã cài cho user trước khi gửi (không cần user tự mở app)
+      await this.ensureInstalled(entraId)
+
       let lastError = ''
+      let triedInstall = false
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         try {
           const token = await this.graphToken.getToken()
@@ -135,7 +201,13 @@ export class TeamsActivityService {
           }
           const body = await res.text().catch(() => '')
           lastError = `HTTP ${res.status}: ${body.slice(0, 300)}`
-          // 4xx (trừ 429) = lỗi cấu hình/quyền — retry vô ích
+          // 403 "not authorized ... to the recipient" = app chưa cài xong → cài rồi thử LẠI 1 lần
+          if (res.status === 403 && !triedInstall && /not authorized|recipient/i.test(body)) {
+            triedInstall = true
+            const ok = await this.ensureInstalled(entraId)
+            if (ok) { await new Promise((r) => setTimeout(r, 1500)); continue }
+          }
+          // 4xx còn lại (trừ 429) = lỗi cấu hình/quyền — retry vô ích
           if (res.status !== 429 && res.status < 500) break
         } catch (e: any) {
           lastError = e?.message || String(e)

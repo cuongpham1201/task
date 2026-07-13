@@ -325,6 +325,15 @@ export class TasksService {
         notifyType: added.length ? 'task_assigned' : null, extraRecipients: added,
       })
     })
+    // Teams Activity cho người MỚI được thêm phối hợp (trước đây thiếu — chỉ có in-app)
+    if (added.length) {
+      this.teams.sendMany(added.map((userId) => ({
+        type: 'taskAssigned' as const, recipientUserId: userId, actorUserId: me.id,
+        targetType: 'task' as const, targetId: id, taskInfo: task.title,
+        previewText: 'Bạn được thêm làm người phối hợp một công việc', path: this.taskPath(id),
+        eventSuffix: `collab-${userId}`,
+      })))
+    }
     return this.withCollaborators(id)
   }
 
