@@ -16,6 +16,7 @@ export default function QuickAddTask({ scope = 'personal', departmentId = null, 
     createTask({
       title: t,
       scope,
+      personal: scope === 'personal', // A: "Thêm nhanh việc cá nhân" = riêng tư (không gắn phòng)
       departmentId: scope === 'department' ? departmentId : null,
       channelId: scope === 'channel' ? channelId : null,
       actionId: actionId || null,

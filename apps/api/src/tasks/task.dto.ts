@@ -30,6 +30,8 @@ export class CreateTaskDto {
   @IsOptional() @IsArray() @IsString({ each: true }) subtasks?: string[]
   // P0-2: người nghiệm thu chỉ định — BẮT BUỘC khi reviewRequired=true (validate ở service)
   @IsOptional() @IsString() reviewerId?: string
+  // A (13/07): việc CÁ NHÂN riêng tư → KHÔNG gắn đơn vị/dự án (chỉ người liên quan thấy)
+  @IsOptional() @IsBoolean() personal?: boolean
 }
 
 export class StatusDto {

@@ -100,6 +100,7 @@ export default function CreateTaskModal() {
         expectedOutput: form.expectedOutput.trim(),
         // 3 chiều độc lập: đơn vị luôn có; dự án tùy chọn (scope chỉ còn là nhãn tương thích)
         scope: form.channelId ? 'channel' : (form.departmentId ? 'department' : 'personal'),
+        personal: !form.departmentId && !form.channelId, // A: cá nhân riêng tư → không gắn phòng/dự án
         departmentId: form.departmentId || null,
         orgUnitId: form.departmentId || undefined,
         channelId: form.channelId || null,
@@ -177,24 +178,31 @@ export default function CreateTaskModal() {
                 <span>Đơn vị chịu trách nhiệm</span>
                 <select
                   value={form.departmentId || ''}
-                  onChange={(e) => set({ departmentId: e.target.value || null, actionId: '' })}
+                  onChange={(e) => set({ departmentId: e.target.value || null, actionId: '', ...(e.target.value ? {} : { channelId: '' }) })}
                 >
-                  {deptOptions.length === 0 && <option value="">— Cá nhân (theo người thực hiện) —</option>}
+                  <option value="">— Cá nhân (riêng tư — chỉ bạn &amp; người được giao) —</option>
                   {deptOptions.map((d) => (
                     <option key={d.id} value={d.id}>{orgUnitLabel(d)}</option>
                   ))}
                 </select>
               </label>
-              <label className="form-field">
-                <span>Dự án (tùy chọn)</span>
-                <select value={form.channelId || ''} onChange={(e) => set({ channelId: e.target.value })}>
-                  <option value="">— Không thuộc dự án —</option>
-                  {channelOptions.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </label>
+              {form.departmentId && (
+                <label className="form-field">
+                  <span>Dự án (tùy chọn)</span>
+                  <select value={form.channelId || ''} onChange={(e) => set({ channelId: e.target.value })}>
+                    <option value="">— Không thuộc dự án —</option>
+                    {channelOptions.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </div>
+          )}
+          {!fromAction && !form.departmentId && (
+            <p className="muted" style={{ fontSize: 12, margin: '-4px 0 0' }}>
+              Việc cá nhân riêng tư: chỉ bạn và người được giao (cùng người phối hợp/theo dõi được mời) nhìn thấy — không hiện cho phòng ban, không vào báo cáo đơn vị.
+            </p>
           )}
           {!fromAction && form.departmentId && (
             <label className="form-field">

@@ -85,6 +85,11 @@ export class TasksService {
   // Ưu tiên chiều mới; nếu FE cũ chỉ gửi workspaceId thì suy ngược.
   private async resolveDims(me: Me, dto: CreateTaskDto) {
     const assigneeId = dto.assigneeId ?? me.id
+    // A (13/07): việc CÁ NHÂN riêng tư — KHÔNG suy ra phòng, không dự án/action.
+    // Chỉ người tạo + người thực hiện + người được mời (phối hợp/theo dõi) thấy (taskWhere ①).
+    if (dto.personal === true) {
+      return { orgUnitId: null, projectId: null, actionId: null, workspaceId: null, assigneeId }
+    }
     let orgUnitId = dto.orgUnitId ?? null
     let projectId = dto.projectId ?? null
     let workspaceId = dto.workspaceId ?? null

@@ -397,19 +397,22 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
       createTask: (input, subtaskTitles = []) => {
         if (!guard(canCreateTask(currentUser, input, state.channels), 'tạo công việc loại này')) return
         const scope = input.scope || 'personal'
+        // A: việc cá nhân riêng tư (personal) → KHÔNG gắn phòng/dự án/action
+        const personal = input.personal === true || scope === 'personal'
         let workspaceId = null
-        if (scope === 'department') workspaceId = departmentsById[input.departmentId]?.workspaceId || null
-        else if (scope === 'channel') workspaceId = input.channelId || null
+        if (!personal && scope === 'department') workspaceId = departmentsById[input.departmentId]?.workspaceId || null
+        else if (!personal && scope === 'channel') workspaceId = input.channelId || null
         const isScorable = input.isScorable === true
         const dto = {
           title: input.title || '(Chưa đặt tên)',
           description: input.description || '',
           expectedOutput: input.expectedOutput || '',
+          personal,
           workspaceId,
-          orgUnitId: input.orgUnitId ?? (scope === 'department' ? input.departmentId : undefined),
-          projectId: input.projectId ?? (scope === 'channel' ? input.channelId : undefined),
-          actionId: input.actionId || undefined,
-          section: scope === 'department' ? input.section || undefined : undefined,
+          orgUnitId: personal ? undefined : (input.orgUnitId ?? (scope === 'department' ? input.departmentId : undefined)),
+          projectId: personal ? undefined : (input.projectId ?? (scope === 'channel' ? input.channelId : undefined)),
+          actionId: personal ? undefined : (input.actionId || undefined),
+          section: !personal && scope === 'department' ? input.section || undefined : undefined,
           assigneeId: input.assigneeId || me,
           priority: input.priority || 'normal',
           reviewRequired: isScorable ? true : (input.reviewRequired ?? input.completionMode === 'review_required'),
