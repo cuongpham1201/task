@@ -602,7 +602,7 @@ function AttachmentsSection({ task }) {
   const [busy, setBusy] = useState(false)
   const fileRef = useRef()
   const camRef = useRef()
-  const canAttach = perms.comment(task)
+  const canAttach = perms.attach(task)
 
   const load = () => fetchAttachments(task.id).then(setItems).catch(() => {})
   useEffect(() => { load() /* eslint-disable-next-line */ }, [task.id])

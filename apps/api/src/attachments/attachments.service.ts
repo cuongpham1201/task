@@ -44,7 +44,8 @@ export class AttachmentsService {
     if (!file) throw new BadRequestException('Không có tệp')
     if (file.size > MAX_BYTES) throw new BadRequestException('Tệp vượt quá 25MB')
     const task = await this.loadTask(taskId)
-    this.policy.assert(await this.policy.canView(me, task), 'Không có quyền đính kèm')
+    // A: chỉ người TRONG CUỘC được đính kèm (người xem theo phòng chỉ comment, không đưa file)
+    this.policy.assert(await this.policy.canAttach(me, task), 'Chỉ người tham gia công việc mới đính kèm tệp')
     const safe = (file.originalname || 'file').replace(/[^\w.\-]+/g, '_').slice(-120)
     const key = `${taskId}/${randomUUID()}-${safe}`
     const abs = join(UPLOAD_DIR, key)

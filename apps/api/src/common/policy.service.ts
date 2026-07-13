@@ -63,6 +63,24 @@ export class PolicyService {
     return this.managesProject(me, task.projectId)
   }
 
+  /**
+   * A (13/07): đính kèm/xóa tệp = NGƯỜI TRONG CUỘC (participant) hoặc quản lý/admin —
+   * KHÔNG cho người chỉ xem theo phòng (họ vẫn comment được, chỉ không đưa tài liệu vào).
+   * Trong cuộc = admin ∨ creator ∨ quản lý org/dự án ∨ assignee ∨ reviewer ∨ collaborator ∨ watcher.
+   */
+  async canAttach(me: Me, task: TaskLike): Promise<boolean> {
+    if (await this.canManage(me, task)) return true // admin ∨ creator ∨ quản lý org/dự án
+    if (task.assigneeId === me.id) return true
+    if (task.reviewerId === me.id) return true
+    if (task.id) {
+      const inv = await this.prisma.taskCollaborator.findFirst({ where: { taskId: task.id, userId: me.id } })
+      if (inv) return true
+      const w = await this.prisma.taskWatcher.findFirst({ where: { taskId: task.id, userId: me.id } })
+      if (w) return true
+    }
+    return false
+  }
+
   async canComment(me: Me, task: TaskLike): Promise<boolean> {
     return this.canView(me, task)
   }

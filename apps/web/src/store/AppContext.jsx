@@ -291,6 +291,12 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
         updateStatus: (task) => canUpdateStatus(currentUser, task, managedIds),
         subtasks: (task) => canWorkSubtasks(currentUser, task, managedIds),
         comment: (task) => canComment(currentUser, task),
+        // A: đính kèm chỉ người TRONG CUỘC (khớp backend canAttach) — người xem theo phòng chỉ comment
+        attach: (task) => !!currentUser && (
+          canManageTask(currentUser, task, managedIds) ||
+          task.assigneeId === me || task.reviewerId === me ||
+          (task.collaboratorIds || []).includes(me) || (task.watcherIds || []).includes(me)
+        ),
         review: (task) => canReview(task),
         createDeptTask: (departmentId) => canCreateDeptTask(currentUser, departmentId, state.departments),
         createChannelTask: (channel) => canCreateChannelTask(currentUser, channel),
