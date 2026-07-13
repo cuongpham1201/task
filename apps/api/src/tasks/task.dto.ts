@@ -32,6 +32,8 @@ export class CreateTaskDto {
   @IsOptional() @IsString() reviewerId?: string
   // A (13/07): việc CÁ NHÂN riêng tư → KHÔNG gắn đơn vị/dự án (chỉ người liên quan thấy)
   @IsOptional() @IsBoolean() personal?: boolean
+  // B (13/07): tạo ở dạng NHÁP (quick-add) — chỉ người tạo thấy, không bắn thông báo tới khi kích hoạt
+  @IsOptional() @IsBoolean() draft?: boolean
 }
 
 export class StatusDto {

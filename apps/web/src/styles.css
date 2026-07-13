@@ -1183,3 +1183,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .reminder-field { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .reminder-label { min-width: 320px; font-weight: 600; font-size: 13.5px; display: inline-flex; align-items: center; gap: 6px; }
 @media (max-width: 700px) { .reminder-label { min-width: 100%; } }
+
+/* B: banner task nháp */
+.draft-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; margin-bottom: 12px; border-radius: 8px; background: var(--amber-soft, #fdf3d8); border: 1px solid var(--amber, #d9a514); font-size: 13px; }
+.draft-banner .btn { white-space: nowrap; }

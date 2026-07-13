@@ -173,6 +173,7 @@ export class TasksService {
           kpiWeight: isScorable ? dto.kpiWeight : null,
           startDate: dto.startDate ? new Date(dto.startDate) : null,
           dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
+          isDraft: dto.draft === true,
         },
       })
       if (dto.collaboratorIds?.length) {
@@ -186,14 +187,16 @@ export class TasksService {
           data: dto.subtasks.map((title, i) => ({ taskId: created.id, title, assigneeId: created.assigneeId, sortOrder: i })),
         })
       }
+      // B: NHÁP → chỉ ghi activity 'create', KHÔNG bắn thông báo tới ai (kích hoạt sau mới bắn)
       await this.notifications.emit(tx, {
-        task: created, actorId: me.id, action: 'create', notifyType: 'task_assigned',
-        extraRecipients: reviewerId ? [reviewerId] : [], // báo người được chỉ định nghiệm thu
+        task: created, actorId: me.id, action: 'create',
+        notifyType: created.isDraft ? null : 'task_assigned',
+        extraRecipients: created.isDraft ? [] : (reviewerId ? [reviewerId] : []),
       })
       return created
     })
-    // Teams Activity (fire-and-forget, SAU commit): giao việc cho assignee
-    this.teams.sendMany([{
+    // Teams Activity (fire-and-forget, SAU commit): giao việc cho assignee — KHÔNG gửi nếu nháp
+    if (!task.isDraft) this.teams.sendMany([{
       type: 'taskAssigned', recipientUserId: task.assigneeId, actorUserId: me.id,
       targetType: 'task', targetId: task.id, taskInfo: task.title,
       previewText: 'Bạn được giao một công việc mới', path: this.taskPath(task.id),
@@ -304,8 +307,10 @@ export class TasksService {
     this.policy.assert(await this.policy.canManage(me, task), 'Không có quyền đổi người phụ trách')
     await this.prisma.$transaction(async (tx) => {
       await tx.task.update({ where: { id }, data: { assigneeId: dto.assigneeId } })
-      await this.notifications.emit(tx, { task: { ...task, assigneeId: dto.assigneeId }, actorId: me.id, action: 'assign', metadata: { from: task.assigneeId, to: dto.assigneeId }, notifyType: 'task_assigned', extraRecipients: [dto.assigneeId] })
+      // B: task nháp → đổi assignee im lặng (chưa bắn), kích hoạt mới báo
+      await this.notifications.emit(tx, { task: { ...task, assigneeId: dto.assigneeId }, actorId: me.id, action: 'assign', metadata: { from: task.assigneeId, to: dto.assigneeId }, notifyType: task.isDraft ? null : 'task_assigned', extraRecipients: task.isDraft ? [] : [dto.assigneeId] })
     })
+    if (task.isDraft) return this.withCollaborators(id)
     // Teams Activity: giao lại cho người thực hiện mới
     this.teams.sendMany([{
       type: 'taskAssigned', recipientUserId: dto.assigneeId, actorUserId: me.id,
@@ -330,11 +335,11 @@ export class TasksService {
       if (added.length) await tx.taskCollaborator.createMany({ data: added.map((userId) => ({ taskId: id, userId })), skipDuplicates: true })
       await this.notifications.emit(tx, {
         task, actorId: me.id, action: 'collaborator', metadata: { from: current, to: ids },
-        notifyType: added.length ? 'task_assigned' : null, extraRecipients: added,
+        notifyType: added.length && !task.isDraft ? 'task_assigned' : null, extraRecipients: task.isDraft ? [] : added,
       })
     })
-    // Teams Activity cho người MỚI được thêm phối hợp (trước đây thiếu — chỉ có in-app)
-    if (added.length) {
+    // Teams Activity cho người MỚI được thêm phối hợp — KHÔNG gửi nếu task nháp
+    if (added.length && !task.isDraft) {
       this.teams.sendMany(added.map((userId) => ({
         type: 'taskAssigned' as const, recipientUserId: userId, actorUserId: me.id,
         targetType: 'task' as const, targetId: id, taskInfo: task.title,
@@ -482,6 +487,32 @@ export class TasksService {
         extraRecipients: newReviewer ? [newReviewer] : [],
       })
     })
+    return this.withCollaborators(id)
+  }
+
+  /** B: KÍCH HOẠT task nháp → hiện theo phạm vi thật + bắn thông báo GỘP 1 lần. */
+  async activate(me: Me, id: string) {
+    const task = await this.load(id)
+    this.policy.assert(await this.policy.canManage(me, task), 'Không có quyền kích hoạt công việc này')
+    if (!task.isDraft) return this.withCollaborators(id) // đã kích hoạt rồi → no-op
+    const collabs = (await this.prisma.taskCollaborator.findMany({ where: { taskId: id }, select: { userId: true } })).map((c) => c.userId)
+    await this.prisma.$transaction(async (tx) => {
+      await tx.task.update({ where: { id }, data: { isDraft: false } })
+      // 1 thông báo gộp cho người thực hiện + phối hợp + người nghiệm thu (emit gom Set, không trùng)
+      await this.notifications.emit(tx, {
+        task, actorId: me.id, action: 'assign', metadata: { activated: true },
+        notifyType: 'task_assigned',
+        extraRecipients: [task.assigneeId, ...collabs, ...(task.reviewerId ? [task.reviewerId] : [])],
+      })
+    })
+    // Teams: báo người thực hiện + phối hợp (bỏ chính actor)
+    const teamsTargets = [...new Set([task.assigneeId, ...collabs])].filter((u) => u !== me.id)
+    this.teams.sendMany(teamsTargets.map((userId) => ({
+      type: 'taskAssigned' as const, recipientUserId: userId, actorUserId: me.id,
+      targetType: 'task' as const, targetId: id, taskInfo: task.title,
+      previewText: userId === task.assigneeId ? 'Bạn được giao một công việc' : 'Bạn được thêm làm người phối hợp',
+      path: this.taskPath(id), eventSuffix: `activate-${userId}`,
+    })))
     return this.withCollaborators(id)
   }
 

@@ -48,7 +48,7 @@ export default function TaskDetailPanel() {
   const {
     state, usersById, currentUser, perms, getTask, getSubtasks, getComments, getActivities,
     selectTask, updateTaskField, setStatus, toggleComplete,
-    assignTask, setCollaborators, setTaskOrgUnit, setDueDate, setPriority, submitTask, reviewTask,
+    assignTask, setCollaborators, setTaskOrgUnit, setDueDate, setPriority, submitTask, reviewTask, activateTask,
     addComment, toggleSubtask, addSubtask, taskContextLabel,
     archiveTask, updateSubtask, deleteSubtask, editComment, deleteComment,
     actionsById, channelsById, actionsForOrg, orgUnitName, watchTask, unwatchTask,
@@ -182,6 +182,14 @@ export default function TaskDetailPanel() {
         </div>
 
         <div className="detail-body">
+          {task.isDraft && (
+            <div className="draft-banner">
+              <span><strong>Nháp</strong> — chỉ mình bạn thấy. Soạn xong (người thực hiện, hạn, mô tả…) rồi bấm để giao & thông báo.</span>
+              {canManage && (
+                <button className="btn btn-primary" onClick={() => activateTask(task.id)}>Bắt đầu giao</button>
+              )}
+            </div>
+          )}
           <h2 className={`detail-title ${isDone ? 'done' : ''}`}>
             {task.title}
             {canManage && (

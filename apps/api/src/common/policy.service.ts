@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { VisibilityService, type Me } from './visibility.service'
 
 // Task chỉ cần các chiều này để xét quyền (freeze §7/§8).
-type TaskLike = { id?: string; creatorId: string; assigneeId: string; orgUnitId: string | null; projectId: string | null; reviewerId?: string | null }
+type TaskLike = { id?: string; creatorId: string; assigneeId: string; orgUnitId: string | null; projectId: string | null; reviewerId?: string | null; isDraft?: boolean }
 type ActionLike = { orgUnitId: string; ownerId: string; createdById: string }
 
 /**
@@ -87,6 +87,8 @@ export class PolicyService {
 
   async canView(me: Me, task: TaskLike): Promise<boolean> {
     if (me.role === 'admin') return true
+    // B: task nháp chỉ người tạo thấy
+    if ((task as any).isDraft && task.creatorId !== me.id) return false
     if (task.creatorId === me.id || task.assigneeId === me.id) return true
     // P0-2: reviewer chỉ định xem được task cần mình nghiệm thu (KHÔNG mở rộng sang cả dự án/phòng)
     if (task.reviewerId === me.id) return true

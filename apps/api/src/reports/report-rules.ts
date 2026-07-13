@@ -64,7 +64,7 @@ export function parseRange(from?: string, to?: string): { from?: Date; to?: Date
 
 /** Where TASK dùng chung cho MỌI chỉ số + drill-down (đảm bảo khớp số tuyệt đối). */
 export function taskBaseWhere(f: ReportFilters): any {
-  const where: any = { archived: false, orgUnitId: { in: f.orgUnitIds } }
+  const where: any = { archived: false, isDraft: false, orgUnitId: { in: f.orgUnitIds } } // B: bỏ task nháp khỏi báo cáo
   if (f.from || f.to) {
     where.createdAt = { ...(f.from ? { gte: f.from } : {}), ...(f.to ? { lte: f.to } : {}) }
   }

@@ -105,6 +105,12 @@ export class TasksController {
     return this.tasks.updateFields(await this.me(c), id, dto)
   }
 
+  // B: kích hoạt task nháp
+  @Post(':id/activate')
+  async activate(@AuthUser() c: AuthClaims, @Param('id') id: string) {
+    return this.tasks.activate(await this.me(c), id)
+  }
+
   @Delete(':id')
   async remove(@AuthUser() c: AuthClaims, @Param('id') id: string) {
     return this.tasks.archive(await this.me(c), id)

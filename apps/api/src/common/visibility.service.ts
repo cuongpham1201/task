@@ -119,14 +119,20 @@ export class VisibilityService {
     if (me.role === 'admin') return {}
     const [orgIds, projIds] = await Promise.all([this.visibleOrgUnitIds(me), this.myProjectIds(me)])
     return {
-      OR: [
-        { creatorId: me.id },
-        { assigneeId: me.id },
-        { reviewerId: me.id }, // P0-2: người nghiệm thu chỉ định thấy task của mình
-        { collaborators: { some: { userId: me.id } } },
-        { watchers: { some: { userId: me.id } } },
-        { orgUnitId: { in: orgIds } },
-        { projectId: { in: projIds } },
+      AND: [
+        {
+          OR: [
+            { creatorId: me.id },
+            { assigneeId: me.id },
+            { reviewerId: me.id }, // P0-2: người nghiệm thu chỉ định thấy task của mình
+            { collaborators: { some: { userId: me.id } } },
+            { watchers: { some: { userId: me.id } } },
+            { orgUnitId: { in: orgIds } },
+            { projectId: { in: projIds } },
+          ],
+        },
+        // B: task NHÁP chỉ người tạo thấy (chưa kích hoạt → chưa hiện cho ai khác)
+        { OR: [{ isDraft: false }, { creatorId: me.id }] },
       ],
     }
   }

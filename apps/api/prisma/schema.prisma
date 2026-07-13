@@ -345,6 +345,9 @@ model Task {
   status          TaskStatus     @default(todo)
   completionMode  CompletionMode @default(self) @map("completion_mode") // DEPRECATED — dùng reviewRequired
   reviewRequired  Boolean        @default(false) @map("review_required")
+  // B (13/07): task tạo bằng "Thêm nhanh" = NHÁP — chỉ người tạo thấy, sửa KHÔNG bắn
+  // thông báo; bấm "Bắt đầu giao" → isDraft=false + bắn thông báo GỘP 1 lần.
+  isDraft         Boolean        @default(false) @map("is_draft")
   // P0-2 (12/07/2026): người nghiệm thu CHỈ ĐỊNH — bắt buộc khi reviewRequired=true.
   // 1 reviewer (không bảng quan hệ) vì TaskReview là quyết định đơn 1-1.
   // Task cũ backfill reviewer = creator (đúng người duyệt mặc định của rule cũ).

@@ -423,6 +423,7 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
           priority: input.priority || 'normal',
           reviewRequired: isScorable ? true : (input.reviewRequired ?? input.completionMode === 'review_required'),
           reviewerId: input.reviewerId || undefined,
+          draft: input.draft === true || undefined,
           isScorable: isScorable || undefined,
           kpiDefinitionId: isScorable ? input.kpiDefinitionId : undefined,
           kpiWeight: isScorable ? input.kpiWeight : undefined,
@@ -489,6 +490,14 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
           toast('Đã chuyển đơn vị yêu cầu', 'success')
         })
       },
+
+      // B: kích hoạt task nháp → hiện theo phạm vi + bắn thông báo gộp
+      activateTask: (id, onOk) =>
+        persist(post(`/tasks/${id}/activate`, {}), (t) => {
+          dispatch({ type: 'REPLACE_TASK', task: t })
+          toast('Đã bắt đầu giao việc — thông báo đã gửi', 'success')
+          onOk?.(t)
+        }),
 
       setDueDate: (id, dueDate) => {
         const task = findTask(id)
