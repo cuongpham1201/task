@@ -270,12 +270,12 @@ export default function TaskDetailPanel() {
                 <select value={task.projectId || ''} onChange={(e) => updateTaskField(task.id, { projectId: e.target.value || null })}>
                   <option value="">— Không thuộc dự án —</option>
                   {task.projectId && !state.channels.some((c) => c.id === task.projectId) && (
-                    <option value={task.projectId}>{channelsById[task.projectId]?.name || 'Dự án hiện tại'}</option>
+                    <option value={task.projectId}>{channelsById[task.projectId]?.name || task.projectName || 'Dự án hiện tại'}</option>
                   )}
                   {state.channels.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               ) : (
-                task.projectId ? (channelsById[task.projectId]?.name || '—') : <span className="muted">Không</span>
+                task.projectId ? (channelsById[task.projectId]?.name || task.projectName || '—') : <span className="muted">Không</span>
               )}
             </Field>
             <Field label="Action">

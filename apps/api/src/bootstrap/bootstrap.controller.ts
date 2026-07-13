@@ -25,7 +25,7 @@ export class BootstrapController {
     const departmentId = t.orgUnitId ?? (workspace?.type === 'org_unit' ? workspace.orgUnitId : null)
     const channelId = t.projectId ?? (workspace?.type === 'project' ? workspace.id : null)
     const scope = channelId ? 'channel' : (workspace?.type === 'org_unit' ? 'department' : 'personal')
-    return { ...rest, scope, departmentId, channelId, collaboratorIds: collaborators.map((c: any) => c.userId), watcherIds: (watchers ?? []).map((w: any) => w.userId), orgUnitName: orgUnit?.name ?? null, actionTitle: action?.title ?? null }
+    return { ...rest, scope, departmentId, channelId, collaboratorIds: collaborators.map((c: any) => c.userId), watcherIds: (watchers ?? []).map((w: any) => w.userId), orgUnitName: orgUnit?.name ?? null, actionTitle: action?.title ?? null, projectName: workspace?.type === 'project' ? workspace.name : null }
   }
 
   @Get()

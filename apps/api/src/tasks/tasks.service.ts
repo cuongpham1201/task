@@ -49,6 +49,9 @@ export class TasksService {
       ...rest, scope, departmentId, channelId, collaboratorIds,
       watcherIds: (watchers ?? []).map((w: any) => w.userId),
       orgUnitName: orgUnit?.name ?? null, actionTitle: action?.title ?? null,
+      // A: tên dự án luôn kèm task (workspace project = tên dự án) → người xem theo phòng
+      // cũng thấy "Dự án: X" read-only, không cần là thành viên dự án.
+      projectName: workspace?.type === 'project' ? workspace.name : null,
     }
   }
 
