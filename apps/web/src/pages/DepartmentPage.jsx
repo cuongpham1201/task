@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { List, Kanban, CalendarDays, BarChart3, Plus } from 'lucide-react'
+import { List, Kanban, Layers, CalendarDays, BarChart3, Plus } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import TaskTable from '../components/task/TaskTable'
 import QuickAddTask from '../components/task/QuickAddTask'
@@ -15,6 +15,7 @@ import { TaskDashboard } from '../components/shared/charts'
 
 const VIEWS = [
   { key: 'list', label: 'Danh sách', icon: List },
+  { key: 'section', label: 'Section', icon: Layers },
   { key: 'board', label: 'Bảng', icon: Kanban },
   { key: 'calendar', label: 'Lịch', icon: CalendarDays },
   { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
@@ -98,6 +99,12 @@ export default function DepartmentPage() {
           groupBySection
           emptyText="Phòng ban chưa có công việc nào"
         />
+      )}
+      {view === 'section' && perms.createDeptTask(dept.id) && (
+        <QuickAddTask scope="department" departmentId={dept.id} placeholder="Thêm nhanh việc cho phòng… (Enter)" />
+      )}
+      {view === 'section' && (
+        <TaskTable tasks={tasks} showContext={false} groupByAppSection emptyText="Phòng ban chưa có công việc nào" />
       )}
       {view === 'board' && <KanbanBoard tasks={tasks} />}
       {view === 'calendar' && <CalendarView tasks={tasks} />}

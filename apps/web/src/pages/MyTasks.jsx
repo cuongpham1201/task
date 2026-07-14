@@ -73,7 +73,7 @@ export default function MyTasks() {
 
   // Nhóm (nếu chọn)
   const groups = useMemo(() => {
-    if (groupBy === 'none') return null
+    if (groupBy === 'none' || groupBy === 'section') return null // 'section' render bằng bảng DnD riêng
     const keyOf = (t) => {
       if (groupBy === 'status') return STATUS[t.status]?.label || t.status
       if (groupBy === 'action') return t.actionTitle || '— Không thuộc Action'
@@ -111,13 +111,16 @@ export default function MyTasks() {
         </select>
         <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
           <option value="none">Nhóm: Không</option>
+          <option value="section">Nhóm: Section (kéo-thả)</option>
           <option value="status">Nhóm: Trạng thái</option>
           <option value="action">Nhóm: Action</option>
           <option value="project">Nhóm: Dự án</option>
         </select>
       </div>
 
-      {groups ? (
+      {groupBy === 'section' ? (
+        <TaskTable tasks={filtered} groupByAppSection emptyText="Không có công việc nào trong mục này" />
+      ) : groups ? (
         groups.map(([name, items]) => (
           <div key={name} className="mytasks-group">
             <h3 className="mytasks-group-title">{name} <span className="section-count">{items.length}</span></h3>
