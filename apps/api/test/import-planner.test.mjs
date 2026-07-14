@@ -135,6 +135,23 @@ test('followers → watchers (chỉ user active)', () => {
   assert.deepEqual(p.items[0].watcherIds, ['appF1'])
 })
 
+test('org theo section (project=Khối): mỗi section→1 đơn vị; không map→default', () => {
+  const mk = (gid, sec) => task({ gid, name: gid, assignee: { gid: 'u1', name: 'U' }, memberships: [{ project: { gid: 'SRC', name: 'Khối' }, section: { name: sec } }] })
+  const data = [mk('a', 'Ban Tài Chính'), mk('b', 'Ban Pháp Chế'), mk('c', 'Khác')]
+  const c = cfg({ userMap: { u1: 'app1' }, orgBySection: { 'Ban Tài Chính': 'orgTC', 'Ban Pháp Chế': 'orgPC' } })
+  const p = plan(data, c, ctx({ activeUserIds: new Set(['app1']), defaultOrgUnitId: 'orgDefault' }))
+  assert.equal(p.items.find((i) => i.gid === 'a').orgUnitId, 'orgTC')
+  assert.equal(p.items.find((i) => i.gid === 'b').orgUnitId, 'orgPC')
+  assert.equal(p.items.find((i) => i.gid === 'c').orgUnitId, 'orgDefault', 'section không map → default')
+})
+
+test('override orgUnit thắng cả section-map', () => {
+  const data = [task({ gid: 'a', name: 'A', assignee: { gid: 'u1', name: 'U' }, memberships: [{ project: { gid: 'SRC', name: 'K' }, section: { name: 'Ban A' } }] })]
+  const c = cfg({ userMap: { u1: 'app1' }, orgBySection: { 'Ban A': 'orgA' }, overrides: { a: { orgUnitId: 'orgOverride' } } })
+  const p = plan(data, c, ctx({ activeUserIds: new Set(['app1']), defaultOrgUnitId: 'orgDefault' }))
+  assert.equal(p.items[0].orgUnitId, 'orgOverride')
+})
+
 test('override skip → skip; override assignee/status/priority áp dụng', () => {
   const data = [task({ gid: 't1', name: 'A', ...inSrc(), assignee: { gid: 'u1', name: 'U' } })]
   const p = plan(data, cfg({ userMap: { u1: 'app1' }, overrides: { t1: { assigneeId: 'app2', status: 'done', priority: 'high' } } }), ctx({ activeUserIds: new Set(['app1', 'app2']) }))

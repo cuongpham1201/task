@@ -117,6 +117,16 @@ test('custom fields gom theo gid + cờ looksLikePriority', () => {
   assert.equal(r.tasks[0].customFieldValues.cf1, 'High')
 })
 
+test('sectionByProject + sectionsByProject (project=Khối, section=phòng ban)', () => {
+  const r = norm.normalize([task({ gid: '1', name: 'A', memberships: [
+    { project: { gid: 'K', name: 'Khối' }, section: { name: 'Ban A' } },
+    { project: { gid: 'P8', name: 'Ban' }, section: { name: 'Công việc BP' } },
+  ] })])
+  assert.equal(r.tasks[0].sectionByProject.K, 'Ban A')
+  assert.equal(r.tasks[0].sectionByProject.P8, 'Công việc BP')
+  assert.equal(r.sectionsByProject.K[0].name, 'Ban A')
+})
+
 test('mapPriority EN/VI', () => {
   assert.equal(consts.mapPriority('Low').value, 'low')
   assert.equal(consts.mapPriority('Medium').value, 'normal')

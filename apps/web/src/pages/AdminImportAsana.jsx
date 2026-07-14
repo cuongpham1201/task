@@ -26,6 +26,7 @@ const defaultConfig = () => ({
   sourceProjectGid: '',
   fieldMap: { notes: true, startDate: true, dueDate: true, followers: true, priorityFieldGid: null, tags: 'ignore', sectionMode: 'ignore', sectionSingle: null, sectionMap: {} },
   userMap: {},
+  orgBySection: {},
   missingAssigneePolicy: 'default',
   defaultAssigneeId: null,
   overrides: {},
@@ -204,6 +205,14 @@ function Step2({ parseRes, config, patchConfig, targetMode, setTargetMode, targe
   useEffect(() => { apiFetch('/admin/org-units').then((r) => setOrgUnits((r || []).filter((o) => o.active))).catch(() => setOrgUnits([])) }, [])
   const projects = parseRes.projects || []
   const users = parseRes.users || []
+  const srcSections = (parseRes.sectionsByProject && parseRes.sectionsByProject[config.sourceProjectGid]) || []
+  const orgOptGroups = (
+    ['company', 'block', 'department'].map((t) => (
+      <optgroup key={t} label={ORG_TYPE[t] || t}>
+        {orgUnits.filter((o) => o.type === t).map((o) => <option key={o.id} value={o.id}>{o.name}{o.code ? ` (${o.code})` : ''}</option>)}
+      </optgroup>
+    ))
+  )
 
   return (
     <>
@@ -222,14 +231,33 @@ function Step2({ parseRes, config, patchConfig, targetMode, setTargetMode, targe
           <label>Đơn vị chịu trách nhiệm {targetMode === 'none' && <span className="req">*</span>}</label>
           <select value={defaultOrgUnitId} onChange={(e) => setDefaultOrgUnitId(e.target.value)}>
             <option value="">— Không gán đơn vị —</option>
-            {['company', 'block', 'department'].map((t) => (
-              <optgroup key={t} label={ORG_TYPE[t] || t}>
-                {orgUnits.filter((o) => o.type === t).map((o) => <option key={o.id} value={o.id}>{o.name}{o.code ? ` (${o.code})` : ''}</option>)}
-              </optgroup>
-            ))}
+            {orgOptGroups}
           </select>
           <span className="form-hint muted">Task import thuộc đơn vị này (giống việc phòng ban). Áp cho mọi task, có thể đổi từng task ở bước xem trước.</span>
         </div>
+
+        {srcSections.length > 0 && (
+          <div className="form-field">
+            <label>Gán đơn vị theo section <span className="muted" style={{ fontWeight: 400 }}>(khi project = Khối, section = phòng/ban — tùy chọn)</span></label>
+            <span className="form-hint muted">Mỗi section là một phòng/ban thì map section → đơn vị tương ứng. Section không map → dùng đơn vị mặc định ở trên.</span>
+            <div className="table-wrap" style={{ marginTop: 6 }}>
+              <table className="task-table settings-table">
+                <thead><tr><th>Section (dự án nguồn)</th><th>Số task</th><th>→ Đơn vị chịu trách nhiệm</th></tr></thead>
+                <tbody>
+                  {srcSections.map((s) => (
+                    <tr key={s.name}>
+                      <td>{s.name}</td><td>{s.count}</td>
+                      <td><select value={config.orgBySection[s.name] || ''} onChange={(e) => patchConfig({ orgBySection: { ...config.orgBySection, [s.name]: e.target.value || null } })}>
+                        <option value="">— Dùng đơn vị mặc định —</option>
+                        {orgOptGroups}
+                      </select></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         <div className="form-field">
           <label>Dự án đích trong App <span className="muted" style={{ fontWeight: 400 }}>(tùy chọn)</span></label>

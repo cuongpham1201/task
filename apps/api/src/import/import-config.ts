@@ -55,23 +55,36 @@ function sanitizeOverrides(raw: any): Record<string, TaskOverride> {
   return out
 }
 
-export function sanitizeConfig(raw: any): ImportConfig {
-  const r = raw && typeof raw === 'object' ? raw : {}
-  const userMap: Record<string, string | null> = {}
-  if (r.userMap && typeof r.userMap === 'object') {
-    for (const [k, v] of Object.entries(r.userMap)) {
+function sanitizeStringMap(raw: any): Record<string, string | null> {
+  const out: Record<string, string | null> = {}
+  if (raw && typeof raw === 'object') {
+    for (const [k, v] of Object.entries(raw)) {
       if (DANGEROUS.has(k)) continue
-      userMap[k] = typeof v === 'string' && v ? v : null
+      out[k] = typeof v === 'string' && v ? v : null
     }
   }
+  return out
+}
+
+export function sanitizeConfig(raw: any): ImportConfig {
+  const r = raw && typeof raw === 'object' ? raw : {}
   return {
     sourceProjectGid: str(r.sourceProjectGid) || '',
     fieldMap: sanitizeFieldMap(r.fieldMap),
-    userMap,
+    userMap: sanitizeStringMap(r.userMap),
+    orgBySection: sanitizeStringMap(r.orgBySection),
     missingAssigneePolicy: r.missingAssigneePolicy === 'skip' ? 'skip' : 'default',
     defaultAssigneeId: str(r.defaultAssigneeId),
     overrides: sanitizeOverrides(r.overrides),
   }
+}
+
+/** Org-unit id được tham chiếu trong config (để nạp + kiểm active). */
+export function referencedOrgIds(cfg: ImportConfig): string[] {
+  const ids = new Set<string>()
+  for (const v of Object.values(cfg.orgBySection)) if (v) ids.add(v)
+  for (const ov of Object.values(cfg.overrides)) if (ov.orgUnitId) ids.add(ov.orgUnitId)
+  return [...ids]
 }
 
 /** Tập user-id được tham chiếu trong config (để nạp + kiểm active). */

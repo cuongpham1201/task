@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { parseAsanaJson } from './asana-parser'
 import { normalize, type NormalizeResult } from './asana-normalizer'
 import { buildPlan, type ImportConfig, type ImportPlan, type PlanContext, type PlanItem } from './import-planner'
-import { sanitizeConfig, referencedUserIds } from './import-config'
+import { sanitizeConfig, referencedUserIds, referencedOrgIds } from './import-config'
 import { IMPORT_LIMITS, IMPORT_SOURCE } from './import.constants'
 
 const dateOnly = (s: string | null): Date | undefined => (s ? new Date(s + 'T00:00:00Z') : undefined)
@@ -66,6 +66,7 @@ export class ImportService {
       users: normalized.users,
       customFields: normalized.customFields,
       sections: normalized.sections,
+      sectionsByProject: normalized.sectionsByProject,
       warnings: normalized.warnings.slice(0, 200),
     }
   }
@@ -97,6 +98,12 @@ export class ImportService {
     if (defaultOrgUnitId) {
       const ou = await this.prisma.orgUnit.findUnique({ where: { id: defaultOrgUnitId }, select: { active: true } })
       if (!ou?.active) throw new BadRequestException('Đơn vị mặc định không hợp lệ')
+    }
+    // Đơn vị map theo section (dạng project=Khối) — mọi org id phải tồn tại + active.
+    const orgIds = referencedOrgIds(cfg)
+    if (orgIds.length) {
+      const found = await this.prisma.orgUnit.findMany({ where: { id: { in: orgIds }, active: true }, select: { id: true } })
+      if (found.length !== orgIds.length) throw new BadRequestException('Có đơn vị (map theo section) không hợp lệ hoặc đã ngừng hoạt động')
     }
 
     const refIds = referencedUserIds(cfg)

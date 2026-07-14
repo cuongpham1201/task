@@ -42,6 +42,7 @@ export interface ImportConfig {
   sourceProjectGid: string
   fieldMap: ImportFieldMap
   userMap: Record<string, string | null> // asanaUserGid → appUserId | null
+  orgBySection: Record<string, string | null> // tên section (trong dự án nguồn) → orgUnitId
   missingAssigneePolicy: 'default' | 'skip'
   defaultAssigneeId: string | null
   overrides: Record<string, TaskOverride>
@@ -146,17 +147,30 @@ export function buildPlan(normalized: NormalizeResult, config: ImportConfig, ctx
     return m.value
   }
 
+  // Section của task TRONG dự án nguồn (ưu tiên) — dùng cho cả map enum lẫn map đơn vị.
+  const sectionInSource = (t: NormalizedTask): string | null => t.sectionByProject?.[source] || null
+
   const resolveSection = (t: NormalizedTask, ov: TaskOverride): AppTaskSection | null => {
     if (ov.section !== undefined) return ov.section
     const fm = config.fieldMap
     if (fm.sectionMode === 'single') return fm.sectionSingle ?? null
     if (fm.sectionMode === 'manual') {
-      for (const s of t.sections) {
+      const inSrc = sectionInSource(t)
+      const candidates = inSrc ? [inSrc, ...t.sections] : t.sections
+      for (const s of candidates) {
         const mapped = asSection(fm.sectionMap[s])
         if (mapped) return mapped
       }
     }
     return null
+  }
+
+  // Đơn vị: override > theo section (dự án nguồn) > mặc định. Cho phép project=Khối, section=phòng ban.
+  const resolveOrg = (t: NormalizedTask, ov: TaskOverride): string | null => {
+    if (ov.orgUnitId !== undefined) return ov.orgUnitId
+    const inSrc = sectionInSource(t)
+    if (inSrc && config.orgBySection && config.orgBySection[inSrc]) return config.orgBySection[inSrc]
+    return ctx.defaultOrgUnitId
   }
 
   const mapWatchers = (t: NormalizedTask): string[] => {
@@ -282,7 +296,7 @@ export function buildPlan(normalized: NormalizeResult, config: ImportConfig, ctx
 
     if (kind === 'task') {
       item.section = resolveSection(t, ov)
-      item.orgUnitId = ov.orgUnitId !== undefined ? ov.orgUnitId : ctx.defaultOrgUnitId
+      item.orgUnitId = resolveOrg(t, ov)
       item.watcherIds = mapWatchers(t)
     } else {
       // Subtask app chỉ giữ title/done/assignee → cảnh báo field mất nếu có dữ liệu

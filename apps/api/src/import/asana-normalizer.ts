@@ -29,6 +29,7 @@ export interface NormalizedTask {
   parentGid: string | null
   projectGids: string[]
   sections: string[] // tên section (mọi project) — để map thủ công
+  sectionByProject: Record<string, string> // projectGid → tên section trong project đó
   permalink: string | null
   tags: string[]
   customFieldValues: Record<string, string> // fieldGid → display value
@@ -80,6 +81,7 @@ export interface NormalizeResult {
   users: NormalizedUser[]
   customFields: NormalizedCustomField[]
   sections: NormalizedSection[]
+  sectionsByProject: Record<string, NormalizedSection[]> // projectGid → sections trong project đó
   summary: NormalizeSummary
   warnings: string[]
 }
@@ -205,6 +207,7 @@ export function normalize(data: any[]): NormalizeResult {
   const userMap = new Map<string, NormalizedUser>()
   const cfMap = new Map<string, NormalizedCustomField>()
   const sectMap = new Map<string, NormalizedSection>()
+  const sectByProjMap = new Map<string, Map<string, number>>() // projectGid → (sectionName → count)
 
   const bumpUser = (u: any) => {
     const gid = gidOf(u)
@@ -278,6 +281,7 @@ export function normalize(data: any[]): NormalizeResult {
     // projects: projects[] + memberships[].project ; sections từ memberships[].section
     const projectGids = new Set<string>()
     const sections = new Set<string>()
+    const sectionByProject: Record<string, string> = {}
     if (Array.isArray(raw.projects)) for (const p of raw.projects) {
       const pg = bumpProject(p)
       if (pg) projectGids.add(pg)
@@ -292,6 +296,12 @@ export function normalize(data: any[]): NormalizeResult {
           const cur = sectMap.get(sName)
           if (cur) cur.count++
           else sectMap.set(sName, { name: sName, count: 1 })
+          if (pg) {
+            sectionByProject[pg] = sName // section của task TRONG project pg
+            let pm = sectByProjMap.get(pg)
+            if (!pm) { pm = new Map(); sectByProjMap.set(pg, pm) }
+            pm.set(sName, (pm.get(sName) || 0) + 1)
+          }
         }
       }
     }
@@ -344,6 +354,7 @@ export function normalize(data: any[]): NormalizeResult {
       sections: [...sections],
       permalink: str(raw.permalink_url) || null,
       tags,
+      sectionByProject,
       customFieldValues,
       occurrences: agg.count,
       conflict: agg.conflict,
@@ -372,6 +383,9 @@ export function normalize(data: any[]): NormalizeResult {
     users: [...userMap.values()].sort((a, b) => b.count - a.count),
     customFields: [...cfMap.values()].sort((a, b) => Number(b.looksLikePriority) - Number(a.looksLikePriority) || b.valueCount - a.valueCount),
     sections: [...sectMap.values()].sort((a, b) => b.count - a.count),
+    sectionsByProject: Object.fromEntries(
+      [...sectByProjMap].map(([pg, m]) => [pg, [...m.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)]),
+    ),
     summary,
     warnings,
   }
