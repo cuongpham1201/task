@@ -23,9 +23,14 @@ export interface ImportFieldMap {
   followers: boolean
   priorityFieldGid: string | null
   tags: 'ignore' | 'append'
+  // "Loại việc" (enum cố định)
   sectionMode: 'ignore' | 'single' | 'manual'
   sectionSingle: AppTaskSection | null
   sectionMap: Record<string, AppTaskSection | null>
+  // "Section" (danh sách chung admin) — Asana section → Section.id
+  appSectionMode: 'ignore' | 'single' | 'manual'
+  appSectionSingle: string | null
+  appSectionMap: Record<string, string | null>
 }
 
 export interface TaskOverride {
@@ -69,7 +74,8 @@ export interface PlanItem {
   assigneeId: string | null
   status: ImportTaskStatus
   priority: 'low' | 'normal' | 'high' | 'urgent'
-  section: AppTaskSection | null
+  section: AppTaskSection | null // "Loại việc" (enum)
+  sectionId: string | null // "Section" (danh sách chung)
   orgUnitId: string | null
   startOn: string | null
   dueOn: string | null
@@ -173,6 +179,17 @@ export function buildPlan(normalized: NormalizeResult, config: ImportConfig, ctx
     return ctx.defaultOrgUnitId
   }
 
+  // "Section" (danh sách chung): single = 1 cho tất cả; manual = theo section dự án nguồn.
+  const resolveAppSection = (t: NormalizedTask): string | null => {
+    const fm = config.fieldMap
+    if (fm.appSectionMode === 'single') return fm.appSectionSingle || null
+    if (fm.appSectionMode === 'manual') {
+      const inSrc = sectionInSource(t)
+      if (inSrc && fm.appSectionMap && fm.appSectionMap[inSrc]) return fm.appSectionMap[inSrc]
+    }
+    return null
+  }
+
   const mapWatchers = (t: NormalizedTask): string[] => {
     if (!config.fieldMap.followers) return []
     const out = new Set<string>()
@@ -186,7 +203,7 @@ export function buildPlan(normalized: NormalizeResult, config: ImportConfig, ctx
   const baseItem = (t: NormalizedTask, kind: 'task' | 'subtask'): PlanItem => ({
     gid: t.gid, kind, action: 'create', reason: null, parentGid: t.parentGid,
     title: '', description: '', assigneeId: null, status: t.completed ? 'done' : 'todo',
-    priority: 'normal', section: null, orgUnitId: null, startOn: null, dueOn: null,
+    priority: 'normal', section: null, sectionId: null, orgUnitId: null, startOn: null, dueOn: null,
     completedAt: t.completedAt, sourceCreatedAt: t.sourceCreatedAt, permalink: t.permalink, watcherIds: [], warnings: [],
   })
 
@@ -296,6 +313,7 @@ export function buildPlan(normalized: NormalizeResult, config: ImportConfig, ctx
 
     if (kind === 'task') {
       item.section = resolveSection(t, ov)
+      item.sectionId = resolveAppSection(t)
       item.orgUnitId = resolveOrg(t, ov)
       item.watcherIds = mapWatchers(t)
     } else {

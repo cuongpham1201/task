@@ -23,6 +23,13 @@ function sanitizeFieldMap(raw: any): ImportFieldMap {
       sectionMap[k] = section(v)
     }
   }
+  const appSectionMap: Record<string, string | null> = {}
+  if (r.appSectionMap && typeof r.appSectionMap === 'object') {
+    for (const [k, v] of Object.entries(r.appSectionMap)) {
+      if (DANGEROUS.has(k)) continue
+      appSectionMap[k] = typeof v === 'string' && v ? v : null
+    }
+  }
   return {
     notes: bool(r.notes, true),
     startDate: bool(r.startDate, true),
@@ -33,6 +40,9 @@ function sanitizeFieldMap(raw: any): ImportFieldMap {
     sectionMode: r.sectionMode === 'single' || r.sectionMode === 'manual' ? r.sectionMode : 'ignore',
     sectionSingle: section(r.sectionSingle),
     sectionMap,
+    appSectionMode: r.appSectionMode === 'single' || r.appSectionMode === 'manual' ? r.appSectionMode : 'ignore',
+    appSectionSingle: str(r.appSectionSingle),
+    appSectionMap,
   }
 }
 
@@ -84,6 +94,15 @@ export function referencedOrgIds(cfg: ImportConfig): string[] {
   const ids = new Set<string>()
   for (const v of Object.values(cfg.orgBySection)) if (v) ids.add(v)
   for (const ov of Object.values(cfg.overrides)) if (ov.orgUnitId) ids.add(ov.orgUnitId)
+  return [...ids]
+}
+
+/** Section (danh sách chung) id được tham chiếu trong config. */
+export function referencedSectionIds(cfg: ImportConfig): string[] {
+  const ids = new Set<string>()
+  const fm = cfg.fieldMap
+  if (fm.appSectionSingle) ids.add(fm.appSectionSingle)
+  for (const v of Object.values(fm.appSectionMap)) if (v) ids.add(v)
   return [...ids]
 }
 

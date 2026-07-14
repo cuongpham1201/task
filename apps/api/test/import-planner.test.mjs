@@ -5,8 +5,8 @@ import * as norm from '../dist/import/asana-normalizer.js'
 import * as planner from '../dist/import/import-planner.js'
 
 const task = (o) => ({ resource_type: 'task', ...o })
-const baseFieldMap = { notes: true, startDate: true, dueDate: true, followers: true, priorityFieldGid: null, tags: 'ignore', sectionMode: 'ignore', sectionSingle: null, sectionMap: {} }
-const cfg = (over = {}) => ({ sourceProjectGid: 'SRC', fieldMap: baseFieldMap, userMap: {}, missingAssigneePolicy: 'default', defaultAssigneeId: null, overrides: {}, ...over })
+const baseFieldMap = { notes: true, startDate: true, dueDate: true, followers: true, priorityFieldGid: null, tags: 'ignore', sectionMode: 'ignore', sectionSingle: null, sectionMap: {}, appSectionMode: 'ignore', appSectionSingle: null, appSectionMap: {} }
+const cfg = (over = {}) => ({ sourceProjectGid: 'SRC', fieldMap: baseFieldMap, userMap: {}, orgBySection: {}, missingAssigneePolicy: 'default', defaultAssigneeId: null, overrides: {}, ...over })
 const ctx = (over = {}) => ({ activeUserIds: new Set(), existingGids: new Set(), targetProjectId: null, defaultOrgUnitId: null, ...over })
 const plan = (data, c, x) => planner.buildPlan(norm.normalize(data), c, x)
 const inSrc = (extra = {}) => ({ projects: [{ gid: 'SRC', name: 'Nguồn' }], ...extra })
@@ -150,6 +150,19 @@ test('override orgUnit thắng cả section-map', () => {
   const c = cfg({ userMap: { u1: 'app1' }, orgBySection: { 'Ban A': 'orgA' }, overrides: { a: { orgUnitId: 'orgOverride' } } })
   const p = plan(data, c, ctx({ activeUserIds: new Set(['app1']), defaultOrgUnitId: 'orgDefault' }))
   assert.equal(p.items[0].orgUnitId, 'orgOverride')
+})
+
+test('Section (danh sách chung): single gán 1 cho tất cả; manual theo section nguồn', () => {
+  const data = [
+    task({ gid: 'a', name: 'A', assignee: { gid: 'u1', name: 'U' }, memberships: [{ project: { gid: 'SRC', name: 'K' }, section: { name: 'Nhóm 1' } }] }),
+    task({ gid: 'b', name: 'B', assignee: { gid: 'u1', name: 'U' }, memberships: [{ project: { gid: 'SRC', name: 'K' }, section: { name: 'Nhóm 2' } }] }),
+  ]
+  const single = plan(data, cfg({ userMap: { u1: 'app1' }, fieldMap: { ...baseFieldMap, appSectionMode: 'single', appSectionSingle: 'secX' } }), ctx({ activeUserIds: new Set(['app1']) }))
+  assert.equal(single.items.find((i) => i.gid === 'a').sectionId, 'secX')
+  assert.equal(single.items.find((i) => i.gid === 'b').sectionId, 'secX')
+  const manual = plan(data, cfg({ userMap: { u1: 'app1' }, fieldMap: { ...baseFieldMap, appSectionMode: 'manual', appSectionMap: { 'Nhóm 1': 'sec1' } } }), ctx({ activeUserIds: new Set(['app1']) }))
+  assert.equal(manual.items.find((i) => i.gid === 'a').sectionId, 'sec1')
+  assert.equal(manual.items.find((i) => i.gid === 'b').sectionId, null, 'section chưa map → null')
 })
 
 test('override skip → skip; override assignee/status/priority áp dụng', () => {

@@ -24,7 +24,7 @@ const PRIORITIES = [
 
 const defaultConfig = () => ({
   sourceProjectGid: '',
-  fieldMap: { notes: true, startDate: true, dueDate: true, followers: true, priorityFieldGid: null, tags: 'ignore', sectionMode: 'ignore', sectionSingle: null, sectionMap: {} },
+  fieldMap: { notes: true, startDate: true, dueDate: true, followers: true, priorityFieldGid: null, tags: 'ignore', sectionMode: 'ignore', sectionSingle: null, sectionMap: {}, appSectionMode: 'ignore', appSectionSingle: null, appSectionMap: {} },
   userMap: {},
   orgBySection: {},
   missingAssigneePolicy: 'default',
@@ -370,9 +370,12 @@ const StatusChip = ({ status }) => {
 
 /* ── STEP 3 ── */
 function Step3({ parseRes, config, patchFieldMap }) {
+  const { state } = useApp()
   const fm = config.fieldMap
   const cfs = (parseRes.customFields || []).filter((c) => c.valueCount > 0)
   const sections = parseRes.sections || []
+  const appSections = state.sections || []
+  const srcSections = (parseRes.sectionsByProject && parseRes.sectionsByProject[config.sourceProjectGid]) || sections
   return (
     <div className="card">
       <div className="card-head"><h2>3 · Ánh xạ trường</h2></div>
@@ -405,7 +408,7 @@ function Step3({ parseRes, config, patchFieldMap }) {
       </div>
 
       <div className="form-field">
-        <label>Nhóm việc (section)</label>
+        <label>Loại việc (Sự vụ / Kế hoạch / Hằng ngày / Phát sinh)</label>
         <div className="import-radio-row">
           <label><input type="radio" checked={fm.sectionMode === 'ignore'} onChange={() => patchFieldMap({ sectionMode: 'ignore' })} /> Bỏ qua</label>
           <label><input type="radio" checked={fm.sectionMode === 'single'} onChange={() => patchFieldMap({ sectionMode: 'single' })} /> Gán 1 nhóm cho tất cả</label>
@@ -436,6 +439,42 @@ function Step3({ parseRes, config, patchFieldMap }) {
           </div>
         )}
       </div>
+
+      {appSections.length > 0 && (
+        <div className="form-field">
+          <label>Section (nhóm sắp xếp — danh sách chung)</label>
+          <div className="import-radio-row">
+            <label><input type="radio" checked={fm.appSectionMode === 'ignore'} onChange={() => patchFieldMap({ appSectionMode: 'ignore' })} /> Bỏ qua</label>
+            <label><input type="radio" checked={fm.appSectionMode === 'single'} onChange={() => patchFieldMap({ appSectionMode: 'single' })} /> Gán 1 Section cho tất cả</label>
+            <label><input type="radio" checked={fm.appSectionMode === 'manual'} onChange={() => patchFieldMap({ appSectionMode: 'manual' })} /> Map từng section Asana</label>
+          </div>
+          {fm.appSectionMode === 'single' && (
+            <select value={fm.appSectionSingle || ''} onChange={(e) => patchFieldMap({ appSectionSingle: e.target.value || null })}>
+              <option value="">— Chọn Section —</option>
+              {appSections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          )}
+          {fm.appSectionMode === 'manual' && (
+            <div className="table-wrap" style={{ marginTop: 6 }}>
+              <table className="task-table settings-table">
+                <thead><tr><th>Section Asana (dự án nguồn)</th><th>Số task</th><th>→ Section App</th></tr></thead>
+                <tbody>
+                  {srcSections.map((s) => (
+                    <tr key={s.name}><td>{s.name}</td><td>{s.count}</td>
+                      <td><select value={fm.appSectionMap[s.name] || ''} onChange={(e) => patchFieldMap({ appSectionMap: { ...fm.appSectionMap, [s.name]: e.target.value || null } })}>
+                        <option value="">— Bỏ qua —</option>
+                        {appSections.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                      </select></td>
+                    </tr>
+                  ))}
+                  {srcSections.length === 0 && <tr><td colSpan={3} className="muted">Không có section trong dự án nguồn.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <span className="form-hint muted">Section = danh sách chung do admin tạo (tab Cài đặt → Section). Khác "Loại việc" ở trên.</span>
+        </div>
+      )}
 
       <p className="muted" style={{ fontSize: 12 }}>Không nhập: người nghiệm thu (tắt), Action (không gán), assignee_status/hearts/likes/thời lượng. Việc con chỉ giữ tiêu đề + xong/chưa + người thực hiện.</p>
     </div>

@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { parseAsanaJson } from './asana-parser'
 import { normalize, type NormalizeResult } from './asana-normalizer'
 import { buildPlan, type ImportConfig, type ImportPlan, type PlanContext, type PlanItem } from './import-planner'
-import { sanitizeConfig, referencedUserIds, referencedOrgIds } from './import-config'
+import { sanitizeConfig, referencedUserIds, referencedOrgIds, referencedSectionIds } from './import-config'
 import { IMPORT_LIMITS, IMPORT_SOURCE } from './import.constants'
 
 const dateOnly = (s: string | null): Date | undefined => (s ? new Date(s + 'T00:00:00Z') : undefined)
@@ -104,6 +104,12 @@ export class ImportService {
     if (orgIds.length) {
       const found = await this.prisma.orgUnit.findMany({ where: { id: { in: orgIds }, active: true }, select: { id: true } })
       if (found.length !== orgIds.length) throw new BadRequestException('Có đơn vị (map theo section) không hợp lệ hoặc đã ngừng hoạt động')
+    }
+    // Section (danh sách chung) map từ Asana section — phải tồn tại + active.
+    const sectionIds = referencedSectionIds(cfg)
+    if (sectionIds.length) {
+      const found = await this.prisma.section.findMany({ where: { id: { in: sectionIds }, active: true }, select: { id: true } })
+      if (found.length !== sectionIds.length) throw new BadRequestException('Có Section không hợp lệ hoặc đã ẩn')
     }
 
     const refIds = referencedUserIds(cfg)
@@ -219,6 +225,7 @@ export class ImportService {
               workspaceId: targetProjectId, // project == workspace container
               actionId: null,
               section: item.section,
+              sectionId: item.sectionId,
               creatorId: meId, // creator = người import (KHÔNG lấy từ JSON)
               assigneeId: item.assigneeId!, // task 'create' luôn có assignee (plan đảm bảo)
               status: item.status,
