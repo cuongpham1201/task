@@ -614,22 +614,34 @@ function ResultView({ result, onDone, onReset }) {
 
 /* ── HISTORY ── */
 function BatchHistory() {
+  const { toast } = useApp()
   const [rows, setRows] = useState(null)
-  useEffect(() => { apiFetch('/admin/import/asana/batches').then(setRows).catch(() => setRows([])) }, [])
+  const load = () => apiFetch('/admin/import/asana/batches').then(setRows).catch(() => setRows([]))
+  useEffect(() => { load() }, [])
+  const rollback = async (b) => {
+    if (!window.confirm(`Hoàn tác lần import "${b.sourceProjectName || b.id}"? Xóa toàn bộ task/việc con đã tạo bởi lần này (không xóa dự án đích).`)) return
+    try {
+      const r = await apiFetch(`/admin/import/asana/batches/${b.id}/rollback`, { method: 'POST' })
+      toast(`Đã hoàn tác: xóa ${r.deletedTasks} task + ${r.deletedSubtasks} việc con.`, 'success')
+      load()
+    } catch (e) { toast('Lỗi hoàn tác: ' + shortErr(e), 'error') }
+  }
   if (!rows || rows.length === 0) return null
+  const canRollback = (s) => s === 'completed' || s === 'partial' || s === 'ready'
   return (
     <div className="card" style={{ marginTop: 16 }}>
       <div className="card-head"><h2>Lịch sử import</h2></div>
       <div className="table-wrap">
         <table className="task-table settings-table">
-          <thead><tr><th>Thời gian</th><th>Dự án nguồn</th><th>Trạng thái</th><th>Tạo</th><th>Bỏ qua</th><th>Lỗi</th></tr></thead>
+          <thead><tr><th>Thời gian</th><th>Dự án nguồn</th><th>Trạng thái</th><th>Tạo</th><th>Bỏ qua</th><th>Lỗi</th><th>Thao tác</th></tr></thead>
           <tbody>
             {rows.map((b) => (
               <tr key={b.id}>
                 <td>{new Date(b.createdAt).toLocaleString('vi')}</td>
                 <td>{b.sourceProjectName || '—'}</td>
-                <td><span className={`badge ${b.status === 'completed' ? 'tone-green' : b.status === 'failed' ? 'tone-red' : b.status === 'partial' ? 'tone-amber' : 'tone-gray'}`}>{b.status}</span></td>
+                <td><span className={`badge ${b.status === 'completed' ? 'tone-green' : b.status === 'failed' ? 'tone-red' : b.status === 'partial' ? 'tone-amber' : b.status === 'rolledback' ? 'tone-gray' : 'tone-gray'}`}>{b.status}</span></td>
                 <td>{b.createdCount}</td><td>{b.skippedCount}</td><td>{b.failedCount}</td>
+                <td>{canRollback(b.status) && b.createdCount > 0 ? <button className="btn btn-sm" onClick={() => rollback(b)}>Hoàn tác</button> : '—'}</td>
               </tr>
             ))}
           </tbody>

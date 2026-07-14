@@ -51,6 +51,12 @@ export class ImportController {
     return this.imports.listBatches()
   }
 
+  @Post('batches/:id/rollback')
+  async rollback(@AuthUser() c: AuthClaims, @Param('id') id: string) {
+    const me = await this.admin(c)
+    return this.imports.rollback(me.id, true, id)
+  }
+
   @Get('batches/:id')
   async batch(@AuthUser() c: AuthClaims, @Param('id') id: string) {
     await this.admin(c)

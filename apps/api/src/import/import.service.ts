@@ -322,6 +322,36 @@ export class ImportService {
     return { batchId, status, created, createdSubtasks, skipped, failed, warnings, targetProjectId, errors: errors.slice(0, 50) }
   }
 
+  /**
+   * Hoàn tác 1 batch: xóa CHÍNH XÁC các task/việc con đã tạo bởi batch (theo mapping),
+   * cascade xóa activity/watcher/comment... KHÔNG xóa dự án đích (không chắc do batch tạo).
+   */
+  async rollback(meId: string, isAdmin: boolean, batchId: string) {
+    const batch = await this.loadBatchMeta(meId, isAdmin, batchId)
+    if (batch.status === 'running') throw new BadRequestException('Batch đang chạy')
+    const maps = await this.prisma.externalEntityMapping.findMany({ where: { importBatchId: batchId }, select: { entityType: true, internalId: true } })
+    const taskIds = maps.filter((m) => m.entityType === 'task').map((m) => m.internalId)
+    const subtaskIds = maps.filter((m) => m.entityType === 'subtask').map((m) => m.internalId)
+
+    let deletedTasks = 0
+    let deletedSubtasks = 0
+    await this.prisma.$transaction(async (tx) => {
+      await tx.externalEntityMapping.deleteMany({ where: { importBatchId: batchId } })
+      if (subtaskIds.length) deletedSubtasks = (await tx.subtask.deleteMany({ where: { id: { in: subtaskIds } } })).count
+      if (taskIds.length) deletedTasks = (await tx.task.deleteMany({ where: { id: { in: taskIds } } })).count // cascade: subtask/watcher/comment/activity...
+      await tx.externalImportBatch.update({ where: { id: batchId }, data: { status: 'rolledback', createdCount: 0, errorSummary: `Hoàn tác: xóa ${deletedTasks} task + ${deletedSubtasks} việc con` } })
+    })
+    await this.prisma.adminAuditLog.create({ data: { actorId: meId, action: 'asana_import_rollback', metadata: { batchId, deletedTasks, deletedSubtasks } } })
+    return { batchId, deletedTasks, deletedSubtasks }
+  }
+
+  private async loadBatchMeta(meId: string, isAdmin: boolean, batchId: string) {
+    const batch = await this.prisma.externalImportBatch.findUnique({ where: { id: batchId }, select: { id: true, status: true, importedById: true } })
+    if (!batch) throw new NotFoundException('Không tìm thấy phiên import')
+    if (!isAdmin && batch.importedById !== meId) throw new ForbiddenException('Không có quyền với phiên import này')
+    return batch
+  }
+
   /** Lịch sử batch (mới nhất trước). */
   async listBatches(limit = 30) {
     const rows = await this.prisma.externalImportBatch.findMany({
