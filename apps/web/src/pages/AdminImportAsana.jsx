@@ -27,6 +27,7 @@ const defaultConfig = () => ({
   fieldMap: { notes: true, startDate: true, dueDate: true, followers: true, priorityFieldGid: null, tags: 'ignore', sectionMode: 'ignore', sectionSingle: null, sectionMap: {}, appSectionMode: 'ignore', appSectionSingle: null, appSectionMap: {} },
   userMap: {},
   orgBySection: {},
+  orgFromAssignee: false,
   missingAssigneePolicy: 'default',
   defaultAssigneeId: null,
   overrides: {},
@@ -235,6 +236,11 @@ function Step2({ parseRes, config, patchConfig, targetMode, setTargetMode, targe
           </select>
           <span className="form-hint muted">Task import thuộc đơn vị này (giống việc phòng ban). Áp cho mọi task, có thể đổi từng task ở bước xem trước.</span>
         </div>
+
+        <label className="import-map-item import-map-toggle" style={{ maxWidth: 640 }}>
+          <input type="checkbox" checked={config.orgFromAssignee} onChange={(e) => patchConfig({ orgFromAssignee: e.target.checked })} />
+          <span>Đơn vị = <b>phòng ban của người thực hiện</b> (ưu tiên hơn map section; người chưa map → dùng section/đơn vị mặc định)</span>
+        </label>
 
         {srcSections.length > 0 && (
           <div className="form-field">

@@ -48,6 +48,7 @@ export interface ImportConfig {
   fieldMap: ImportFieldMap
   userMap: Record<string, string | null> // asanaUserGid → appUserId | null
   orgBySection: Record<string, string | null> // tên section (trong dự án nguồn) → orgUnitId
+  orgFromAssignee: boolean // true → đơn vị = phòng "nhà" (HRM) của người thực hiện (ưu tiên hơn section)
   missingAssigneePolicy: 'default' | 'skip'
   defaultAssigneeId: string | null
   overrides: Record<string, TaskOverride>
@@ -55,6 +56,7 @@ export interface ImportConfig {
 
 export interface PlanContext {
   activeUserIds: Set<string>
+  userOrgUnit: Record<string, string | null> // appUserId → orgUnitId "nhà" (cho orgFromAssignee)
   existingGids: Set<string> // gid đã import (mọi entityType) — chống trùng
   targetProjectId: string | null
   defaultOrgUnitId: string | null
@@ -171,9 +173,14 @@ export function buildPlan(normalized: NormalizeResult, config: ImportConfig, ctx
     return null
   }
 
-  // Đơn vị: override > theo section (dự án nguồn) > mặc định. Cho phép project=Khối, section=phòng ban.
-  const resolveOrg = (t: NormalizedTask, ov: TaskOverride): string | null => {
+  // Đơn vị: override > phòng người thực hiện (nếu bật) > theo section > mặc định.
+  // fromDefault=true (assignee dùng người mặc định) → KHÔNG lấy phòng người mặc định (tránh gán bừa).
+  const resolveOrg = (t: NormalizedTask, ov: TaskOverride, assigneeId: string | null, fromDefault: boolean): string | null => {
     if (ov.orgUnitId !== undefined) return ov.orgUnitId
+    if (config.orgFromAssignee && assigneeId && !fromDefault) {
+      const dept = ctx.userOrgUnit?.[assigneeId]
+      if (dept) return dept
+    }
     const inSrc = sectionInSource(t)
     if (inSrc && config.orgBySection && config.orgBySection[inSrc]) return config.orgBySection[inSrc]
     return ctx.defaultOrgUnitId
@@ -276,6 +283,7 @@ export function buildPlan(normalized: NormalizeResult, config: ImportConfig, ctx
       continue
     }
     let assigneeId = a.id
+    let assigneeFromDefault = false
     if (!assigneeId) {
       if (config.missingAssigneePolicy === 'skip') {
         item.action = 'skip'
@@ -287,6 +295,7 @@ export function buildPlan(normalized: NormalizeResult, config: ImportConfig, ctx
       // policy 'default'
       if (config.defaultAssigneeId && ctx.activeUserIds.has(config.defaultAssigneeId)) {
         assigneeId = config.defaultAssigneeId
+        assigneeFromDefault = true
         warns.push('Thiếu người thực hiện — dùng người mặc định')
       } else if (kind === 'task') {
         item.action = 'error'
@@ -314,7 +323,7 @@ export function buildPlan(normalized: NormalizeResult, config: ImportConfig, ctx
     if (kind === 'task') {
       item.section = resolveSection(t, ov)
       item.sectionId = resolveAppSection(t)
-      item.orgUnitId = resolveOrg(t, ov)
+      item.orgUnitId = resolveOrg(t, ov, assigneeId, assigneeFromDefault)
       item.watcherIds = mapWatchers(t)
     } else {
       // Subtask app chỉ giữ title/done/assignee → cảnh báo field mất nếu có dữ liệu

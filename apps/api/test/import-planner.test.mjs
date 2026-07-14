@@ -6,8 +6,8 @@ import * as planner from '../dist/import/import-planner.js'
 
 const task = (o) => ({ resource_type: 'task', ...o })
 const baseFieldMap = { notes: true, startDate: true, dueDate: true, followers: true, priorityFieldGid: null, tags: 'ignore', sectionMode: 'ignore', sectionSingle: null, sectionMap: {}, appSectionMode: 'ignore', appSectionSingle: null, appSectionMap: {} }
-const cfg = (over = {}) => ({ sourceProjectGid: 'SRC', fieldMap: baseFieldMap, userMap: {}, orgBySection: {}, missingAssigneePolicy: 'default', defaultAssigneeId: null, overrides: {}, ...over })
-const ctx = (over = {}) => ({ activeUserIds: new Set(), existingGids: new Set(), targetProjectId: null, defaultOrgUnitId: null, ...over })
+const cfg = (over = {}) => ({ sourceProjectGid: 'SRC', fieldMap: baseFieldMap, userMap: {}, orgBySection: {}, orgFromAssignee: false, missingAssigneePolicy: 'default', defaultAssigneeId: null, overrides: {}, ...over })
+const ctx = (over = {}) => ({ activeUserIds: new Set(), userOrgUnit: {}, existingGids: new Set(), targetProjectId: null, defaultOrgUnitId: null, ...over })
 const plan = (data, c, x) => planner.buildPlan(norm.normalize(data), c, x)
 const inSrc = (extra = {}) => ({ projects: [{ gid: 'SRC', name: 'Nguồn' }], ...extra })
 
@@ -143,6 +143,17 @@ test('org theo section (project=Khối): mỗi section→1 đơn vị; không ma
   assert.equal(p.items.find((i) => i.gid === 'a').orgUnitId, 'orgTC')
   assert.equal(p.items.find((i) => i.gid === 'b').orgUnitId, 'orgPC')
   assert.equal(p.items.find((i) => i.gid === 'c').orgUnitId, 'orgDefault', 'section không map → default')
+})
+
+test('orgFromAssignee: đơn vị = phòng người thực hiện; ưu tiên hơn section; default→dùng section', () => {
+  const mk = (gid, au, sec) => task({ gid, name: gid, assignee: { gid: au, name: au }, memberships: [{ project: { gid: 'SRC', name: 'K' }, section: { name: sec } }] })
+  const data = [mk('a', 'au1', 'Khối X'), mk('b', 'au2', 'Khối X'), mk('c', null, 'Khối X')]
+  const c = cfg({ userMap: { au1: 'app1', au2: 'app2' }, orgFromAssignee: true, orgBySection: { 'Khối X': 'orgSection' }, defaultAssigneeId: 'appDef' })
+  const x = ctx({ activeUserIds: new Set(['app1', 'app2', 'appDef']), userOrgUnit: { app1: 'deptA', app2: null, appDef: 'deptAdmin' }, defaultOrgUnitId: 'orgDefault' })
+  const p = plan(data, c, x)
+  assert.equal(p.items.find((i) => i.gid === 'a').orgUnitId, 'deptA', 'lấy phòng người TH')
+  assert.equal(p.items.find((i) => i.gid === 'b').orgUnitId, 'orgSection', 'người TH không có phòng → fallback section')
+  assert.equal(p.items.find((i) => i.gid === 'c').orgUnitId, 'orgSection', 'assignee dùng default → KHÔNG lấy phòng admin, fallback section')
 })
 
 test('override orgUnit thắng cả section-map', () => {

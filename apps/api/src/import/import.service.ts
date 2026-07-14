@@ -114,9 +114,10 @@ export class ImportService {
 
     const refIds = referencedUserIds(cfg)
     const activeUsers = refIds.length
-      ? await this.prisma.user.findMany({ where: { id: { in: refIds }, active: true }, select: { id: true } })
+      ? await this.prisma.user.findMany({ where: { id: { in: refIds }, active: true }, select: { id: true, orgUnitId: true } })
       : []
     const activeUserIds = new Set(activeUsers.map((u) => u.id))
+    const userOrgUnit = Object.fromEntries(activeUsers.map((u) => [u.id, u.orgUnitId])) // cho orgFromAssignee
 
     const gids = normalized.tasks.map((t) => t.gid)
     const existing = gids.length
@@ -127,7 +128,7 @@ export class ImportService {
       : []
     const existingGids = new Set(existing.map((e) => e.externalId))
 
-    return { activeUserIds, existingGids, targetProjectId: resolvedTargetProjectId, defaultOrgUnitId }
+    return { activeUserIds, userOrgUnit, existingGids, targetProjectId: resolvedTargetProjectId, defaultOrgUnitId }
   }
 
   /** PHA 2 — dry-run. KHÔNG ghi Task/Subtask/mapping/notification. Ghi mappingJson+counts vào batch. */

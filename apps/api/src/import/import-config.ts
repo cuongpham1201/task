@@ -83,6 +83,7 @@ export function sanitizeConfig(raw: any): ImportConfig {
     fieldMap: sanitizeFieldMap(r.fieldMap),
     userMap: sanitizeStringMap(r.userMap),
     orgBySection: sanitizeStringMap(r.orgBySection),
+    orgFromAssignee: bool(r.orgFromAssignee, false),
     missingAssigneePolicy: r.missingAssigneePolicy === 'skip' ? 'skip' : 'default',
     defaultAssigneeId: str(r.defaultAssigneeId),
     overrides: sanitizeOverrides(r.overrides),
