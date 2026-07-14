@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { LogOut, RefreshCw } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { LogOut, RefreshCw, UploadCloud } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../auth/AuthProvider'
 import { apiFetch } from '../api/client'
@@ -23,6 +24,7 @@ export default function Settings() {
       { key: 'departments', label: 'Phòng ban' },
       { key: 'reminders', label: 'Nhắc việc' },
       { key: 'hrm', label: 'Đồng bộ HRM' },
+      { key: 'import', label: 'Nhập Asana' },
     ] : []),
   ]
 
@@ -66,6 +68,14 @@ export default function Settings() {
       {tab === 'reminders' && isAdmin && <ReminderSettings />}
 
       {tab === 'hrm' && isAdmin && <HrmSyncTab />}
+
+      {tab === 'import' && isAdmin && (
+        <div className="card">
+          <div className="card-head"><h2>Nhập công việc từ Asana</h2></div>
+          <p className="muted settings-hint">Nhập Project/Task/Việc con từ file JSON export của Asana. Có ghép người dùng, chạy thử trước, chống trùng theo Asana gid, thông báo hàng loạt tắt mặc định.</p>
+          <Link className="btn btn-primary" to="/admin/import/asana"><UploadCloud size={15} /> Mở trang nhập Asana</Link>
+        </div>
+      )}
     </div>
   )
 }

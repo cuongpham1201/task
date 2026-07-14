@@ -23,6 +23,7 @@ import ActionLog from './pages/ActionLog'
 import ActionDetail from './pages/ActionDetail'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
+import AdminImportAsana from './pages/AdminImportAsana'
 
 /** Deep link: ?task=<id> mở TaskDetailPanel (browser + Teams Activity Feed đều dùng). */
 function DeepLinkHandler() {
@@ -75,6 +76,7 @@ function AppShell() {
             <Route path="/actions/:id" element={<ActionDetail />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/admin/import/asana" element={<AdminImportAsana />} />
           </Routes>
         </main>
       </div>
