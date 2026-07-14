@@ -17,6 +17,7 @@ import { RemindersModule } from './reminders/reminders.module'
 import { TeamsModule } from './teams/teams.module'
 import { AdminModule } from './admin/admin.module'
 import { BootstrapModule } from './bootstrap/bootstrap.module'
+import { ImportModule } from './import/import.module'
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { BootstrapModule } from './bootstrap/bootstrap.module'
     TeamsModule,
     AdminModule,
     BootstrapModule,
+    ImportModule,
   ],
   controllers: [HealthController],
 })
