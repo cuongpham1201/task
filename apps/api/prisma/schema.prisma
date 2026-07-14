@@ -405,13 +405,16 @@ model Task {
 // "Section" (nhóm sắp xếp) — danh sách CHUNG toàn hệ thống, CHỈ admin quản.
 // Khác "Loại việc" (Task.section enum). Task.sectionId trỏ tới đây (tùy chọn).
 model Section {
-  id          String   @id @default(uuid())
-  name        String
-  sortOrder   Int      @default(0) @map("sort_order")
-  active      Boolean  @default(true)
-  createdById String?  @map("created_by_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  name         String
+  sortOrder    Int      @default(0) @map("sort_order")
+  active       Boolean  @default(true)
+  // Rule tự động: task chuyển sang done → gán vào section này. Tối đa 1 section active
+  // được đánh dấu (enforce app-level khi set). Mở lại task done → gỡ khỏi section này.
+  isDoneBucket Boolean  @default(false) @map("is_done_bucket")
+  createdById  String?  @map("created_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   tasks Task[]
 

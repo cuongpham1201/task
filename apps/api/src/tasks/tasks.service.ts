@@ -67,6 +67,19 @@ export class TasksService {
     if (!s || !s.active) throw new BadRequestException('Section không hợp lệ hoặc đã ẩn')
   }
 
+  /**
+   * Rule tự động Section "Đã hoàn thành":
+   *  - task → done  ⇒ gán vào section isDoneBucket (nếu có).
+   *  - task rời done ⇒ nếu đang ở section done-bucket thì gỡ ra (null).
+   * Trả patch để merge vào task.update; {} nếu không có bucket / không đổi.
+   */
+  private async doneSectionPatch(toDone: boolean, currentSectionId: string | null): Promise<{ sectionId?: string | null }> {
+    const bucket = await this.prisma.section.findFirst({ where: { isDoneBucket: true, active: true }, select: { id: true } })
+    if (!bucket) return {}
+    if (toDone) return currentSectionId === bucket.id ? {} : { sectionId: bucket.id }
+    return currentSectionId === bucket.id ? { sectionId: null } : {}
+  }
+
   /** P0-1/P0-3: Action gắn vào task phải tồn tại, chưa lưu trữ và CÙNG đơn vị chịu trách nhiệm. */
   private async validateActionForOrg(actionId: string, orgUnitId: string | null) {
     const act = await this.prisma.action.findUnique({ where: { id: actionId } })
@@ -226,10 +239,11 @@ export class TasksService {
       throw new BadRequestException('Việc này cần nghiệm thu — hãy "Nộp nghiệm thu" thay vì tự đóng.')
     }
     const isDone = status === 'done'
+    const sectionPatch = await this.doneSectionPatch(isDone, (task as any).sectionId ?? null)
     await this.prisma.$transaction(async (tx) => {
       await tx.task.update({
         where: { id },
-        data: { status: status as any, completedAt: isDone ? new Date() : null, completedById: isDone ? me.id : null, progress: isDone ? 100 : task.progress },
+        data: { status: status as any, completedAt: isDone ? new Date() : null, completedById: isDone ? me.id : null, progress: isDone ? 100 : task.progress, ...sectionPatch },
       })
       await this.notifications.emit(tx, {
         task, actorId: me.id, action: isDone ? 'complete' : 'status',
@@ -255,6 +269,7 @@ export class TasksService {
     this.policy.assert(await this.policy.canReview(me, task), 'Không có quyền nghiệm thu công việc này')
     const passed = dto.decision === 'passed'
     const now = new Date()
+    const sectionPatch = await this.doneSectionPatch(passed, (task as any).sectionId ?? null)
     await this.prisma.$transaction(async (tx) => {
       await tx.taskReview.upsert({
         where: { taskId: id },
@@ -264,8 +279,8 @@ export class TasksService {
       await tx.task.update({
         where: { id },
         data: passed
-          ? { status: 'done' as any, completedAt: now, acceptedAt: now, completedById: task.assigneeId, progress: 100 }
-          : { status: 'returned' as any, completedAt: null, acceptedAt: null, completedById: null },
+          ? { status: 'done' as any, completedAt: now, acceptedAt: now, completedById: task.assigneeId, progress: 100, ...sectionPatch }
+          : { status: 'returned' as any, completedAt: null, acceptedAt: null, completedById: null, ...sectionPatch },
       })
       // KPI evidence (freeze §8): CHỈ sinh khi is_scorable=true (sửa bug: trước đây sinh cho mọi task).
       if (passed && task.isScorable) {

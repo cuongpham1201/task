@@ -14,6 +14,7 @@ class UpdateSectionDto {
   @IsOptional() @IsString() @MaxLength(120) name?: string
   @IsOptional() @IsInt() sortOrder?: number
   @IsOptional() @IsBoolean() active?: boolean
+  @IsOptional() @IsBoolean() isDoneBucket?: boolean
 }
 
 /**
@@ -59,13 +60,20 @@ export class SectionsController {
   @Patch(':id')
   async update(@AuthUser() c: AuthClaims, @Param('id') id: string, @Body() dto: UpdateSectionDto) {
     await this.admin(c)
-    return this.prisma.section.update({
-      where: { id },
-      data: {
-        ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
-        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
-        ...(dto.active !== undefined ? { active: dto.active } : {}),
-      },
+    // "Mục Hoàn thành" chỉ MỘT section active — set true thì bỏ đánh dấu các section khác.
+    return this.prisma.$transaction(async (tx) => {
+      if (dto.isDoneBucket === true) {
+        await tx.section.updateMany({ where: { isDoneBucket: true, NOT: { id } }, data: { isDoneBucket: false } })
+      }
+      return tx.section.update({
+        where: { id },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+          ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+          ...(dto.active !== undefined ? { active: dto.active } : {}),
+          ...(dto.isDoneBucket !== undefined ? { isDoneBucket: dto.isDoneBucket } : {}),
+        },
+      })
     })
   }
 

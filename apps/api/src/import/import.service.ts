@@ -205,6 +205,9 @@ export class ImportService {
       data: { status: 'running', startedAt: new Date(), targetProjectId: targetProjectId ?? null, defaultOrgUnitId: defaultOrgUnitId ?? null, mappingJson: cfg as any, sourceProjectId: cfg.sourceProjectGid },
     })
 
+    // Rule "Đã hoàn thành": task import done mà chưa có Section → gán vào section done-bucket.
+    const doneBucket = await this.prisma.section.findFirst({ where: { isDoneBucket: true, active: true }, select: { id: true } })
+
     const gidToTaskId = new Map<string, string>() // gid task tạo trong phiên → task.id
     let created = 0
     let createdSubtasks = 0
@@ -225,7 +228,7 @@ export class ImportService {
               workspaceId: targetProjectId, // project == workspace container
               actionId: null,
               section: item.section,
-              sectionId: item.sectionId,
+              sectionId: item.sectionId ?? (item.status === 'done' ? doneBucket?.id ?? null : null),
               creatorId: meId, // creator = người import (KHÔNG lấy từ JSON)
               assigneeId: item.assigneeId!, // task 'create' luôn có assignee (plan đảm bảo)
               status: item.status,
