@@ -627,7 +627,7 @@ function BatchHistory() {
     } catch (e) { toast('Lỗi hoàn tác: ' + shortErr(e), 'error') }
   }
   if (!rows || rows.length === 0) return null
-  const canRollback = (s) => s === 'completed' || s === 'partial' || s === 'ready'
+  const canRollback = (s) => s === 'completed' || s === 'partial'
   return (
     <div className="card" style={{ marginTop: 16 }}>
       <div className="card-head"><h2>Lịch sử import</h2></div>
