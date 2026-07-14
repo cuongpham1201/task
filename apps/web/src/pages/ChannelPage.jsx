@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  LayoutGrid, List, Kanban, Users, Activity, Plus, Hash, UserPlus, X, Pencil, Archive, BarChart3,
+  LayoutGrid, List, Kanban, Layers, Users, Activity, Plus, Hash, UserPlus, X, Pencil, Archive, BarChart3,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import TaskTable from '../components/task/TaskTable'
@@ -121,8 +121,9 @@ export default function ChannelPage() {
         <>
           <div className="filter-row">
             <div className="view-toggle">
-              <button className={`btn ${view === 'list' ? 'btn-primary' : ''}`} onClick={() => setView('list')}><List size={15} /></button>
-              <button className={`btn ${view === 'board' ? 'btn-primary' : ''}`} onClick={() => setView('board')}><Kanban size={15} /></button>
+              <button className={`btn ${view === 'list' ? 'btn-primary' : ''}`} title="Danh sách" onClick={() => setView('list')}><List size={15} /></button>
+              <button className={`btn ${view === 'section' ? 'btn-primary' : ''}`} title="Nhóm theo Section (kéo-thả)" onClick={() => setView('section')}><Layers size={15} /></button>
+              <button className={`btn ${view === 'board' ? 'btn-primary' : ''}`} title="Bảng Kanban" onClick={() => setView('board')}><Kanban size={15} /></button>
             </div>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="all">Trạng thái: Tất cả</option>
@@ -136,9 +137,9 @@ export default function ChannelPage() {
           {perms.createChannelTask(channel) && (
             <QuickAddTask scope="channel" channelId={channel.id} placeholder="Thêm nhanh việc cho dự án… (Enter)" />
           )}
-          {view === 'list'
-            ? <TaskTable tasks={filtered} showContext={false} emptyText="Không có công việc phù hợp" />
-            : <KanbanBoard tasks={filtered} />}
+          {view === 'list' && <TaskTable tasks={filtered} showContext={false} emptyText="Không có công việc phù hợp" />}
+          {view === 'section' && <TaskTable tasks={filtered} showContext={false} groupByAppSection emptyText="Không có công việc phù hợp" />}
+          {view === 'board' && <KanbanBoard tasks={filtered} />}
         </>
       )}
 

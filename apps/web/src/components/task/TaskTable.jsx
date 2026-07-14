@@ -10,7 +10,7 @@ import useIsMobile from '../../utils/useIsMobile'
 import { dueLabel } from '../../utils/date'
 import { SECTIONS, SECTION_ORDER, STATUS, STATUS_ORDER, PRIORITY, PRIORITY_ORDER } from '../../data/constants'
 
-function TaskRow({ task, showContext, selectable, selected, onToggleSel }) {
+function TaskRow({ task, showContext, selectable, selected, onToggleSel, dragProps }) {
   const {
     usersById, perms, selectTask, toggleComplete, setStatus,
     getSubtasks, getComments, taskContextLabel, taskContextFull, toggleSubtask,
@@ -29,7 +29,7 @@ function TaskRow({ task, showContext, selectable, selected, onToggleSel }) {
 
   return (
     <>
-    <tr className={`task-row ${isDone ? 'done' : ''} ${selected ? 'row-selected' : ''}`} onClick={() => selectTask(task.id)}>
+    <tr className={`task-row ${isDone ? 'done' : ''} ${selected ? 'row-selected' : ''} ${dragProps ? 'draggable-row' : ''}`} onClick={() => selectTask(task.id)} {...(dragProps || {})}>
       {selectable && (
         <td className="col-check" onClick={(e) => e.stopPropagation()}>
           <input type="checkbox" checked={!!selected} onChange={() => onToggleSel(task.id)} />
@@ -148,8 +148,13 @@ function sectionGroups(tasks) {
   return groups.filter((g) => g.items.length > 0)
 }
 
-export default function TaskTable({ tasks, showContext = true, groupBySection = false, emptyText = 'Không có công việc nào' }) {
+export default function TaskTable({ tasks, showContext = true, groupBySection = false, groupByAppSection = false, emptyText = 'Không có công việc nào' }) {
   const isMobile = useIsMobile()
+
+  // Nhóm theo "Section" (danh sách chung) + kéo-thả — kiểu Asana. Không dùng ở mobile (giữ list card).
+  if (groupByAppSection && !isMobile) {
+    return <AppSectionGrouped tasks={tasks} showContext={showContext} emptyText={emptyText} />
+  }
 
   if (tasks.length === 0) {
     return <EmptyState title={emptyText} hint="Nhấn “Tạo công việc” để thêm việc mới." />
@@ -241,6 +246,69 @@ function FlatSelectableTable({ tasks, showContext }) {
         </table>
       </div>
     </>
+  )
+}
+
+/**
+ * Nhóm task theo "Section" (danh sách chung admin) + KÉO-THẢ giữa section (kiểu Asana).
+ * Hiện tất cả section active (cả rỗng) để có chỗ thả + nhóm "Chưa có section".
+ * Thả 1 task vào section → updateTaskField(sectionId). Chỉ ai có quyền sửa task mới thả được.
+ */
+function AppSectionGrouped({ tasks, showContext }) {
+  const { state, updateTaskField, perms } = useApp()
+  const [overKey, setOverKey] = useState(null)
+  const sections = state.sections || []
+
+  const byId = new Map(sections.map((s) => [s.id, { key: s.id, id: s.id, name: s.name, items: [] }]))
+  const noneGroup = { key: '__none__', id: null, name: 'Chưa có section', items: [] }
+  for (const t of tasks) {
+    const g = (t.sectionId && byId.get(t.sectionId)) || noneGroup
+    g.items.push(t)
+  }
+  const groups = [...byId.values(), noneGroup] // giữ thứ tự section + nhóm chưa có ở cuối
+
+  const onDrop = (group) => (e) => {
+    e.preventDefault(); setOverKey(null)
+    const taskId = e.dataTransfer.getData('text/task')
+    if (!taskId) return
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task || task.sectionId === group.id) return
+    if (!perms.updateStatus(task)) return // cùng quyền như đổi trạng thái
+    updateTaskField(taskId, { sectionId: group.id })
+  }
+  const dragStart = (task) => (e) => {
+    e.dataTransfer.setData('text/task', task.id)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  return (
+    <div className="table-wrap">
+      <table className="task-table">
+        <TableHead showContext={showContext} />
+        {groups.map((g) => (
+          <tbody
+            key={g.key}
+            className={`section-dnd ${overKey === g.key ? 'section-dnd-over' : ''}`}
+            onDragOver={(e) => { e.preventDefault(); if (overKey !== g.key) setOverKey(g.key) }}
+            onDragLeave={(e) => { if (e.currentTarget === e.target) setOverKey(null) }}
+            onDrop={onDrop(g)}
+          >
+            <tr className="section-row">
+              <td colSpan={showContext ? 7 : 6}>
+                {g.name} <span className="section-count">{g.items.length}</span>
+                {overKey === g.key && <span className="muted section-drop-hint"> — thả vào đây</span>}
+              </td>
+            </tr>
+            {g.items.map((t) => (
+              <TaskRow key={t.id} task={t} showContext={showContext} dragProps={{ draggable: true, onDragStart: dragStart(t) }} />
+            ))}
+            {g.items.length === 0 && (
+              <tr className="section-empty-row"><td colSpan={showContext ? 7 : 6} className="muted">Kéo task vào đây…</td></tr>
+            )}
+          </tbody>
+        ))}
+      </table>
+    </div>
   )
 }
 
