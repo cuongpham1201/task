@@ -178,6 +178,12 @@ export class ImportService {
       targetProjectId = ws.id
     }
 
+    // An toàn: không có dự án đích LẪN đơn vị → task sẽ thành việc cá nhân riêng tư (chỉ người tạo thấy).
+    // Import theo phòng ban thì bắt buộc có đơn vị; import theo dự án thì có project.
+    if (!targetProjectId && !defaultOrgUnitId) {
+      throw new BadRequestException('Chọn dự án đích HOẶC đơn vị chịu trách nhiệm (nếu không, task sẽ thành việc cá nhân riêng tư).')
+    }
+
     const ctx = await this.buildContext(cfg, normalized, targetProjectId)
     const plan = buildPlan(normalized, cfg, ctx)
 

@@ -48,7 +48,7 @@ function Wizard() {
   const [rawJson, setRawJson] = useState('')
   const [parseRes, setParseRes] = useState(null)
   const [config, setConfig] = useState(defaultConfig())
-  const [targetMode, setTargetMode] = useState('new') // new | existing
+  const [targetMode, setTargetMode] = useState('none') // none (chỉ phòng ban) | new | existing
   const [targetProjectId, setTargetProjectId] = useState('')
   const [newProject, setNewProject] = useState({ name: '', memberIds: [] })
   const [defaultOrgUnitId, setDefaultOrgUnitId] = useState('')
@@ -61,10 +61,15 @@ function Wizard() {
 
   const canNext = useMemo(() => {
     if (step === 1) return !!parseRes
-    if (step === 2) return !!config.sourceProjectGid && (targetMode === 'existing' ? !!targetProjectId : !!newProject.name.trim())
+    if (step === 2) {
+      if (!config.sourceProjectGid) return false
+      if (targetMode === 'existing') return !!targetProjectId
+      if (targetMode === 'new') return !!newProject.name.trim()
+      return !!defaultOrgUnitId // 'none' → bắt buộc có đơn vị (không thì thành việc cá nhân)
+    }
     if (step === 3) return true
     return false
-  }, [step, parseRes, config.sourceProjectGid, targetMode, targetProjectId, newProject.name])
+  }, [step, parseRes, config.sourceProjectGid, targetMode, targetProjectId, newProject.name, defaultOrgUnitId])
 
   const doParse = async () => {
     if (!rawJson.trim()) return toast('Chưa có dữ liệu JSON', 'error')
@@ -214,27 +219,7 @@ function Step2({ parseRes, config, patchConfig, targetMode, setTargetMode, targe
         </div>
 
         <div className="form-field">
-          <label>Dự án đích trong App <span className="req">*</span></label>
-          <div className="import-radio-row">
-            <label><input type="radio" checked={targetMode === 'new'} onChange={() => setTargetMode('new')} /> Tạo dự án mới</label>
-            <label><input type="radio" checked={targetMode === 'existing'} onChange={() => setTargetMode('existing')} /> Dùng dự án có sẵn</label>
-          </div>
-          {targetMode === 'new' ? (
-            <div className="import-subform">
-              <input placeholder="Tên dự án mới" value={newProject.name} onChange={(e) => setNewProject((p) => ({ ...p, name: e.target.value }))} />
-              <span className="form-hint muted">Chủ dự án = bạn ({currentUser.displayName}). Thêm thành viên:</span>
-              <MemberPicker memberIds={newProject.memberIds} onChange={(ids) => setNewProject((p) => ({ ...p, memberIds: ids }))} />
-            </div>
-          ) : (
-            <select value={targetProjectId} onChange={(e) => setTargetProjectId(e.target.value)}>
-              <option value="">— Chọn dự án có sẵn —</option>
-              {state.channels.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          )}
-        </div>
-
-        <div className="form-field">
-          <label>Đơn vị chịu trách nhiệm mặc định</label>
+          <label>Đơn vị chịu trách nhiệm {targetMode === 'none' && <span className="req">*</span>}</label>
           <select value={defaultOrgUnitId} onChange={(e) => setDefaultOrgUnitId(e.target.value)}>
             <option value="">— Không gán đơn vị —</option>
             {['company', 'block', 'department'].map((t) => (
@@ -243,7 +228,32 @@ function Step2({ parseRes, config, patchConfig, targetMode, setTargetMode, targe
               </optgroup>
             ))}
           </select>
-          <span className="form-hint muted">Áp cho mọi task import (có thể đổi từng task ở bước xem trước).</span>
+          <span className="form-hint muted">Task import thuộc đơn vị này (giống việc phòng ban). Áp cho mọi task, có thể đổi từng task ở bước xem trước.</span>
+        </div>
+
+        <div className="form-field">
+          <label>Dự án đích trong App <span className="muted" style={{ fontWeight: 400 }}>(tùy chọn)</span></label>
+          <div className="import-radio-row">
+            <label><input type="radio" checked={targetMode === 'none'} onChange={() => setTargetMode('none')} /> Không gán dự án — chỉ theo phòng ban</label>
+            <label><input type="radio" checked={targetMode === 'new'} onChange={() => setTargetMode('new')} /> Tạo dự án mới</label>
+            <label><input type="radio" checked={targetMode === 'existing'} onChange={() => setTargetMode('existing')} /> Dùng dự án có sẵn</label>
+          </div>
+          {targetMode === 'none' && (
+            <span className="form-hint muted">Task sẽ là việc của phòng ban (không thuộc dự án nào) — đúng khi chỉ bê task theo đơn vị về. Vẫn xem/lọc được ở dashboard phòng ban.</span>
+          )}
+          {targetMode === 'new' && (
+            <div className="import-subform">
+              <input placeholder="Tên dự án mới" value={newProject.name} onChange={(e) => setNewProject((p) => ({ ...p, name: e.target.value }))} />
+              <span className="form-hint muted">Chủ dự án = bạn ({currentUser.displayName}). Thêm thành viên:</span>
+              <MemberPicker memberIds={newProject.memberIds} onChange={(ids) => setNewProject((p) => ({ ...p, memberIds: ids }))} />
+            </div>
+          )}
+          {targetMode === 'existing' && (
+            <select value={targetProjectId} onChange={(e) => setTargetProjectId(e.target.value)}>
+              <option value="">— Chọn dự án có sẵn —</option>
+              {state.channels.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
         </div>
       </div>
 
