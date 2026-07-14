@@ -1240,3 +1240,4 @@ tbody.section-dnd-over { background: var(--accent-soft); outline: 2px dashed var
 .section-empty-row td { padding: 8px 14px; font-size: 12px; font-style: italic; }
 .section-toggle { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; margin-right: 4px; padding: 2px; border: none; background: transparent; color: var(--text-soft); cursor: pointer; border-radius: 4px; }
 .section-toggle:hover { background: var(--gray-soft); color: var(--text); }
+.section-toggle-row { display: flex; align-items: center; gap: 6px; width: 100%; background: transparent; border: none; cursor: pointer; font: inherit; color: inherit; text-align: left; }

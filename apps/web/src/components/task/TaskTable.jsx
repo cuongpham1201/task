@@ -152,9 +152,10 @@ function sectionGroups(tasks) {
 export default function TaskTable({ tasks, showContext = true, groupBySection = false, groupByAppSection = false, emptyText = 'Không có công việc nào' }) {
   const isMobile = useIsMobile()
 
-  // Nhóm theo "Section" (danh sách chung) + kéo-thả — kiểu Asana. Không dùng ở mobile (giữ list card).
-  if (groupByAppSection && !isMobile) {
-    return <AppSectionGrouped tasks={tasks} showContext={showContext} emptyText={emptyText} />
+  // Nhóm theo "Section" (danh sách chung) — desktop có kéo-thả; mobile hiện nhóm thẻ (đổi section qua chi tiết task).
+  if (groupByAppSection) {
+    if (tasks.length === 0) return <EmptyState title={emptyText} hint="Nhấn “Tạo công việc” để thêm việc mới." />
+    return <AppSectionGrouped tasks={tasks} showContext={showContext} />
   }
 
   if (tasks.length === 0) {
@@ -257,6 +258,7 @@ function FlatSelectableTable({ tasks, showContext }) {
  */
 function AppSectionGrouped({ tasks, showContext }) {
   const { state, updateTaskField, perms } = useApp()
+  const isMobile = useIsMobile()
   const [overKey, setOverKey] = useState(null)
   const [collapsed, setCollapsed] = useLocalStorage('section.collapsed', {})
   const toggleCollapse = (key) => setCollapsed((c) => ({ ...c, [key]: !c[key] }))
@@ -269,6 +271,26 @@ function AppSectionGrouped({ tasks, showContext }) {
     g.items.push(t)
   }
   const groups = [...byId.values(), noneGroup] // giữ thứ tự section + nhóm chưa có ở cuối
+
+  // Mobile: hiện nhóm thẻ (thu/mở), KHÔNG kéo-thả (đổi section qua chi tiết task).
+  if (isMobile) {
+    return (
+      <div className="task-card-list">
+        {groups.filter((g) => g.items.length > 0).map((g) => {
+          const isCollapsed = !!collapsed[g.key]
+          return (
+            <div key={g.key} className="task-card-group">
+              <button className="task-card-group-head section-toggle-row" onClick={() => toggleCollapse(g.key)}>
+                {isCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+                {g.name} <span className="section-count">{g.items.length}</span>
+              </button>
+              {!isCollapsed && g.items.map((t) => <TaskCardMobile key={t.id} task={t} showContext={showContext} />)}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
 
   const onDrop = (group) => (e) => {
     e.preventDefault(); setOverKey(null)
