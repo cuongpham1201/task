@@ -159,6 +159,13 @@ function SectionsAdmin() {
     try { await apiFetch(`/sections/${s.id}`, { method: 'PATCH', body: JSON.stringify({ isDoneBucket: !s.isDoneBucket }) }); after(); toast(s.isDoneBucket ? 'Đã bỏ mục Hoàn thành' : 'Đã đặt làm mục Hoàn thành', 'success') }
     catch (e) { toast('Lỗi: ' + e.message, 'error') }
   }
+  const backfillDone = async (s) => {
+    if (!window.confirm(`Dồn TẤT CẢ việc đã hoàn thành hiện có vào section "${s.name}"? (task done từ trước sẽ chuyển vào đây)`)) return
+    try {
+      const r = await apiFetch(`/sections/${s.id}/backfill-done`, { method: 'POST' })
+      toast(`Đã dồn ${r.moved} việc. Tải lại trang để cập nhật danh sách.`, 'success')
+    } catch (e) { toast('Lỗi: ' + e.message, 'error') }
+  }
   const move = async (s, dir) => {
     try { await apiFetch(`/sections/${s.id}`, { method: 'PATCH', body: JSON.stringify({ sortOrder: (s.sortOrder || 0) + dir }) }); after() }
     catch (e) { toast('Lỗi: ' + e.message, 'error') }
@@ -187,6 +194,7 @@ function SectionsAdmin() {
                   <button className="btn btn-sm" onClick={() => move(s, 1)} title="Xuống">↓</button>
                   <button className="btn btn-sm" onClick={() => rename(s)}>Đổi tên</button>
                   <button className="btn btn-sm" onClick={() => setDoneBucket(s)} title="Task done tự vào section này">{s.isDoneBucket ? 'Bỏ Hoàn thành' : 'Đặt Hoàn thành'}</button>
+                  {s.isDoneBucket && <button className="btn btn-sm" onClick={() => backfillDone(s)} title="Dồn việc done từ trước vào đây">Dồn việc done</button>}
                   <button className="btn btn-sm" onClick={() => toggle(s)}>{s.active ? 'Ẩn' : 'Hiện'}</button>
                 </td>
               </tr>

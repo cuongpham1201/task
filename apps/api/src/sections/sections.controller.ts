@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
 import { IsBoolean, IsInt, IsOptional, IsString, MaxLength } from 'class-validator'
 import { AuthGuard } from '../auth/auth.guard'
 import { AuthUser } from '../auth/current-user.decorator'
@@ -75,6 +75,20 @@ export class SectionsController {
         },
       })
     })
+  }
+
+  // Dồn 1 lần: mọi task đã Hoàn thành (không lưu trữ, không nháp) chưa ở section này → gán vào đây.
+  // Rule tự động chỉ áp cho task MỚI chuyển done; nút này xử lý task done TỪ TRƯỚC.
+  @Post(':id/backfill-done')
+  async backfillDone(@AuthUser() c: AuthClaims, @Param('id') id: string) {
+    await this.admin(c)
+    const sec = await this.prisma.section.findUnique({ where: { id }, select: { active: true } })
+    if (!sec) throw new NotFoundException('Không tìm thấy section')
+    const r = await this.prisma.task.updateMany({
+      where: { status: 'done', archived: false, isDraft: false, NOT: { sectionId: id } },
+      data: { sectionId: id },
+    })
+    return { moved: r.count }
   }
 
   // Ẩn (soft) — giữ lịch sử; task đang gắn vẫn giữ (FK SET NULL chỉ khi xóa cứng).
