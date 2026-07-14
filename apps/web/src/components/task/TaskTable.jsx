@@ -8,6 +8,7 @@ import EmptyState from '../shared/EmptyState'
 import TaskCardMobile from './TaskCardMobile'
 import useIsMobile from '../../utils/useIsMobile'
 import { dueLabel } from '../../utils/date'
+import { useLocalStorage } from '../../utils/useLocalStorage'
 import { SECTIONS, SECTION_ORDER, STATUS, STATUS_ORDER, PRIORITY, PRIORITY_ORDER } from '../../data/constants'
 
 function TaskRow({ task, showContext, selectable, selected, onToggleSel, dragProps }) {
@@ -257,6 +258,8 @@ function FlatSelectableTable({ tasks, showContext }) {
 function AppSectionGrouped({ tasks, showContext }) {
   const { state, updateTaskField, perms } = useApp()
   const [overKey, setOverKey] = useState(null)
+  const [collapsed, setCollapsed] = useLocalStorage('section.collapsed', {})
+  const toggleCollapse = (key) => setCollapsed((c) => ({ ...c, [key]: !c[key] }))
   const sections = state.sections || []
 
   const byId = new Map(sections.map((s) => [s.id, { key: s.id, id: s.id, name: s.name, items: [] }]))
@@ -285,28 +288,35 @@ function AppSectionGrouped({ tasks, showContext }) {
     <div className="table-wrap">
       <table className="task-table">
         <TableHead showContext={showContext} />
-        {groups.map((g) => (
-          <tbody
-            key={g.key}
-            className={`section-dnd ${overKey === g.key ? 'section-dnd-over' : ''}`}
-            onDragOver={(e) => { e.preventDefault(); if (overKey !== g.key) setOverKey(g.key) }}
-            onDragLeave={(e) => { if (e.currentTarget === e.target) setOverKey(null) }}
-            onDrop={onDrop(g)}
-          >
-            <tr className="section-row">
-              <td colSpan={showContext ? 7 : 6}>
-                {g.name} <span className="section-count">{g.items.length}</span>
-                {overKey === g.key && <span className="muted section-drop-hint"> — thả vào đây</span>}
-              </td>
-            </tr>
-            {g.items.map((t) => (
-              <TaskRow key={t.id} task={t} showContext={showContext} dragProps={{ draggable: true, onDragStart: dragStart(t) }} />
-            ))}
-            {g.items.length === 0 && (
-              <tr className="section-empty-row"><td colSpan={showContext ? 7 : 6} className="muted">Kéo task vào đây…</td></tr>
-            )}
-          </tbody>
-        ))}
+        {groups.map((g) => {
+          const isCollapsed = !!collapsed[g.key]
+          return (
+            <tbody
+              key={g.key}
+              className={`section-dnd ${overKey === g.key ? 'section-dnd-over' : ''}`}
+              onDragOver={(e) => { e.preventDefault(); if (overKey !== g.key) setOverKey(g.key) }}
+              onDragLeave={(e) => { if (e.currentTarget === e.target) setOverKey(null) }}
+              onDrop={onDrop(g)}
+            >
+              <tr className="section-row">
+                <td colSpan={showContext ? 7 : 6}>
+                  <button className="section-toggle" onClick={() => toggleCollapse(g.key)} title={isCollapsed ? 'Mở rộng' : 'Thu gọn'}>
+                    {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                  {g.name} <span className="section-count">{g.items.length}</span>
+                  {isCollapsed && g.items.length > 0 && <span className="muted section-drop-hint"> · đã thu gọn</span>}
+                  {overKey === g.key && <span className="muted section-drop-hint"> — thả vào đây</span>}
+                </td>
+              </tr>
+              {!isCollapsed && g.items.map((t) => (
+                <TaskRow key={t.id} task={t} showContext={showContext} dragProps={{ draggable: true, onDragStart: dragStart(t) }} />
+              ))}
+              {!isCollapsed && g.items.length === 0 && (
+                <tr className="section-empty-row"><td colSpan={showContext ? 7 : 6} className="muted">Kéo task vào đây…</td></tr>
+              )}
+            </tbody>
+          )
+        })}
       </table>
     </div>
   )
