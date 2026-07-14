@@ -18,7 +18,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false })
   app.setGlobalPrefix('api/v1')
   app.use(cookieParser())
-  app.use('/api/v1/admin/import', json({ limit: '12mb' })) // P1-6: chỉ path import
+  app.use('/api/v1/admin/import', json({ limit: '30mb' })) // P1-6: chỉ path import (JSON Asana lớn)
   app.use(json({ limit: '1mb' }))
   app.use(urlencoded({ extended: true, limit: '1mb' }))
   app.useGlobalPipes(

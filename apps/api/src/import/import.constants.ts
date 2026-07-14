@@ -3,8 +3,8 @@
  * Đặt tập trung để parser/normalizer/service/test cùng một nguồn.
  */
 export const IMPORT_LIMITS = {
-  MAX_RAW_BYTES: 8 * 1024 * 1024, // 8MB chuỗi JSON thô — vượt → 413/400
-  MAX_ENTITIES: 5000, // tổng task+subtask unique — vượt → từ chối
+  MAX_RAW_BYTES: 25 * 1024 * 1024, // 25MB chuỗi JSON thô — vượt → 400 (body limit main.ts = 30MB)
+  MAX_ENTITIES: 20000, // tổng task+subtask unique — vượt → từ chối
   MAX_DEPTH: 20, // độ sâu cây tối đa quét (chống JSON lồng vô hạn)
   MAX_TITLE: 255, // khớp Task.title @MaxLength(255) — dài hơn → cắt + warning
   MAX_NOTES: 20000, // cắt mô tả quá dài

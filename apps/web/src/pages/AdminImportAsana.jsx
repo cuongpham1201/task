@@ -8,7 +8,7 @@ import Avatar from '../components/shared/Avatar'
 import { deaccent } from '../utils/text'
 import { ORG_TYPE } from '../utils/org'
 
-const MAX_FILE_BYTES = 8 * 1024 * 1024
+const MAX_FILE_BYTES = 25 * 1024 * 1024
 const SECTIONS = [
   { value: 'suvu', label: 'Sự vụ' },
   { value: 'kehoach', label: 'Kế hoạch' },
