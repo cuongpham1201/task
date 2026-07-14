@@ -184,36 +184,36 @@ enum ActionUpdateType {
 }
 
 model User {
-  id          String   @id @default(uuid())
-  entraId     String?  @unique @map("entra_id")
-  email       String   @unique
-  displayName String   @map("display_name")
-  orgUnitId   String?  @map("org_unit_id") // phòng/ban chính (từ HRM)
-  role        UserRole @default(member)
-  jobTitle    String?  @map("job_title")
-  avatarUrl   String?  @map("avatar_url")
-  active      Boolean  @default(true)
+  id                 String    @id @default(uuid())
+  entraId            String?   @unique @map("entra_id")
+  email              String    @unique
+  displayName        String    @map("display_name")
+  orgUnitId          String?   @map("org_unit_id") // phòng/ban chính (từ HRM)
+  role               UserRole  @default(member)
+  jobTitle           String?   @map("job_title")
+  avatarUrl          String?   @map("avatar_url")
+  active             Boolean   @default(true)
   // ── FEATURE-001: Local login (App sở hữu; HRM KHÔNG đụng các field này) ──
-  username          String?   @unique
-  passwordHash      String?   @map("password_hash") // bcrypt — KHÔNG BAO GIỜ trả qua API
-  localLoginEnabled Boolean   @default(false) @map("local_login_enabled")
-  mustChangePassword Boolean  @default(false) @map("must_change_password")
-  failedLoginCount  Int       @default(0) @map("failed_login_count")
-  lockedUntil       DateTime? @map("locked_until")
-  lastLoginAt       DateTime? @map("last_login_at")
-  passwordChangedAt DateTime? @map("password_changed_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  username           String?   @unique
+  passwordHash       String?   @map("password_hash") // bcrypt — KHÔNG BAO GIỜ trả qua API
+  localLoginEnabled  Boolean   @default(false) @map("local_login_enabled")
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  failedLoginCount   Int       @default(0) @map("failed_login_count")
+  lockedUntil        DateTime? @map("locked_until")
+  lastLoginAt        DateTime? @map("last_login_at")
+  passwordChangedAt  DateTime? @map("password_changed_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  orgUnit               OrgUnit?             @relation("OrgUnitMembers", fields: [orgUnitId], references: [id])
+  orgUnit               OrgUnit?              @relation("OrgUnitMembers", fields: [orgUnitId], references: [id])
   orgUnitRoles          OrgUnitRole[]
-  ownedWorkspaces       Workspace[]          @relation("WorkspaceOwner")
-  workspaceMemberships  WorkspaceMember[]    @relation("WorkspaceMemberships")
-  workspaceMembersAdded WorkspaceMember[]    @relation("WorkspaceMemberAddedBy")
-  createdTasks          Task[]               @relation("TaskCreator")
-  assignedTasks         Task[]               @relation("TaskAssignee")
-  completedTasks        Task[]               @relation("TaskCompletedBy")
-  reviews               TaskReview[]         @relation("TaskReviewer")
+  ownedWorkspaces       Workspace[]           @relation("WorkspaceOwner")
+  workspaceMemberships  WorkspaceMember[]     @relation("WorkspaceMemberships")
+  workspaceMembersAdded WorkspaceMember[]     @relation("WorkspaceMemberAddedBy")
+  createdTasks          Task[]                @relation("TaskCreator")
+  assignedTasks         Task[]                @relation("TaskAssignee")
+  completedTasks        Task[]                @relation("TaskCompletedBy")
+  reviews               TaskReview[]          @relation("TaskReviewer")
   collaborations        TaskCollaborator[]
   watching              TaskWatcher[]
   subtasks              Subtask[]
@@ -222,16 +222,17 @@ model User {
   notifications         Notification[]
   attachments           Attachment[]
   externalMapping       ExternalUserMapping?
-  ownedActions          Action[]             @relation("ActionOwner")
-  createdActions        Action[]             @relation("ActionCreatedBy")
-  actionUpdates         ActionUpdate[]       @relation("ActionUpdateAuthor")
-  reviewedKpiResults    TaskKpiResult[]      @relation("KpiResultReviewer")
-  workLogs              TaskWorkLog[]        @relation("WorkLogAuthor")
-  adminActionsDone      AdminAuditLog[]      @relation("AuditActor")
-  adminActionsReceived  AdminAuditLog[]      @relation("AuditTarget")
-  orgRolesGranted       OrgUnitRole[]        @relation("OrgRoleCreatedBy")
-  tasksToReview         Task[]               @relation("TaskDesignatedReviewer")
-  reminderSettingsEdits ReminderSetting[]    @relation("ReminderSettingUpdatedBy")
+  ownedActions          Action[]              @relation("ActionOwner")
+  createdActions        Action[]              @relation("ActionCreatedBy")
+  actionUpdates         ActionUpdate[]        @relation("ActionUpdateAuthor")
+  reviewedKpiResults    TaskKpiResult[]       @relation("KpiResultReviewer")
+  workLogs              TaskWorkLog[]         @relation("WorkLogAuthor")
+  adminActionsDone      AdminAuditLog[]       @relation("AuditActor")
+  adminActionsReceived  AdminAuditLog[]       @relation("AuditTarget")
+  orgRolesGranted       OrgUnitRole[]         @relation("OrgRoleCreatedBy")
+  tasksToReview         Task[]                @relation("TaskDesignatedReviewer")
+  reminderSettingsEdits ReminderSetting[]     @relation("ReminderSettingUpdatedBy")
+  importBatches         ExternalImportBatch[] @relation("ImportBatchBy")
 
   @@map("users")
 }
@@ -264,14 +265,14 @@ model OrgUnit {
 }
 
 model OrgUnitRole {
-  id        String    @id @default(uuid())
-  userId    String    @map("user_id")
-  orgUnitId String    @map("org_unit_id")
-  role      OrgRole
-  scope     RoleScope @default(self_only)
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  orgUnitId   String    @map("org_unit_id")
+  role        OrgRole
+  scope       RoleScope @default(self_only)
   // MANUAL (admin UI) | HRM_SYNC (script sở hữu) | MANUAL_TEST (seed dev) | SEED
-  source    String    @default("MANUAL")
-  active    Boolean   @default(true)
+  source      String    @default("MANUAL")
+  active      Boolean   @default(true)
   // FEATURE-003: unique nghiệp vụ (userId+orgUnitId+role khi active) enforce Ở APP-LEVEL
   // trong transaction — không partial-unique DB (prisma không model được → drift).
   // Record inactive giữ làm lịch sử; tạo trùng tuple inactive → tái kích hoạt record cũ.
@@ -606,6 +607,64 @@ model ExternalOrgMapping {
   @@map("external_org_mappings")
 }
 
+// ── P1-6: Import từ nguồn ngoài (Asana JSON) ─────────────────────────
+// Idempotency GENERIC theo (source, entityType, externalId). KHÔNG dedupe bằng
+// title/date/assignee. Import lại: đã có mapping → SKIP, chưa có → CREATE.
+// KHÔNG thêm cột externalRef vào Task (bảng mapping đủ + đa nguồn — freeze P).
+model ExternalEntityMapping {
+  id              String    @id @default(uuid())
+  source          String // 'asana'
+  entityType      String    @map("entity_type") // task | subtask | project | user
+  externalId      String    @map("external_id") // Asana gid
+  internalId      String    @map("internal_id") // id trong App (task/workspace/user)
+  importBatchId   String?   @map("import_batch_id")
+  sourceUrl       String?   @map("source_url") // permalink_url (metadata, KHÔNG fetch)
+  sourceCreatedAt DateTime? @map("source_created_at") // created_at gốc bên Asana
+  payloadHash     String?   @map("payload_hash")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  batch ExternalImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+
+  @@unique([source, entityType, externalId])
+  @@index([importBatchId])
+  @@index([internalId])
+  @@map("external_entity_mappings")
+}
+
+// P1-6: 1 lần chạy import = 1 batch. Lưu normalizedJson (đã flatten+dedupe+sanitize,
+// GIỚI HẠN kích thước) để preview/execute stateless (multi-worker), KHÔNG lưu raw JSON gốc.
+model ExternalImportBatch {
+  id                String    @id @default(uuid())
+  source            String    @default("asana")
+  status            String    @default("parsed") // parsed | ready | running | completed | partial | failed
+  sourceProjectId   String?   @map("source_project_id") // Asana project gid nguồn
+  sourceProjectName String?   @map("source_project_name")
+  targetProjectId   String?   @map("target_project_id") // workspace.id đích
+  defaultOrgUnitId  String?   @map("default_org_unit_id")
+  importedById      String    @map("imported_by_id")
+  mappingJson       Json?     @map("mapping_json") // cấu hình field/user/section mapping
+  normalizedJson    Json?     @map("normalized_json") // dữ liệu chuẩn hoá (capped)
+  payloadHash       String?   @map("payload_hash")
+  totalItems        Int       @default(0) @map("total_items")
+  createdCount      Int       @default(0) @map("created_count")
+  skippedCount      Int       @default(0) @map("skipped_count")
+  failedCount       Int       @default(0) @map("failed_count")
+  warningCount      Int       @default(0) @map("warning_count")
+  startedAt         DateTime? @map("started_at")
+  completedAt       DateTime? @map("completed_at")
+  errorSummary      String?   @map("error_summary")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  importedBy User                    @relation("ImportBatchBy", fields: [importedById], references: [id])
+  mappings   ExternalEntityMapping[]
+
+  @@index([importedById, createdAt])
+  @@index([status])
+  @@map("external_import_batches")
+}
+
 model TaskKpiResult {
   id              String     @id @default(uuid())
   taskId          String     @map("task_id")
@@ -730,6 +789,7 @@ model Action {
   updates   ActionUpdate[]
 
   reminderNotifications Notification[]
+
   @@index([orgUnitId, period])
   @@index([projectId])
   @@index([status])
