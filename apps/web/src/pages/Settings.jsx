@@ -22,6 +22,7 @@ export default function Settings() {
     ...(isAdmin ? [
       { key: 'users', label: 'Người dùng' },
       { key: 'departments', label: 'Phòng ban' },
+      { key: 'sections', label: 'Section' },
       { key: 'reminders', label: 'Nhắc việc' },
       { key: 'hrm', label: 'Đồng bộ HRM' },
       { key: 'import', label: 'Nhập Asana' },
@@ -64,6 +65,8 @@ export default function Settings() {
       )}
 
       {tab === 'departments' && isAdmin && <DepartmentsTab state={state} />}
+
+      {tab === 'sections' && isAdmin && <SectionsAdmin />}
 
       {tab === 'reminders' && isAdmin && <ReminderSettings />}
 
@@ -117,6 +120,76 @@ function DepartmentsTab({ state }) {
         "Số nhân viên" = biên chế chính từ HRM (users.orgUnitId). Thành viên ban chức năng
         sẽ thống kê riêng khi triển khai OrgUnitMembership (phase sau).
       </p>
+    </div>
+  )
+}
+
+/**
+ * P1-6+: "Section" (nhóm sắp xếp) — danh sách CHUNG toàn hệ thống, chỉ admin quản.
+ * Khác "Loại việc" (enum sự vụ/kế hoạch…). Thêm/đổi tên/ẩn/thứ tự.
+ */
+function SectionsAdmin() {
+  const { toast, reloadSections } = useApp()
+  const [rows, setRows] = useState(null)
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const load = () => apiFetch('/sections?all=1').then(setRows).catch(() => setRows([]))
+  useEffect(() => { load() }, [])
+
+  const after = () => { load(); reloadSections() }
+  const add = async () => {
+    const n = name.trim()
+    if (!n) return
+    setBusy(true)
+    try { await apiFetch('/sections', { method: 'POST', body: JSON.stringify({ name: n, sortOrder: rows?.length || 0 }) }); setName(''); after(); toast('Đã thêm section', 'success') }
+    catch (e) { toast('Lỗi: ' + e.message, 'error') } finally { setBusy(false) }
+  }
+  const rename = async (s) => {
+    const n = window.prompt('Tên section', s.name); if (n === null) return
+    const t = n.trim(); if (!t) return
+    try { await apiFetch(`/sections/${s.id}`, { method: 'PATCH', body: JSON.stringify({ name: t }) }); after() }
+    catch (e) { toast('Lỗi: ' + e.message, 'error') }
+  }
+  const toggle = async (s) => {
+    try { await apiFetch(`/sections/${s.id}`, { method: 'PATCH', body: JSON.stringify({ active: !s.active }) }); after() }
+    catch (e) { toast('Lỗi: ' + e.message, 'error') }
+  }
+  const move = async (s, dir) => {
+    try { await apiFetch(`/sections/${s.id}`, { method: 'PATCH', body: JSON.stringify({ sortOrder: (s.sortOrder || 0) + dir }) }); after() }
+    catch (e) { toast('Lỗi: ' + e.message, 'error') }
+  }
+
+  return (
+    <div className="card">
+      <div className="card-head"><h2>Section (nhóm sắp xếp — dùng chung)</h2></div>
+      <p className="muted settings-hint">Danh sách chung toàn hệ thống, gắn vào công việc để nhóm/lọc. Khác "Loại việc" (Sự vụ/Kế hoạch/Hằng ngày/Phát sinh). Ẩn section không xóa dữ liệu task đang gắn.</p>
+      <div className="filter-row" style={{ marginBottom: 10 }}>
+        <input placeholder="Tên section mới…" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+        <button className="btn btn-primary" disabled={busy || !name.trim()} onClick={add}>Thêm</button>
+      </div>
+      <div className="table-wrap">
+        <table className="task-table settings-table">
+          <thead><tr><th>Tên</th><th>Thứ tự</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+          <tbody>
+            {(rows || []).map((s) => (
+              <tr key={s.id} className={s.active ? '' : 'row-inactive'}>
+                <td>{s.name}</td>
+                <td>{s.sortOrder}</td>
+                <td>{s.active ? <span className="badge tone-green">Hiện</span> : <span className="badge tone-gray">Ẩn</span>}</td>
+                <td className="admin-actions">
+                  <button className="btn btn-sm" onClick={() => move(s, -1)} title="Lên">↑</button>
+                  <button className="btn btn-sm" onClick={() => move(s, 1)} title="Xuống">↓</button>
+                  <button className="btn btn-sm" onClick={() => rename(s)}>Đổi tên</button>
+                  <button className="btn btn-sm" onClick={() => toggle(s)}>{s.active ? 'Ẩn' : 'Hiện'}</button>
+                </td>
+              </tr>
+            ))}
+            {rows && rows.length === 0 && <tr><td colSpan={4} className="muted">Chưa có section nào. Thêm ở trên.</td></tr>}
+            {rows === null && <tr><td colSpan={4} className="muted">Đang tải…</td></tr>}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

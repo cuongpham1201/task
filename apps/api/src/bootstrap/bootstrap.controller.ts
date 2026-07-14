@@ -77,6 +77,9 @@ export class BootstrapController {
     })
     const channels = projWs.map((w) => ({ id: w.id, name: w.name, description: w.description, ownerId: w.ownerId, members: w.members.map((m) => m.userId) }))
 
+    // "Section" (nhóm sắp xếp) — danh sách chung active (admin quản)
+    const sections = await this.prisma.section.findMany({ where: { active: true }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] })
+
     const users = await this.prisma.user.findMany({
       where: { active: true },
       select: { id: true, email: true, displayName: true, orgUnitId: true, role: true, jobTitle: true, avatarUrl: true },
@@ -123,6 +126,7 @@ export class BootstrapController {
       blocks,
       departments,
       channels,
+      sections,
       tasks,
       subtasks,
       comments,

@@ -340,7 +340,8 @@ model Task {
   orgUnitId       String?        @map("org_unit_id") // đơn vị chịu trách nhiệm (bắt buộc ở tầng app với task nghiệp vụ)
   projectId       String?        @map("project_id") // P1: = workspace.id của workspace type=project (không đặt FK để dễ tách bảng projects sau)
   actionId        String?        @map("action_id") // thuộc Action nào (nullable)
-  section         TaskSection?
+  section         TaskSection? // "Loại việc" (sự vụ/kế hoạch/hằng ngày/phát sinh) — enum cố định, gộp báo cáo được
+  sectionId       String?        @map("section_id") // "Section" (nhóm sắp xếp) — danh sách chung do admin quản (Section table)
   creatorId       String         @map("creator_id")
   assigneeId      String         @map("assignee_id")
   status          TaskStatus     @default(todo)
@@ -372,6 +373,7 @@ model Task {
   workspace     Workspace?     @relation(fields: [workspaceId], references: [id])
   orgUnit       OrgUnit?       @relation("TaskOrgUnit", fields: [orgUnitId], references: [id])
   action        Action?        @relation(fields: [actionId], references: [id])
+  sectionRef    Section?       @relation(fields: [sectionId], references: [id])
   reviewer      User?          @relation("TaskDesignatedReviewer", fields: [reviewerId], references: [id])
   kpiDefinition KpiDefinition? @relation(fields: [kpiDefinitionId], references: [id])
   creator       User           @relation("TaskCreator", fields: [creatorId], references: [id])
@@ -396,7 +398,25 @@ model Task {
   @@index([actionId])
   @@index([dueDate])
   @@index([status])
+  @@index([sectionId])
   @@map("tasks")
+}
+
+// "Section" (nhóm sắp xếp) — danh sách CHUNG toàn hệ thống, CHỈ admin quản.
+// Khác "Loại việc" (Task.section enum). Task.sectionId trỏ tới đây (tùy chọn).
+model Section {
+  id          String   @id @default(uuid())
+  name        String
+  sortOrder   Int      @default(0) @map("sort_order")
+  active      Boolean  @default(true)
+  createdById String?  @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tasks Task[]
+
+  @@index([active, sortOrder])
+  @@map("sections")
 }
 
 model TaskReview {

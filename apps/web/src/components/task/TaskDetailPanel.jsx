@@ -51,7 +51,7 @@ export default function TaskDetailPanel() {
     assignTask, setCollaborators, setTaskOrgUnit, setDueDate, setPriority, submitTask, reviewTask, activateTask,
     addComment, toggleSubtask, addSubtask, taskContextLabel,
     archiveTask, updateSubtask, deleteSubtask, editComment, deleteComment,
-    actionsById, channelsById, actionsForOrg, orgUnitName, watchTask, unwatchTask,
+    actionsById, channelsById, actionsForOrg, orgUnitName, watchTask, unwatchTask, sectionsById,
   } = useApp()
 
   const task = state.selectedTaskId ? getTask(state.selectedTaskId) : null
@@ -309,6 +309,19 @@ export default function TaskDetailPanel() {
                 <span className="muted">Không</span>
               )}
             </Field>
+            {(state.sections.length > 0 || task.sectionId) && (
+              <Field label="Section">
+                {canManage ? (
+                  <select value={task.sectionId || ''} onChange={(e) => updateTaskField(task.id, { sectionId: e.target.value || null })}>
+                    <option value="">— Không —</option>
+                    {task.sectionId && !state.sections.some((s) => s.id === task.sectionId) && (
+                      <option value={task.sectionId}>{sectionsById[task.sectionId]?.name || 'Section hiện tại'}</option>
+                    )}
+                    {state.sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                ) : task.sectionId ? (sectionsById[task.sectionId]?.name || '—') : <span className="muted">Không</span>}
+              </Field>
+            )}
           </div>
 
           <h3 className="detail-group-title">Chi tiết công việc</h3>

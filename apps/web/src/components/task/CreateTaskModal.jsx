@@ -35,6 +35,7 @@ export default function CreateTaskModal() {
           : (deptOptions.find((d) => d.id === currentUser.orgUnitId)?.id || deptOptions[0]?.id || null),
       channelId: channelOptions.some((c) => c.id === defaults.channelId) ? defaults.channelId : '',
       section: defaults.section || 'suvu',
+      sectionId: defaults.sectionId || '',
       assigneeId: currentUser.id,
       collaboratorIds: [],
       startDate: '',
@@ -106,6 +107,7 @@ export default function CreateTaskModal() {
         channelId: form.channelId || null,
         projectId: form.channelId || undefined,
         section: form.departmentId ? form.section : null,
+        sectionId: form.sectionId || null,
         assigneeId: form.assigneeId,
         collaboratorIds: form.collaboratorIds.filter((id) => id !== form.assigneeId),
         startDate: fromInputDate(form.startDate),
@@ -206,11 +208,20 @@ export default function CreateTaskModal() {
           )}
           {!fromAction && form.departmentId && (
             <label className="form-field">
-              <span>Section</span>
+              <span>Loại việc</span>
               <select value={form.section} onChange={(e) => set({ section: e.target.value })}>
                 {SECTION_ORDER.map((s) => (
                   <option key={s} value={s}>{SECTIONS[s]}</option>
                 ))}
+              </select>
+            </label>
+          )}
+          {state.sections.length > 0 && (
+            <label className="form-field">
+              <span>Section</span>
+              <select value={form.sectionId} onChange={(e) => set({ sectionId: e.target.value })}>
+                <option value="">— Không —</option>
+                {state.sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </label>
           )}

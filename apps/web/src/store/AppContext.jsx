@@ -26,6 +26,7 @@ function buildInitialState(currentUserId, bootstrap) {
     blocks: bootstrap.blocks || [], // khối (để nhóm menu phòng ban theo cây)
     departments: bootstrap.departments || [],
     channels: bootstrap.channels || [],
+    sections: bootstrap.sections || [], // "Section" (nhóm sắp xếp) — danh sách chung admin quản
     tasks: bootstrap.tasks || [],
     subtasks: bootstrap.subtasks || [],
     comments: bootstrap.comments || [],
@@ -158,6 +159,8 @@ function reducer(state, action) {
       }
     case 'SET_NOTIFS':
       return { ...state, notifications: action.list }
+    case 'SET_SECTIONS':
+      return { ...state, sections: action.list }
     case 'UPDATE_CHANNEL':
       return { ...state, channels: state.channels.map((c) => (c.id === action.channel.id ? action.channel : c)) }
     case 'ADD_CHANNEL':
@@ -214,6 +217,7 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
     const usersById = Object.fromEntries(state.users.map((u) => [u.id, u]))
     const departmentsById = Object.fromEntries(state.departments.map((d) => [d.id, d]))
     const channelsById = Object.fromEntries(state.channels.map((c) => [c.id, c]))
+    const sectionsById = Object.fromEntries(state.sections.map((s) => [s.id, s]))
     const orgUnitsById = Object.fromEntries([...state.departments, ...(state.blocks || [])].map((o) => [o.id, o]))
     const me = usersById[state.currentUserId] ? state.currentUserId : state.users[0]?.id
     const currentUser = usersById[me]
@@ -285,6 +289,8 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
       usersById,
       departmentsById,
       channelsById,
+      sectionsById,
+      reloadSections: () => apiFetch('/sections').then((list) => dispatch({ type: 'SET_SECTIONS', list })).catch(() => {}),
 
       perms: {
         manage: (task) => canManageTask(currentUser, task, managedIds),
@@ -419,6 +425,8 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
           projectId: personal ? undefined : (input.projectId ?? (scope === 'channel' ? input.channelId : undefined)),
           actionId: personal ? undefined : (input.actionId || undefined),
           section: !personal && scope === 'department' ? input.section || undefined : undefined,
+          sectionId: input.sectionId || undefined, // Section (nhóm sắp xếp) — độc lập, cho cả việc cá nhân
+
           assigneeId: input.assigneeId || me,
           priority: input.priority || 'normal',
           reviewRequired: isScorable ? true : (input.reviewRequired ?? input.completionMode === 'review_required'),

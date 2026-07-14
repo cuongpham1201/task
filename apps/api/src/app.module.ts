@@ -18,6 +18,7 @@ import { TeamsModule } from './teams/teams.module'
 import { AdminModule } from './admin/admin.module'
 import { BootstrapModule } from './bootstrap/bootstrap.module'
 import { ImportModule } from './import/import.module'
+import { SectionsModule } from './sections/sections.module'
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { ImportModule } from './import/import.module'
     AdminModule,
     BootstrapModule,
     ImportModule,
+    SectionsModule,
   ],
   controllers: [HealthController],
 })

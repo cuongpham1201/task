@@ -61,6 +61,12 @@ export class TasksService {
     if (!u || !u.active) throw new BadRequestException('Người nghiệm thu không hợp lệ hoặc đã ngưng hoạt động')
   }
 
+  /** Section (nhóm sắp xếp) phải tồn tại + đang active. */
+  private async validateSection(sectionId: string) {
+    const s = await this.prisma.section.findUnique({ where: { id: sectionId }, select: { active: true } })
+    if (!s || !s.active) throw new BadRequestException('Section không hợp lệ hoặc đã ẩn')
+  }
+
   /** P0-1/P0-3: Action gắn vào task phải tồn tại, chưa lưu trữ và CÙNG đơn vị chịu trách nhiệm. */
   private async validateActionForOrg(actionId: string, orgUnitId: string | null) {
     const act = await this.prisma.action.findUnique({ where: { id: actionId } })
@@ -137,6 +143,7 @@ export class TasksService {
       if (dto.kpiWeight == null) throw new BadRequestException('Task tính KPI phải có trọng số (kpi_weight)')
     }
     if (dto.actionId) await this.validateActionForOrg(dto.actionId, dims.orgUnitId)
+    if (dto.sectionId) await this.validateSection(dto.sectionId)
 
     // P0-2: cần nghiệm thu ⇒ phải chỉ định người nghiệm thu (user active)
     let reviewerId: string | null = null
@@ -162,6 +169,7 @@ export class TasksService {
           projectId: dims.projectId,
           actionId: dims.actionId,
           section: (dto.section as any) ?? null,
+          sectionId: dto.sectionId ?? null,
           creatorId: me.id,
           assigneeId: dims.assigneeId,
           priority: (dto.priority as any) ?? 'normal',
@@ -472,6 +480,7 @@ export class TasksService {
     if (nextReviewRequired && reviewPatch.reviewerId === undefined && !(task as any).reviewerId && dto.reviewRequired === true) {
       throw new BadRequestException('Bật nghiệm thu phải chọn người nghiệm thu')
     }
+    if (dto.sectionId) await this.validateSection(dto.sectionId)
 
     await this.prisma.$transaction(async (tx) => {
       await tx.task.update({
@@ -481,6 +490,7 @@ export class TasksService {
           ...(dto.description !== undefined ? { description: dto.description } : {}),
           ...(dto.expectedOutput !== undefined ? { expectedOutput: dto.expectedOutput } : {}),
           ...(dto.section !== undefined ? { section: dto.section as any } : {}),
+          ...(dto.sectionId !== undefined ? { sectionId: dto.sectionId || null } : {}),
           ...(dto.startDate !== undefined ? { startDate: dto.startDate ? new Date(dto.startDate) : null } : {}),
           ...projectPatch,
           ...actionPatch,
