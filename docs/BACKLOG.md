@@ -87,6 +87,35 @@
 - **Mục tiêu**: quá hạn vượt ngưỡng (VD 7 ngày) → nhắc thêm quản lý đơn vị (org_unit_roles department_manager/scope), có cờ bật/tắt; không gửi diện rộng.
 - **Trạng thái**: **READY** — chưa làm theo nguyên tắc "không suy đoán manager"; nguồn quản lý = org_unit_roles đã có. Dependency: P1-3 (done).
 
+## P1-6 — Import Project/Task từ Asana JSON
+
+- **Mục tiêu**: Admin dán/tải file JSON export Asana → phân tích, ghép người/dự án/đơn vị, ánh xạ trường, chạy thử (dry-run), nhập thật; chống trùng theo Asana `gid`; lưu lịch sử batch.
+- **Trạng thái**: **DONE** (14/07/2026 — MVP chuẩn dùng thật).
+- **Bằng chứng code**:
+  - Schema (migration additive `20260714020558_p1_6_asana_import`, KHÔNG đụng Task/KPI): `ExternalEntityMapping` (unique `(source,entityType,externalId)` — idempotency generic, KHÔNG thêm cột vào Task) + `ExternalImportBatch` (lưu `normalizedJson` để preview/execute stateless; KHÔNG lưu raw JSON, chỉ `payloadHash`).
+  - Core thuần (test được): `asana-parser.ts` (parse an toàn, giới hạn 8MB/5000 mục, chặn prototype-pollution, root `{data:[]}`), `asana-normalizer.ts` (flatten cây + dedupe theo gid + merge deterministic + gom project/user/custom-field/section + summary/warnings), `import-planner.ts` (task-vs-subtask, lọc source project, giữ subtask hợp lệ/không tạo orphan, policy thiếu assignee, priority Low/Medium/High, section, override).
+  - Service `import.service.ts`: `parse`/`preview`(dry-run — KHÔNG ghi Task/Subtask/notification)/`execute` (revalidate server-side, ghi trong transaction từng mục, idempotent theo gid, **giữ `createdAt`/`completedAt` gốc Asana**, creator = người import, **suppress notification hàng loạt**, ghi Activity `create` + `admin_audit_log` action `asana_import`). API chỉ Admin: `POST /admin/import/asana/parse|preview|execute`, `GET .../batches[/:id]`. `main.ts` nới body limit RIÊNG path import (12mb); các route khác giữ 1mb.
+  - UI `/admin/import/asana` (route + tab "Nhập Asana" trong Cài đặt): wizard 4 bước (Nhập JSON/tải file → Ghép người-dự án-đơn vị → Ánh xạ trường → Xem trước & nhập), bảng ghép user (matched/gợi ý khớp/gợi ý mờ KHÔNG auto-confirm/chưa ghép), preview lọc + override (skip/assignee/status/priority), dry-run + nhập thật (confirm), lịch sử batch. Tái dùng `SearchUser`/style hiện có, KHÔNG thêm package.
+  - Test: 31 unit (`node:test`, `npm run test -w api`) parser/normalizer/planner + smoke DEV `test/smoke-import.mjs` (30 assert: dry-run không ghi DB, đếm đúng, giữ mốc gốc, suppress notif, activity/audit, re-import 0 bản sao — cleanup chính xác theo batchId).
+- **Quyết định đã chốt**: (1) `createdAt` = mốc gốc Asana (báo cáo theo kỳ đúng lịch sử) + `sourceCreatedAt` lưu ở mapping; (2) route riêng `/admin/import/asana`; (3) dedupe CHỈ theo gid, KHÔNG title/date; (4) suppress notification mặc định (không có opt-in trong MVP).
+- **Không làm (đã tách backlog)**: comment/attachment/activity history, đồng bộ lại/2 chiều, Asana API trực tiếp, module tag mới, workflow mapping nâng cao.
+
+## P1-6A — Import comment & attachment từ Asana
+
+- **Trạng thái**: **READY** — parse đã có `permalink` (metadata); attachment cần tải nhị phân (Asana API/URL) → ngoài phạm vi "chỉ JSON".
+
+## P1-6B — Đồng bộ lại / cập nhật task cũ từ Asana (update, không chỉ create)
+
+- **Trạng thái**: **READY** — mapping `(source,externalId)` đã sẵn; MVP hiện SKIP entity đã tồn tại, chưa update. Cần rule merge + audit thay đổi.
+
+## P1-6C — Kết nối Asana API trực tiếp (OAuth, kéo dữ liệu tự động)
+
+- **Trạng thái**: **ICEBOX** — cần OAuth Asana + rate limit + đồng bộ định kỳ; chờ nhu cầu thực tế.
+
+## P1-6D — Mapping section/tag nâng cao + lưu user-mapping tái dùng
+
+- **Trạng thái**: **READY** — hiện section map thủ công theo tên, tag nối mô tả; nên lưu `ExternalEntityMapping` entityType `user` để lần import sau tự gợi ý theo gid.
+
 ## P1-2 — Export báo cáo tổng hợp (XLSX/CSV)
 
 - **Mục tiêu**: xuất báo cáo theo đúng filter + permission backend hiện tại (sheet Task/Action/Phòng ban/chi tiết task nguồn; tên file gồm loại + kỳ + thời điểm xuất).
