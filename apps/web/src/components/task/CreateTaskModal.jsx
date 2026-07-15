@@ -3,7 +3,7 @@ import { X, Plus, Trash2, Target } from 'lucide-react'
 import { useApp } from '../../store/AppContext'
 import Avatar from '../shared/Avatar'
 import SearchUser from '../shared/SearchUser'
-import { PRIORITY, PRIORITY_ORDER, SECTIONS, SECTION_ORDER } from '../../data/constants'
+import { PRIORITY, PRIORITY_ORDER } from '../../data/constants'
 import { fromInputDate } from '../../utils/date'
 import { orgUnitLabel } from '../../utils/org'
 
@@ -34,7 +34,6 @@ export default function CreateTaskModal() {
           ? defaults.departmentId
           : (deptOptions.find((d) => d.id === currentUser.orgUnitId)?.id || deptOptions[0]?.id || null),
       channelId: channelOptions.some((c) => c.id === defaults.channelId) ? defaults.channelId : '',
-      section: defaults.section || 'suvu',
       sectionId: defaults.sectionId || '',
       assigneeId: currentUser.id,
       collaboratorIds: [],
@@ -106,7 +105,6 @@ export default function CreateTaskModal() {
         orgUnitId: form.departmentId || undefined,
         channelId: form.channelId || null,
         projectId: form.channelId || undefined,
-        section: form.departmentId ? form.section : null,
         sectionId: form.sectionId || null,
         assigneeId: form.assigneeId,
         collaboratorIds: form.collaboratorIds.filter((id) => id !== form.assigneeId),
@@ -205,16 +203,6 @@ export default function CreateTaskModal() {
             <p className="muted" style={{ fontSize: 12, margin: '-4px 0 0' }}>
               Việc cá nhân riêng tư: chỉ bạn và người được giao (cùng người phối hợp/theo dõi được mời) nhìn thấy — không hiện cho phòng ban, không vào báo cáo đơn vị.
             </p>
-          )}
-          {!fromAction && form.departmentId && (
-            <label className="form-field">
-              <span>Loại việc</span>
-              <select value={form.section} onChange={(e) => set({ section: e.target.value })}>
-                {SECTION_ORDER.map((s) => (
-                  <option key={s} value={s}>{SECTIONS[s]}</option>
-                ))}
-              </select>
-            </label>
           )}
           {state.sections.length > 0 && (
             <label className="form-field">

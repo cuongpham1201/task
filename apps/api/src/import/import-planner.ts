@@ -13,7 +13,7 @@
  *  - creator = người import (không lấy từ JSON) — set ở service.
  *  - assignee thiếu: theo policy (default/skip); KHÔNG âm thầm gán người import.
  */
-import { mapPriority, type ImportTaskStatus, type AppTaskSection, APP_TASK_SECTIONS, IMPORT_LIMITS } from './import.constants'
+import { mapPriority, type ImportTaskStatus, IMPORT_LIMITS } from './import.constants'
 import type { NormalizedTask, NormalizeResult } from './asana-normalizer'
 
 export interface ImportFieldMap {
@@ -23,10 +23,6 @@ export interface ImportFieldMap {
   followers: boolean
   priorityFieldGid: string | null
   tags: 'ignore' | 'append'
-  // "Loại việc" (enum cố định)
-  sectionMode: 'ignore' | 'single' | 'manual'
-  sectionSingle: AppTaskSection | null
-  sectionMap: Record<string, AppTaskSection | null>
   // "Section" (danh sách chung admin) — Asana section → Section.id
   appSectionMode: 'ignore' | 'single' | 'manual'
   appSectionSingle: string | null
@@ -40,7 +36,6 @@ export interface TaskOverride {
   status?: ImportTaskStatus
   priority?: 'low' | 'normal' | 'high' | 'urgent'
   orgUnitId?: string | null
-  section?: AppTaskSection | null
 }
 
 export interface ImportConfig {
@@ -79,8 +74,7 @@ export interface PlanItem {
   assigneeId: string | null
   status: ImportTaskStatus
   priority: 'low' | 'normal' | 'high' | 'urgent'
-  section: AppTaskSection | null // "Loại việc" (enum)
-  sectionId: string | null // "Section" (danh sách chung)
+  sectionId: string | null // "Section" (danh sách chung) — trục phân loại duy nhất
   orgUnitId: string | null
   startOn: string | null
   dueOn: string | null
@@ -122,9 +116,6 @@ function rootAncestor(gid: string, byGid: Map<string, NormalizedTask>): string |
   return cur ? cur.gid : null
 }
 
-const asSection = (v: unknown): AppTaskSection | null =>
-  typeof v === 'string' && (APP_TASK_SECTIONS as readonly string[]).includes(v) ? (v as AppTaskSection) : null
-
 export function buildPlan(normalized: NormalizeResult, config: ImportConfig, ctx: PlanContext): ImportPlan {
   const byGid = new Map(normalized.tasks.map((t) => [t.gid, t]))
   const source = config.sourceProjectGid
@@ -158,23 +149,8 @@ export function buildPlan(normalized: NormalizeResult, config: ImportConfig, ctx
     return m.value
   }
 
-  // Section của task TRONG dự án nguồn (ưu tiên) — dùng cho cả map enum lẫn map đơn vị.
+  // Section của task TRONG dự án nguồn (ưu tiên) — dùng cho map đơn vị + map Section.
   const sectionInSource = (t: NormalizedTask): string | null => t.sectionByProject?.[source] || null
-
-  const resolveSection = (t: NormalizedTask, ov: TaskOverride): AppTaskSection | null => {
-    if (ov.section !== undefined) return ov.section
-    const fm = config.fieldMap
-    if (fm.sectionMode === 'single') return fm.sectionSingle ?? null
-    if (fm.sectionMode === 'manual') {
-      const inSrc = sectionInSource(t)
-      const candidates = inSrc ? [inSrc, ...t.sections] : t.sections
-      for (const s of candidates) {
-        const mapped = asSection(fm.sectionMap[s])
-        if (mapped) return mapped
-      }
-    }
-    return null
-  }
 
   // Đơn vị: override > phòng người thực hiện (nếu bật) > theo section > mặc định.
   // fromDefault=true (assignee dùng người mặc định) → KHÔNG lấy phòng người mặc định (tránh gán bừa).
@@ -213,7 +189,7 @@ export function buildPlan(normalized: NormalizeResult, config: ImportConfig, ctx
   const baseItem = (t: NormalizedTask, kind: 'task' | 'subtask'): PlanItem => ({
     gid: t.gid, kind, action: 'create', reason: null, parentGid: t.parentGid,
     title: '', description: '', assigneeId: null, status: t.completed ? 'done' : 'todo',
-    priority: 'normal', section: null, sectionId: null, orgUnitId: null, startOn: null, dueOn: null,
+    priority: 'normal', sectionId: null, orgUnitId: null, startOn: null, dueOn: null,
     completedAt: t.completedAt, sourceCreatedAt: t.sourceCreatedAt, permalink: t.permalink, watcherIds: [], warnings: [],
   })
 
@@ -324,7 +300,6 @@ export function buildPlan(normalized: NormalizeResult, config: ImportConfig, ctx
     item.completedAt = item.status === 'done' ? t.completedAt : null
 
     if (kind === 'task') {
-      item.section = resolveSection(t, ov)
       item.sectionId = resolveAppSection(t)
       item.orgUnitId = resolveOrg(t, ov, assigneeId, assigneeFromDefault)
       item.watcherIds = mapWatchers(t)

@@ -9,7 +9,7 @@ import TaskCardMobile from './TaskCardMobile'
 import useIsMobile from '../../utils/useIsMobile'
 import { dueLabel } from '../../utils/date'
 import { useLocalStorage } from '../../utils/useLocalStorage'
-import { SECTIONS, SECTION_ORDER, STATUS, STATUS_ORDER, PRIORITY, PRIORITY_ORDER } from '../../data/constants'
+import { STATUS, STATUS_ORDER, PRIORITY, PRIORITY_ORDER } from '../../data/constants'
 
 function TaskRow({ task, showContext, selectable, selected, onToggleSel, dragProps }) {
   const {
@@ -138,21 +138,10 @@ function TableHead({ showContext, selectable, allChecked, onToggleAll }) {
   )
 }
 
-// Nhóm theo section — task chưa gán mục (section null, VD tạo từ dự án/chuyển đơn vị)
-// PHẢI vào nhóm "Chưa phân mục", không được biến mất khỏi danh sách.
-function sectionGroups(tasks) {
-  const groups = SECTION_ORDER
-    .map((key) => ({ key, name: SECTIONS[key], items: tasks.filter((t) => t.section === key) }))
-  const known = new Set(SECTION_ORDER)
-  const other = tasks.filter((t) => !known.has(t.section))
-  if (other.length) groups.push({ key: 'other', name: 'Chưa phân mục', items: other })
-  return groups.filter((g) => g.items.length > 0)
-}
-
-export default function TaskTable({ tasks, showContext = true, groupBySection = false, groupByAppSection = false, emptyText = 'Không có công việc nào' }) {
+export default function TaskTable({ tasks, showContext = true, groupByAppSection = false, emptyText = 'Không có công việc nào' }) {
   const isMobile = useIsMobile()
 
-  // Nhóm theo "Section" (danh sách chung) — desktop có kéo-thả; mobile hiện nhóm thẻ (đổi section qua chi tiết task).
+  // Nhóm theo "Section" (danh sách chung) — desktop có kéo-thả + chọn nhiều; mobile hiện nhóm thẻ.
   if (groupByAppSection) {
     if (tasks.length === 0) return <EmptyState title={emptyText} hint="Nhấn “Tạo công việc” để thêm việc mới." />
     return <AppSectionGrouped tasks={tasks} showContext={showContext} />
@@ -162,49 +151,16 @@ export default function TaskTable({ tasks, showContext = true, groupBySection = 
     return <EmptyState title={emptyText} hint="Nhấn “Tạo công việc” để thêm việc mới." />
   }
 
-  // Mobile: card list thay bảng nhiều cột (desktop giữ nguyên table)
+  // Mobile: card list thay bảng nhiều cột (desktop giữ nguyên bảng có chọn nhiều)
   if (isMobile) {
-    if (!groupBySection) {
-      return (
-        <div className="task-card-list">
-          {tasks.map((t) => <TaskCardMobile key={t.id} task={t} showContext={showContext} />)}
-        </div>
-      )
-    }
-    const groups = sectionGroups(tasks)
     return (
       <div className="task-card-list">
-        {groups.map((g) => (
-          <div key={g.key} className="task-card-group">
-            <div className="task-card-group-head">
-              {g.name} <span className="section-count">{g.items.length}</span>
-            </div>
-            {g.items.map((t) => <TaskCardMobile key={t.id} task={t} showContext={showContext} />)}
-          </div>
-        ))}
+        {tasks.map((t) => <TaskCardMobile key={t.id} task={t} showContext={showContext} />)}
       </div>
     )
   }
 
-  if (!groupBySection) {
-    return <FlatSelectableTable tasks={tasks} showContext={showContext} />
-  }
-
-  // Nhóm theo section kiểu Asana (dùng cho trang Phòng ban)
-  const groups = sectionGroups(tasks)
-
-  return (
-    <div className="table-wrap">
-      <table className="task-table">
-        <TableHead showContext={showContext} />
-        <tbody>
-          {groups.map((g) => (
-            <SectionGroup key={g.key} group={g} showContext={showContext} />
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
+  return <FlatSelectableTable tasks={tasks} showContext={showContext} />
 }
 
 function FlatSelectableTable({ tasks, showContext }) {
@@ -257,12 +213,22 @@ function FlatSelectableTable({ tasks, showContext }) {
  * Thả 1 task vào section → updateTaskField(sectionId). Chỉ ai có quyền sửa task mới thả được.
  */
 function AppSectionGrouped({ tasks, showContext }) {
-  const { state, updateTaskField, perms } = useApp()
+  const { state, updateTaskField, bulkUpdateField, perms } = useApp()
   const isMobile = useIsMobile()
   const [overKey, setOverKey] = useState(null)
   const [collapsed, setCollapsed] = useLocalStorage('section.collapsed', {})
   const toggleCollapse = (key) => setCollapsed((c) => ({ ...c, [key]: !c[key] }))
   const sections = state.sections || []
+
+  // Chọn nhiều task để đổi Loại việc / Section hàng loạt (bổ sung cho kéo-thả từng việc).
+  const [sel, setSel] = useState(() => new Set())
+  const visibleIds = tasks.map((t) => t.id)
+  const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const allChecked = visibleIds.length > 0 && visibleIds.every((id) => sel.has(id))
+  const toggleAll = () => setSel(allChecked ? new Set() : new Set(visibleIds))
+  const clearSel = () => setSel(new Set())
+  const selIds = [...sel].filter((id) => visibleIds.includes(id))
+  const bulkAppSection = (sectionId) => { bulkUpdateField(selIds, { sectionId: sectionId || null }); clearSel() }
 
   const byId = new Map(sections.map((s) => [s.id, { key: s.id, id: s.id, name: s.name, items: [] }]))
   const noneGroup = { key: '__none__', id: null, name: 'Chưa có section', items: [] }
@@ -306,53 +272,59 @@ function AppSectionGrouped({ tasks, showContext }) {
     e.dataTransfer.effectAllowed = 'move'
   }
 
-  return (
-    <div className="table-wrap">
-      <table className="task-table">
-        <TableHead showContext={showContext} />
-        {groups.map((g) => {
-          const isCollapsed = !!collapsed[g.key]
-          return (
-            <tbody
-              key={g.key}
-              className={`section-dnd ${overKey === g.key ? 'section-dnd-over' : ''}`}
-              onDragOver={(e) => { e.preventDefault(); if (overKey !== g.key) setOverKey(g.key) }}
-              onDragLeave={(e) => { if (e.currentTarget === e.target) setOverKey(null) }}
-              onDrop={onDrop(g)}
-            >
-              <tr className="section-row">
-                <td colSpan={showContext ? 7 : 6}>
-                  <button className="section-toggle" onClick={() => toggleCollapse(g.key)} title={isCollapsed ? 'Mở rộng' : 'Thu gọn'}>
-                    {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                  </button>
-                  {g.name} <span className="section-count">{g.items.length}</span>
-                  {isCollapsed && g.items.length > 0 && <span className="muted section-drop-hint"> · đã thu gọn</span>}
-                  {overKey === g.key && <span className="muted section-drop-hint"> — thả vào đây</span>}
-                </td>
-              </tr>
-              {!isCollapsed && g.items.map((t) => (
-                <TaskRow key={t.id} task={t} showContext={showContext} dragProps={{ draggable: true, onDragStart: dragStart(t) }} />
-              ))}
-              {!isCollapsed && g.items.length === 0 && (
-                <tr className="section-empty-row"><td colSpan={showContext ? 7 : 6} className="muted">Kéo task vào đây…</td></tr>
-              )}
-            </tbody>
-          )
-        })}
-      </table>
-    </div>
-  )
-}
+  const headSpan = showContext ? 8 : 7
 
-function SectionGroup({ group, showContext }) {
   return (
     <>
-      <tr className="section-row">
-        <td colSpan={showContext ? 7 : 6}>
-          {group.name} <span className="section-count">{group.items.length}</span>
-        </td>
-      </tr>
-      {group.items.map((t) => <TaskRow key={t.id} task={t} showContext={showContext} />)}
+      {selIds.length > 0 && (
+        <div className="bulk-bar">
+          <span className="bulk-count">{selIds.length} đã chọn</span>
+          <select defaultValue="" onChange={(e) => { if (e.target.value) { bulkAppSection(e.target.value === '__none__' ? null : e.target.value); e.target.value = '' } }}>
+            <option value="">Đổi section…</option>
+            <option value="__none__">— Bỏ khỏi section —</option>
+            {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <button className="btn btn-ghost" onClick={clearSel}><X size={14} /> Bỏ chọn</button>
+        </div>
+      )}
+      <div className="table-wrap">
+        <table className="task-table">
+          <TableHead showContext={showContext} selectable allChecked={allChecked} onToggleAll={toggleAll} />
+          {groups.map((g) => {
+            const isCollapsed = !!collapsed[g.key]
+            return (
+              <tbody
+                key={g.key}
+                className={`section-dnd ${overKey === g.key ? 'section-dnd-over' : ''}`}
+                onDragOver={(e) => { e.preventDefault(); if (overKey !== g.key) setOverKey(g.key) }}
+                onDragLeave={(e) => { if (e.currentTarget === e.target) setOverKey(null) }}
+                onDrop={onDrop(g)}
+              >
+                <tr className="section-row">
+                  <td colSpan={headSpan}>
+                    <button className="section-toggle" onClick={() => toggleCollapse(g.key)} title={isCollapsed ? 'Mở rộng' : 'Thu gọn'}>
+                      {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                    </button>
+                    {g.name} <span className="section-count">{g.items.length}</span>
+                    {isCollapsed && g.items.length > 0 && <span className="muted section-drop-hint"> · đã thu gọn</span>}
+                    {overKey === g.key && <span className="muted section-drop-hint"> — thả vào đây</span>}
+                  </td>
+                </tr>
+                {!isCollapsed && g.items.map((t) => (
+                  <TaskRow
+                    key={t.id} task={t} showContext={showContext}
+                    selectable selected={sel.has(t.id)} onToggleSel={toggleSel}
+                    dragProps={{ draggable: true, onDragStart: dragStart(t) }}
+                  />
+                ))}
+                {!isCollapsed && g.items.length === 0 && (
+                  <tr className="section-empty-row"><td colSpan={headSpan} className="muted">Kéo task vào đây…</td></tr>
+                )}
+              </tbody>
+            )
+          })}
+        </table>
+      </div>
     </>
   )
 }

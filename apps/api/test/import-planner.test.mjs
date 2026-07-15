@@ -5,7 +5,7 @@ import * as norm from '../dist/import/asana-normalizer.js'
 import * as planner from '../dist/import/import-planner.js'
 
 const task = (o) => ({ resource_type: 'task', ...o })
-const baseFieldMap = { notes: true, startDate: true, dueDate: true, followers: true, priorityFieldGid: null, tags: 'ignore', sectionMode: 'ignore', sectionSingle: null, sectionMap: {}, appSectionMode: 'ignore', appSectionSingle: null, appSectionMap: {} }
+const baseFieldMap = { notes: true, startDate: true, dueDate: true, followers: true, priorityFieldGid: null, tags: 'ignore', appSectionMode: 'ignore', appSectionSingle: null, appSectionMap: {} }
 const cfg = (over = {}) => ({ sourceProjectGid: 'SRC', fieldMap: baseFieldMap, userMap: {}, orgBySection: {}, orgFromAssignee: false, missingAssigneePolicy: 'default', defaultAssigneeId: null, overrides: {}, ...over })
 const ctx = (over = {}) => ({ activeUserIds: new Set(), userOrgUnit: {}, existingGids: new Set(), targetProjectId: null, defaultOrgUnitId: null, ...over })
 const plan = (data, c, x) => planner.buildPlan(norm.normalize(data), c, x)
@@ -115,12 +115,12 @@ test('title rỗng: task → error; subtask → skip', () => {
   assert.equal(p.items.find((i) => i.gid === 'Cempty').action, 'skip')
 })
 
-test('section single & manual', () => {
+test('appSection single & manual (Section — trục phân loại duy nhất)', () => {
   const data = [task({ gid: 't1', name: 'A', ...inSrc(), assignee: { gid: 'u1', name: 'U' }, memberships: [{ project: { gid: 'SRC', name: 'Nguồn' }, section: { name: 'Sự vụ nhóm' } }] })]
-  const single = plan(data, cfg({ userMap: { u1: 'app1' }, fieldMap: { ...baseFieldMap, sectionMode: 'single', sectionSingle: 'kehoach' } }), ctx({ activeUserIds: new Set(['app1']) }))
-  assert.equal(single.items[0].section, 'kehoach')
-  const manual = plan(data, cfg({ userMap: { u1: 'app1' }, fieldMap: { ...baseFieldMap, sectionMode: 'manual', sectionMap: { 'Sự vụ nhóm': 'suvu' } } }), ctx({ activeUserIds: new Set(['app1']) }))
-  assert.equal(manual.items[0].section, 'suvu')
+  const single = plan(data, cfg({ userMap: { u1: 'app1' }, fieldMap: { ...baseFieldMap, appSectionMode: 'single', appSectionSingle: 'secX' } }), ctx({ activeUserIds: new Set(['app1']) }))
+  assert.equal(single.items[0].sectionId, 'secX')
+  const manual = plan(data, cfg({ userMap: { u1: 'app1' }, fieldMap: { ...baseFieldMap, appSectionMode: 'manual', appSectionMap: { 'Sự vụ nhóm': 'secY' } } }), ctx({ activeUserIds: new Set(['app1']) }))
+  assert.equal(manual.items[0].sectionId, 'secY')
 })
 
 test('tags append nối vào mô tả', () => {

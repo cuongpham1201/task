@@ -7,7 +7,7 @@ import type { AuthClaims } from '../auth/auth.types'
 import { UsersService } from '../users/users.service'
 import { TasksService } from './tasks.service'
 import {
-  AssigneeDto, CollaboratorsDto, CreateTaskDto, DueDateDto, PriorityDto, ProgressDto, ReviewDto,
+  AssigneeDto, BulkClassifyDto, CollaboratorsDto, CreateTaskDto, DueDateDto, PriorityDto, ProgressDto, ReviewDto,
   StatusDto, TaskOrgUnitDto, UpdateTaskDto, WorkLogDto,
 } from './task.dto'
 
@@ -31,6 +31,12 @@ export class TasksController {
   @Post()
   async create(@AuthUser() c: AuthClaims, @Body() dto: CreateTaskDto) {
     return this.tasks.create(await this.me(c), dto)
+  }
+
+  // Chọn nhiều task → đổi Section hàng loạt (khai báo TRƯỚC @Patch(':id')).
+  @Patch('bulk-classify')
+  async bulkClassify(@AuthUser() c: AuthClaims, @Body() dto: BulkClassifyDto) {
+    return this.tasks.bulkClassify(await this.me(c), dto.ids, { sectionId: dto.sectionId })
   }
 
   @Patch(':id/status')

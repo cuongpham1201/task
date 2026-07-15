@@ -96,7 +96,6 @@ export default function DepartmentPage() {
         <TaskTable
           tasks={tasks}
           showContext={false}
-          groupBySection
           emptyText="Phòng ban chưa có công việc nào"
         />
       )}

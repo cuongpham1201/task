@@ -424,8 +424,7 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
           orgUnitId: personal ? undefined : (input.orgUnitId ?? (scope === 'department' ? input.departmentId : undefined)),
           projectId: personal ? undefined : (input.projectId ?? (scope === 'channel' ? input.channelId : undefined)),
           actionId: personal ? undefined : (input.actionId || undefined),
-          section: !personal && scope === 'department' ? input.section || undefined : undefined,
-          sectionId: input.sectionId || undefined, // Section (nhóm sắp xếp) — độc lập, cho cả việc cá nhân
+          sectionId: input.sectionId || undefined, // Section (nhóm sắp xếp) — trục phân loại duy nhất, cho cả việc cá nhân
 
           assigneeId: input.assigneeId || me,
           priority: input.priority || 'normal',
@@ -543,6 +542,21 @@ export function AppProvider({ children, bootstrap, currentUserId }) {
           activities: [makeActivity(id, me, 'edit', { fields: Object.keys(fieldPatch) })],
         })
         persist(patch(`/tasks/${id}`, fieldPatch), (t) => dispatch({ type: 'REPLACE_TASK', task: t }))
+      },
+
+      // Chọn nhiều task → đổi "Loại việc" (section) / "Section" (sectionId) 1 lần.
+      // fieldPatch: { section } hoặc { sectionId } (sectionId=null để gỡ khỏi section).
+      bulkUpdateField: (ids, fieldPatch) => {
+        const targets = ids.map(findTask).filter(Boolean).filter((t) => canManageTask(currentUser, t, managedIds))
+        if (targets.length === 0) { toast('Không có việc nào bạn được phép sửa', 'warn'); return }
+        targets.forEach((t) => dispatch({
+          type: 'UPDATE_TASK_FIELD', id: t.id, at: now(), patch: fieldPatch,
+          activities: [makeActivity(t.id, me, 'edit', { fields: Object.keys(fieldPatch) })],
+        }))
+        persist(
+          patch('/tasks/bulk-classify', { ids: targets.map((t) => t.id), ...fieldPatch }),
+          (r) => { if (r && r.skipped > 0) toast(`Đã cập nhật ${r.updated} việc, bỏ qua ${r.skipped} (không đủ quyền)`) },
+        )
       },
 
       addComment: (taskId, content, mentionIds = []) => {

@@ -258,7 +258,6 @@ export class ImportService {
               projectId: targetProjectId,
               workspaceId: targetProjectId, // project == workspace container
               actionId: null,
-              section: item.section,
               sectionId: item.sectionId ?? (item.status === 'done' ? doneBucket?.id ?? null : null),
               creatorId: creatorOf(item.assigneeId), // "người giao" theo cấu hình (JSON không có người tạo)
               assigneeId: item.assigneeId!, // task 'create' luôn có assignee (plan đảm bảo)

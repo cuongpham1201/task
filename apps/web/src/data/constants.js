@@ -21,14 +21,6 @@ export const PRIORITY = {
 }
 export const PRIORITY_ORDER = ['low', 'normal', 'high', 'urgent']
 
-export const SECTIONS = {
-  suvu: 'Công việc sự vụ',
-  kehoach: 'Công việc kế hoạch',
-  hangngay: 'Công việc hằng ngày',
-  phatsinh: 'Công việc phát sinh',
-}
-export const SECTION_ORDER = ['suvu', 'kehoach', 'hangngay', 'phatsinh']
-
 // FEATURE-004: role KỸ THUẬT chỉ còn admin/member. "Trưởng phòng" là VAI TRÒ
 // TỔ CHỨC (org_unit_roles), không nằm ở đây. Giá trị lạ (enum cũ) hiển thị Nhân viên.
 export const ROLES = {

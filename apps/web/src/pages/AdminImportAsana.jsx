@@ -9,12 +9,6 @@ import { deaccent } from '../utils/text'
 import { ORG_TYPE } from '../utils/org'
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024
-const SECTIONS = [
-  { value: 'suvu', label: 'Sự vụ' },
-  { value: 'kehoach', label: 'Kế hoạch' },
-  { value: 'hangngay', label: 'Hằng ngày' },
-  { value: 'phatsinh', label: 'Phát sinh' },
-]
 const PRIORITIES = [
   { value: 'low', label: 'Thấp' },
   { value: 'normal', label: 'Bình thường' },
@@ -24,7 +18,7 @@ const PRIORITIES = [
 
 const defaultConfig = () => ({
   sourceProjectGid: '',
-  fieldMap: { notes: true, startDate: true, dueDate: true, followers: true, priorityFieldGid: null, tags: 'ignore', sectionMode: 'ignore', sectionSingle: null, sectionMap: {}, appSectionMode: 'ignore', appSectionSingle: null, appSectionMap: {} },
+  fieldMap: { notes: true, startDate: true, dueDate: true, followers: true, priorityFieldGid: null, tags: 'ignore', appSectionMode: 'ignore', appSectionSingle: null, appSectionMap: {} },
   userMap: {},
   orgBySection: {},
   orgFromAssignee: false,
@@ -449,39 +443,6 @@ function Step3({ parseRes, config, patchFieldMap }) {
         </div>
       </div>
 
-      <div className="form-field">
-        <label>Loại việc (Sự vụ / Kế hoạch / Hằng ngày / Phát sinh)</label>
-        <div className="import-radio-row">
-          <label><input type="radio" checked={fm.sectionMode === 'ignore'} onChange={() => patchFieldMap({ sectionMode: 'ignore' })} /> Bỏ qua</label>
-          <label><input type="radio" checked={fm.sectionMode === 'single'} onChange={() => patchFieldMap({ sectionMode: 'single' })} /> Gán 1 nhóm cho tất cả</label>
-          <label><input type="radio" checked={fm.sectionMode === 'manual'} onChange={() => patchFieldMap({ sectionMode: 'manual' })} /> Map từng section</label>
-        </div>
-        {fm.sectionMode === 'single' && (
-          <select value={fm.sectionSingle || ''} onChange={(e) => patchFieldMap({ sectionSingle: e.target.value || null })}>
-            <option value="">— Chọn nhóm —</option>
-            {SECTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-        )}
-        {fm.sectionMode === 'manual' && (
-          <div className="table-wrap" style={{ marginTop: 6 }}>
-            <table className="task-table settings-table">
-              <thead><tr><th>Section Asana</th><th>Số task</th><th>→ Nhóm App</th></tr></thead>
-              <tbody>
-                {sections.map((s) => (
-                  <tr key={s.name}><td>{s.name}</td><td>{s.count}</td>
-                    <td><select value={fm.sectionMap[s.name] || ''} onChange={(e) => patchFieldMap({ sectionMap: { ...fm.sectionMap, [s.name]: e.target.value || null } })}>
-                      <option value="">— Bỏ qua —</option>
-                      {SECTIONS.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
-                    </select></td>
-                  </tr>
-                ))}
-                {sections.length === 0 && <tr><td colSpan={3} className="muted">Không có section trong file.</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
       {appSections.length > 0 && (
         <div className="form-field">
           <label>Section (nhóm sắp xếp — danh sách chung)</label>
@@ -514,7 +475,7 @@ function Step3({ parseRes, config, patchFieldMap }) {
               </table>
             </div>
           )}
-          <span className="form-hint muted">Section = danh sách chung do admin tạo (tab Cài đặt → Section). Khác "Loại việc" ở trên.</span>
+          <span className="form-hint muted">Section = danh sách chung do admin tạo (tab Cài đặt → Section). Là trục phân loại/nhóm việc.</span>
         </div>
       )}
 

@@ -3,26 +3,17 @@
  * ValidationPipe global KHÔNG deep-validate object lồng key động → sanitize thủ công:
  * chỉ đọc field đã biết, ép kiểu, bỏ key nguy hiểm (chống prototype pollution).
  */
-import { APP_TASK_SECTIONS, type AppTaskSection } from './import.constants'
 import type { ImportConfig, ImportFieldMap, TaskOverride } from './import-planner'
 
 const DANGEROUS = new Set(['__proto__', 'constructor', 'prototype'])
 const bool = (v: any, d = false) => (typeof v === 'boolean' ? v : d)
 const str = (v: any): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null)
-const section = (v: any): AppTaskSection | null => (typeof v === 'string' && (APP_TASK_SECTIONS as readonly string[]).includes(v) ? (v as AppTaskSection) : null)
 const priority = (v: any): 'low' | 'normal' | 'high' | 'urgent' | undefined =>
   v === 'low' || v === 'normal' || v === 'high' || v === 'urgent' ? v : undefined
 const status = (v: any): 'todo' | 'done' | undefined => (v === 'todo' || v === 'done' ? v : undefined)
 
 function sanitizeFieldMap(raw: any): ImportFieldMap {
   const r = raw && typeof raw === 'object' ? raw : {}
-  const sectionMap: Record<string, AppTaskSection | null> = {}
-  if (r.sectionMap && typeof r.sectionMap === 'object') {
-    for (const [k, v] of Object.entries(r.sectionMap)) {
-      if (DANGEROUS.has(k)) continue
-      sectionMap[k] = section(v)
-    }
-  }
   const appSectionMap: Record<string, string | null> = {}
   if (r.appSectionMap && typeof r.appSectionMap === 'object') {
     for (const [k, v] of Object.entries(r.appSectionMap)) {
@@ -37,9 +28,6 @@ function sanitizeFieldMap(raw: any): ImportFieldMap {
     followers: bool(r.followers, true),
     priorityFieldGid: str(r.priorityFieldGid),
     tags: r.tags === 'append' ? 'append' : 'ignore',
-    sectionMode: r.sectionMode === 'single' || r.sectionMode === 'manual' ? r.sectionMode : 'ignore',
-    sectionSingle: section(r.sectionSingle),
-    sectionMap,
     appSectionMode: r.appSectionMode === 'single' || r.appSectionMode === 'manual' ? r.appSectionMode : 'ignore',
     appSectionSingle: str(r.appSectionSingle),
     appSectionMap,
@@ -59,7 +47,6 @@ function sanitizeOverrides(raw: any): Record<string, TaskOverride> {
     const st = status(o.status); if (st) ov.status = st
     const pr = priority(o.priority); if (pr) ov.priority = pr
     if (o.orgUnitId === null || typeof o.orgUnitId === 'string') ov.orgUnitId = o.orgUnitId || null
-    if (o.section === null || typeof o.section === 'string') ov.section = section(o.section)
     out[gid] = ov
   }
   return out

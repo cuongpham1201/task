@@ -39,7 +39,7 @@ async function main() {
 
   const config = {
     sourceProjectGid: SRC,
-    fieldMap: { notes: true, startDate: true, dueDate: true, followers: true, priorityFieldGid: null, tags: 'ignore', sectionMode: 'ignore', sectionSingle: null, sectionMap: {} },
+    fieldMap: { notes: true, startDate: true, dueDate: true, followers: true, priorityFieldGid: null, tags: 'ignore', appSectionMode: 'ignore', appSectionSingle: null, appSectionMap: {} },
     userMap: { au1: u1.id, au2: u2.id }, // au3/none unmapped
     missingAssigneePolicy: 'default',
     defaultAssigneeId: admin.id,

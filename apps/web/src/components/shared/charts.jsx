@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
 import Avatar from './Avatar'
 import { STATUS, ACTION_STATUS } from '../../data/constants'
-import { SECTIONS, SECTION_ORDER } from '../../data/constants'
 import { isOverdue } from '../../utils/date'
+import { useApp } from '../../store/AppContext'
 
 /**
  * FEATURE-005 — Dashboard biểu đồ kiểu Asana cho Phòng ban / Dự án / Action Log.
@@ -129,6 +129,8 @@ function ChartCard({ title, children }) {
 
 // ══ Dashboard TASK (Phòng ban + Dự án) ══
 export function TaskDashboard({ tasks, usersById, showSections = false }) {
+  const { state } = useApp()
+  const sections = state.sections || []
   const m = useMemo(() => {
     const open = tasks.filter((t) => t.status !== 'done')
     const done = tasks.filter((t) => t.status === 'done')
@@ -152,11 +154,11 @@ export function TaskDashboard({ tasks, usersById, showSections = false }) {
       .sort((a, b) => b.value - a.value)
       .slice(0, 10)
     const bySection = showSections
-      ? [...SECTION_ORDER.map((k) => ({ label: SECTIONS[k], value: tasks.filter((t) => t.section === k).length, color: 'var(--accent)' })),
-         { label: 'Chưa phân mục', value: tasks.filter((t) => !SECTION_ORDER.includes(t.section)).length, color: '#9aa1ad' }]
+      ? [...sections.map((s) => ({ label: s.name, value: tasks.filter((t) => t.sectionId === s.id).length, color: 'var(--accent)' })),
+         { label: 'Chưa có section', value: tasks.filter((t) => !t.sectionId).length, color: '#9aa1ad' }].filter((d) => d.value > 0)
       : null
     return { open, done, overdue, byStatus, byDue, byAssignee, bySection }
-  }, [tasks, usersById, showSections])
+  }, [tasks, usersById, showSections, sections])
 
   return (
     <>

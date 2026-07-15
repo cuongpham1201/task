@@ -181,7 +181,6 @@ export class TasksService {
           orgUnitId: dims.orgUnitId,
           projectId: dims.projectId,
           actionId: dims.actionId,
-          section: (dto.section as any) ?? null,
           sectionId: dto.sectionId ?? null,
           creatorId: me.id,
           assigneeId: dims.assigneeId,
@@ -442,7 +441,7 @@ export class TasksService {
     // quan thấy). Ưu tiên trước, bỏ qua projectId/actionId lẻ nếu cùng gửi.
     let personalPatch: any = {}
     if (dto.personal === true) {
-      personalPatch = { orgUnitId: null, projectId: null, workspaceId: null, actionId: null, section: null }
+      personalPatch = { orgUnitId: null, projectId: null, workspaceId: null, actionId: null }
     }
 
     // ── P0-1: đổi/gỡ 2 chiều phân loại (org_unit là chiều gốc — KHÔNG bị thay thế) ──
@@ -504,7 +503,6 @@ export class TasksService {
           ...(dto.title !== undefined ? { title: dto.title } : {}),
           ...(dto.description !== undefined ? { description: dto.description } : {}),
           ...(dto.expectedOutput !== undefined ? { expectedOutput: dto.expectedOutput } : {}),
-          ...(dto.section !== undefined ? { section: dto.section as any } : {}),
           ...(dto.sectionId !== undefined ? { sectionId: dto.sectionId || null } : {}),
           ...(dto.startDate !== undefined ? { startDate: dto.startDate ? new Date(dto.startDate) : null } : {}),
           ...projectPatch,
@@ -521,6 +519,29 @@ export class TasksService {
       })
     })
     return this.withCollaborators(id)
+  }
+
+  /**
+   * Đổi "Section" (sectionId) cho NHIỀU task cùng lúc (sectionId=null để gỡ khỏi section).
+   * Chỉ áp cho task caller được quyền quản lý; task khác bị bỏ qua (không fail cả lô).
+   * KHÔNG bắn notification (phân loại tổ chức, tránh spam khi sửa hàng loạt).
+   */
+  async bulkClassify(me: Me, ids: string[], dto: { sectionId?: string | null }) {
+    if (dto.sectionId === undefined) throw new BadRequestException('Chưa chọn Section')
+    if (!Array.isArray(ids) || ids.length === 0) throw new BadRequestException('Chưa chọn công việc nào')
+    if (ids.length > 1000) throw new BadRequestException('Chọn tối đa 1000 công việc mỗi lần')
+    if (dto.sectionId) await this.validateSection(dto.sectionId)
+
+    const uniqueIds = [...new Set(ids)]
+    const tasks = await this.prisma.task.findMany({ where: { id: { in: uniqueIds }, archived: false } })
+    const allowed: string[] = []
+    for (const t of tasks) {
+      if (await this.policy.canManage(me, t as any)) allowed.push(t.id)
+    }
+    if (allowed.length > 0) {
+      await this.prisma.task.updateMany({ where: { id: { in: allowed } }, data: { sectionId: dto.sectionId || null } })
+    }
+    return { updated: allowed.length, skipped: uniqueIds.length - allowed.length, ids: allowed }
   }
 
   /** B: KÍCH HOẠT task nháp → hiện theo phạm vi thật + bắn thông báo GỘP 1 lần. */

@@ -3,7 +3,6 @@ import {
 } from 'class-validator'
 
 const PRIORITIES = ['low', 'normal', 'high', 'urgent']
-const SECTIONS = ['suvu', 'kehoach', 'hangngay', 'phatsinh']
 const MODES = ['self', 'review_required']
 
 export class CreateTaskDto {
@@ -15,7 +14,6 @@ export class CreateTaskDto {
   @IsOptional() @IsString() orgUnitId?: string | null
   @IsOptional() @IsString() projectId?: string | null
   @IsOptional() @IsString() actionId?: string | null
-  @IsOptional() @IsIn(SECTIONS) section?: string // "Loại việc" (enum cố định)
   @IsOptional() @IsString() sectionId?: string | null // "Section" (danh sách chung admin) — null = gỡ
   @IsOptional() @IsString() assigneeId?: string
   @IsOptional() @IsIn(PRIORITIES) priority?: string
@@ -56,7 +54,6 @@ export class UpdateTaskDto {
   @IsOptional() @IsString() @MaxLength(255) title?: string
   @IsOptional() @IsString() description?: string
   @IsOptional() @IsString() @MaxLength(2000) expectedOutput?: string
-  @IsOptional() @IsIn(SECTIONS) section?: string // "Loại việc"
   @IsOptional() @IsString() sectionId?: string | null // "Section" (null = gỡ)
   @IsOptional() @IsDateString() startDate?: string | null
   // P0: sửa 2 chiều phân loại sau khi tạo (null = gỡ) — validate ở service
@@ -67,6 +64,12 @@ export class UpdateTaskDto {
   @IsOptional() reviewerId?: string | null
   // A/B (13/07): chuyển task về CÁ NHÂN riêng tư → gỡ đơn vị/dự án/action
   @IsOptional() @IsBoolean() personal?: boolean
+}
+// Chọn nhiều task → đổi "Section" (sectionId) hàng loạt.
+// Chỉ áp cho những task caller được quyền quản lý; task khác bị bỏ qua (không lỗi cả lô).
+export class BulkClassifyDto {
+  @IsArray() @IsString({ each: true }) ids!: string[]
+  @IsOptional() @IsString() sectionId?: string | null // "Section" (null = gỡ khỏi section)
 }
 // FEATURE-004: sửa người phối hợp sau khi tạo (client gửi TOÀN BỘ danh sách — server diff)
 export class CollaboratorsDto {

@@ -88,14 +88,6 @@ enum TaskPriority {
   @@map("task_priority")
 }
 
-enum TaskSection {
-  suvu
-  kehoach
-  hangngay
-  phatsinh
-
-  @@map("task_section")
-}
 
 enum ActivityAction {
   create
@@ -340,8 +332,7 @@ model Task {
   orgUnitId       String?        @map("org_unit_id") // đơn vị chịu trách nhiệm (bắt buộc ở tầng app với task nghiệp vụ)
   projectId       String?        @map("project_id") // P1: = workspace.id của workspace type=project (không đặt FK để dễ tách bảng projects sau)
   actionId        String?        @map("action_id") // thuộc Action nào (nullable)
-  section         TaskSection? // "Loại việc" (sự vụ/kế hoạch/hằng ngày/phát sinh) — enum cố định, gộp báo cáo được
-  sectionId       String?        @map("section_id") // "Section" (nhóm sắp xếp) — danh sách chung do admin quản (Section table)
+  sectionId       String?        @map("section_id") // "Section" (nhóm sắp xếp) — danh sách chung do admin quản (Section table). Gộp "Loại việc" cũ vào đây (bỏ enum TaskSection).
   creatorId       String         @map("creator_id")
   assigneeId      String         @map("assignee_id")
   status          TaskStatus     @default(todo)
@@ -403,7 +394,7 @@ model Task {
 }
 
 // "Section" (nhóm sắp xếp) — danh sách CHUNG toàn hệ thống, CHỈ admin quản.
-// Khác "Loại việc" (Task.section enum). Task.sectionId trỏ tới đây (tùy chọn).
+// Trục phân loại duy nhất của task (đã gộp "Loại việc"/enum cũ vào đây). Task.sectionId trỏ tới đây (tùy chọn).
 model Section {
   id           String   @id @default(uuid())
   name         String

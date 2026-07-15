@@ -29,6 +29,3 @@ export function mapPriority(raw: string | null | undefined): { value: 'low' | 'n
   if (/(^|\b)(urgent|khẩn|khan|gấp|gap)\b/.test(v)) return { value: 'urgent', unknown: false }
   return { value: 'normal', unknown: true }
 }
-
-export const APP_TASK_SECTIONS = ['suvu', 'kehoach', 'hangngay', 'phatsinh'] as const
-export type AppTaskSection = (typeof APP_TASK_SECTIONS)[number]
