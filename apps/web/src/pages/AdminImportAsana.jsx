@@ -70,11 +70,11 @@ function Wizard() {
       if (!config.sourceProjectGid) return false
       if (targetMode === 'existing') return !!targetProjectId
       if (targetMode === 'new') return !!newProject.name.trim()
-      return !!defaultOrgUnitId // 'none' → bắt buộc có đơn vị (không thì thành việc cá nhân)
+      return !!defaultOrgUnitId || config.orgFromAssignee // 'none' → cần đơn vị mặc định HOẶC lấy theo phòng người TH
     }
     if (step === 3) return true
     return false
-  }, [step, parseRes, config.sourceProjectGid, targetMode, targetProjectId, newProject.name, defaultOrgUnitId])
+  }, [step, parseRes, config.sourceProjectGid, targetMode, targetProjectId, newProject.name, defaultOrgUnitId, config.orgFromAssignee])
 
   const doParse = async () => {
     if (!rawJson.trim()) return toast('Chưa có dữ liệu JSON', 'error')
@@ -222,7 +222,10 @@ const Stat = ({ n, label, tone }) => <div className="import-stat"><b className={
 function Step2({ parseRes, config, patchConfig, targetMode, setTargetMode, targetProjectId, setTargetProjectId, newProject, setNewProject, defaultOrgUnitId, setDefaultOrgUnitId, currentUser }) {
   const { state } = useApp()
   const [orgUnits, setOrgUnits] = useState([])
+  const [appProjects, setAppProjects] = useState(null) // nạp mới để thấy cả dự án vừa tạo
   useEffect(() => { apiFetch('/admin/org-units').then((r) => setOrgUnits((r || []).filter((o) => o.active))).catch(() => setOrgUnits([])) }, [])
+  useEffect(() => { apiFetch('/projects').then((r) => setAppProjects(r || [])).catch(() => setAppProjects(null)) }, [])
+  const projectList = appProjects || state.channels
   const projects = parseRes.projects || []
   const users = parseRes.users || []
   const srcSections = (parseRes.sectionsByProject && parseRes.sectionsByProject[config.sourceProjectGid]) || []
@@ -304,7 +307,7 @@ function Step2({ parseRes, config, patchConfig, targetMode, setTargetMode, targe
           {targetMode === 'existing' && (
             <select value={targetProjectId} onChange={(e) => setTargetProjectId(e.target.value)}>
               <option value="">— Chọn dự án có sẵn —</option>
-              {state.channels.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {projectList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           )}
         </div>
