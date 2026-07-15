@@ -28,6 +28,8 @@ const defaultConfig = () => ({
   userMap: {},
   orgBySection: {},
   orgFromAssignee: false,
+  creatorSource: 'importer',
+  fixedCreatorId: null,
   missingAssigneePolicy: 'default',
   defaultAssigneeId: null,
   overrides: {},
@@ -302,6 +304,20 @@ function Step2({ parseRes, config, patchConfig, targetMode, setTargetMode, targe
           {config.missingAssigneePolicy === 'default' && (
             <div style={{ maxWidth: 360, marginTop: 6 }}>
               <SearchUser value={config.defaultAssigneeId} onSelect={(id) => patchConfig({ defaultAssigneeId: id })} placeholder="Người thực hiện mặc định…" autoFocus={false} />
+            </div>
+          )}
+        </div>
+
+        <div className="form-field">
+          <label>Người giao <span className="muted" style={{ fontWeight: 400 }}>(JSON/CSV Asana không có người tạo task)</span></label>
+          <div className="import-radio-row">
+            <label><input type="radio" checked={config.creatorSource === 'assignee'} onChange={() => patchConfig({ creatorSource: 'assignee' })} /> = Người thực hiện</label>
+            <label><input type="radio" checked={config.creatorSource === 'fixed'} onChange={() => patchConfig({ creatorSource: 'fixed' })} /> Một người cố định</label>
+            <label><input type="radio" checked={config.creatorSource === 'importer'} onChange={() => patchConfig({ creatorSource: 'importer' })} /> Người import (bạn)</label>
+          </div>
+          {config.creatorSource === 'fixed' && (
+            <div style={{ maxWidth: 360, marginTop: 6 }}>
+              <SearchUser value={config.fixedCreatorId} onSelect={(id) => patchConfig({ fixedCreatorId: id })} placeholder="Chọn người giao cố định…" autoFocus={false} />
             </div>
           )}
         </div>

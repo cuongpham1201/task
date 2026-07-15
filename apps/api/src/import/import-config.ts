@@ -84,6 +84,8 @@ export function sanitizeConfig(raw: any): ImportConfig {
     userMap: sanitizeStringMap(r.userMap),
     orgBySection: sanitizeStringMap(r.orgBySection),
     orgFromAssignee: bool(r.orgFromAssignee, false),
+    creatorSource: r.creatorSource === 'assignee' || r.creatorSource === 'fixed' ? r.creatorSource : 'importer',
+    fixedCreatorId: str(r.fixedCreatorId),
     missingAssigneePolicy: r.missingAssigneePolicy === 'skip' ? 'skip' : 'default',
     defaultAssigneeId: str(r.defaultAssigneeId),
     overrides: sanitizeOverrides(r.overrides),
@@ -112,6 +114,7 @@ export function referencedUserIds(cfg: ImportConfig): string[] {
   const ids = new Set<string>()
   for (const v of Object.values(cfg.userMap)) if (v) ids.add(v)
   if (cfg.defaultAssigneeId) ids.add(cfg.defaultAssigneeId)
+  if (cfg.fixedCreatorId) ids.add(cfg.fixedCreatorId)
   for (const ov of Object.values(cfg.overrides)) if (ov.assigneeId) ids.add(ov.assigneeId)
   return [...ids]
 }

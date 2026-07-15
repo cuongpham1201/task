@@ -49,6 +49,9 @@ export interface ImportConfig {
   userMap: Record<string, string | null> // asanaUserGid → appUserId | null
   orgBySection: Record<string, string | null> // tên section (trong dự án nguồn) → orgUnitId
   orgFromAssignee: boolean // true → đơn vị = phòng "nhà" (HRM) của người thực hiện (ưu tiên hơn section)
+  // "Người giao" (creatorId) — JSON/CSV Asana KHÔNG có người tạo task nên phải chọn nguồn:
+  creatorSource: 'importer' | 'assignee' | 'fixed'
+  fixedCreatorId: string | null // dùng khi creatorSource='fixed'
   missingAssigneePolicy: 'default' | 'skip'
   defaultAssigneeId: string | null
   overrides: Record<string, TaskOverride>

@@ -201,6 +201,13 @@ export class ImportService {
     const ctx = await this.buildContext(cfg, normalized, targetProjectId)
     const plan = buildPlan(normalized, cfg, ctx)
 
+    // "Người giao" (creatorId) — mặc định người import; hoặc = người thực hiện; hoặc 1 người cố định.
+    if (cfg.creatorSource === 'fixed' && (!cfg.fixedCreatorId || !ctx.activeUserIds.has(cfg.fixedCreatorId))) {
+      throw new BadRequestException('Người giao cố định không hợp lệ hoặc đã ngừng hoạt động')
+    }
+    const creatorOf = (assigneeId: string | null): string =>
+      cfg.creatorSource === 'assignee' ? (assigneeId || meId) : cfg.creatorSource === 'fixed' ? (cfg.fixedCreatorId || meId) : meId
+
     await this.prisma.externalImportBatch.update({
       where: { id: batchId },
       data: { status: 'running', startedAt: new Date(), targetProjectId: targetProjectId ?? null, defaultOrgUnitId: defaultOrgUnitId ?? null, mappingJson: cfg as any, sourceProjectId: cfg.sourceProjectGid },
@@ -230,7 +237,7 @@ export class ImportService {
               actionId: null,
               section: item.section,
               sectionId: item.sectionId ?? (item.status === 'done' ? doneBucket?.id ?? null : null),
-              creatorId: meId, // creator = người import (KHÔNG lấy từ JSON)
+              creatorId: creatorOf(item.assigneeId), // "người giao" theo cấu hình (JSON không có người tạo)
               assigneeId: item.assigneeId!, // task 'create' luôn có assignee (plan đảm bảo)
               status: item.status,
               reviewRequired: false,
