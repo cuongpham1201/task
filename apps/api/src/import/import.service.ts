@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import { createHash } from 'node:crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { parseAsanaJson } from './asana-parser'
+import { csvTaskEmails } from './asana-csv'
 import { normalize, type NormalizeResult } from './asana-normalizer'
 import { buildPlan, type ImportConfig, type ImportPlan, type PlanContext, type PlanItem } from './import-planner'
 import { sanitizeConfig, referencedUserIds, referencedOrgIds, referencedSectionIds } from './import-config'
@@ -36,8 +37,9 @@ export class ImportService {
     return n
   }
 
-  /** PHA 1 — parse + normalize + tạo batch. Trả summary/projects/users/customFields cho wizard. */
-  async parse(meId: string, rawJson: string) {
+  /** PHA 1 — parse + normalize + tạo batch. Trả summary/projects/users/customFields cho wizard.
+   *  rawCsv (tùy chọn): CSV export Asana → ghép theo Task ID lấy email → gợi ý map người. */
+  async parse(meId: string, rawJson: string, rawCsv?: string | null) {
     let parsed
     try {
       parsed = parseAsanaJson(rawJson)
@@ -45,6 +47,26 @@ export class ImportService {
       throw new BadRequestException(e?.message || 'JSON không hợp lệ')
     }
     const normalized = this.capNormalized(normalize(parsed.data))
+    let csvMatched = 0
+    if (rawCsv && rawCsv.trim()) {
+      const emailByTaskGid = csvTaskEmails(rawCsv)
+      const gidEmail: Record<string, string> = {}
+      for (const t of normalized.tasks) {
+        if (t.assigneeGid) { const e = emailByTaskGid[t.gid]; if (e && !gidEmail[t.assigneeGid]) gidEmail[t.assigneeGid] = e }
+      }
+      const emails = [...new Set(Object.values(gidEmail))]
+      const appUsers = emails.length
+        ? await this.prisma.user.findMany({ where: { email: { in: emails }, active: true }, select: { id: true, email: true } })
+        : []
+      const byEmail = new Map(appUsers.map((u) => [u.email.toLowerCase(), u.id]))
+      for (const u of normalized.users) {
+        const e = gidEmail[u.gid]
+        if (!e) continue
+        u.email = e
+        const id = byEmail.get(e.toLowerCase())
+        if (id) { u.suggestedUserId = id; u.suggestedBy = 'email'; csvMatched++ }
+      }
+    }
     const payloadHash = this.hash(rawJson)
 
     const batch = await this.prisma.externalImportBatch.create({
@@ -67,6 +89,7 @@ export class ImportService {
       customFields: normalized.customFields,
       sections: normalized.sections,
       sectionsByProject: normalized.sectionsByProject,
+      csvMatched, // số user khớp email từ CSV (0 nếu không nạp CSV)
       warnings: normalized.warnings.slice(0, 200),
     }
   }

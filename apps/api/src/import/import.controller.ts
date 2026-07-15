@@ -28,7 +28,7 @@ export class ImportController {
   @Post('parse')
   async parse(@AuthUser() c: AuthClaims, @Body() dto: ParseAsanaDto) {
     const me = await this.admin(c)
-    return this.imports.parse(me.id, dto.rawJson)
+    return this.imports.parse(me.id, dto.rawJson, dto.rawCsv || null)
   }
 
   @Post('preview')

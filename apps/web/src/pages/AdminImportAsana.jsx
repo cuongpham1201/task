@@ -50,6 +50,7 @@ function Wizard() {
   const { toast, currentUser } = useApp()
   const [step, setStep] = useState(1)
   const [rawJson, setRawJson] = useState('')
+  const [rawCsv, setRawCsv] = useState('')
   const [parseRes, setParseRes] = useState(null)
   const [config, setConfig] = useState(defaultConfig())
   const [targetMode, setTargetMode] = useState('none') // none (chỉ phòng ban) | new | existing
@@ -79,13 +80,17 @@ function Wizard() {
     if (!rawJson.trim()) return toast('Chưa có dữ liệu JSON', 'error')
     setBusy(true)
     try {
-      const r = await apiFetch('/admin/import/asana/parse', { method: 'POST', body: JSON.stringify({ rawJson }) })
+      const r = await apiFetch('/admin/import/asana/parse', { method: 'POST', body: JSON.stringify({ rawJson, rawCsv: rawCsv || undefined }) })
       setParseRes(r)
       // gợi ý dự án nguồn nếu chỉ 1
       if (r.projects?.length === 1) patchConfig({ sourceProjectGid: r.projects[0].gid })
       const src = r.projects?.[0]
       if (src && !newProject.name) setNewProject((p) => ({ ...p, name: src.name }))
-      toast('Đã phân tích dữ liệu', 'success')
+      // Tự điền map người theo email (từ CSV)
+      const um = {}
+      for (const u of r.users || []) if (u.suggestedUserId) um[u.gid] = u.suggestedUserId
+      if (Object.keys(um).length) setConfig((c) => ({ ...c, userMap: { ...c.userMap, ...um } }))
+      toast(`Đã phân tích${r.csvMatched ? ` · khớp ${r.csvMatched} người từ CSV` : ''}`, 'success')
     } catch (e) { toast('Lỗi phân tích: ' + shortErr(e), 'error') }
     finally { setBusy(false) }
   }
@@ -139,7 +144,7 @@ function Wizard() {
         ))}
       </div>
 
-      {step === 1 && <Step1 rawJson={rawJson} setRawJson={setRawJson} parseRes={parseRes} busy={busy} onParse={doParse} toast={toast} />}
+      {step === 1 && <Step1 rawJson={rawJson} setRawJson={setRawJson} rawCsv={rawCsv} setRawCsv={setRawCsv} parseRes={parseRes} busy={busy} onParse={doParse} toast={toast} />}
       {step === 2 && <Step2 parseRes={parseRes} config={config} patchConfig={patchConfig} targetMode={targetMode} setTargetMode={setTargetMode} targetProjectId={targetProjectId} setTargetProjectId={setTargetProjectId} newProject={newProject} setNewProject={setNewProject} defaultOrgUnitId={defaultOrgUnitId} setDefaultOrgUnitId={setDefaultOrgUnitId} currentUser={currentUser} />}
       {step === 3 && <Step3 parseRes={parseRes} config={config} patchFieldMap={patchFieldMap} />}
       {step === 4 && <Step4 plan={plan} config={config} setConfig={setConfig} busy={busy} onPreview={runPreview} onExecute={runExecute} />}
@@ -159,7 +164,7 @@ function Wizard() {
 const shortErr = (e) => String(e?.message || e).replace(/^API [^:]+ lỗi \d+: /, '').slice(0, 300)
 
 /* ── STEP 1 ── */
-function Step1({ rawJson, setRawJson, parseRes, busy, onParse, toast }) {
+function Step1({ rawJson, setRawJson, rawCsv, setRawCsv, parseRes, busy, onParse, toast }) {
   const onFile = async (e) => {
     const f = e.target.files?.[0]
     e.target.value = ''
@@ -168,15 +173,27 @@ function Step1({ rawJson, setRawJson, parseRes, busy, onParse, toast }) {
     if (f.size > MAX_FILE_BYTES) return toast(`File quá lớn (> ${MAX_FILE_BYTES / 1024 / 1024}MB)`, 'error')
     try { setRawJson(await f.text()) } catch { toast('Không đọc được file', 'error') }
   }
+  const onCsv = async (e) => {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f) return
+    if (!/\.csv$/i.test(f.name) && f.type !== 'text/csv') return toast('Chỉ nhận file .csv', 'error')
+    if (f.size > MAX_FILE_BYTES) return toast(`File quá lớn (> ${MAX_FILE_BYTES / 1024 / 1024}MB)`, 'error')
+    try { setRawCsv(await f.text()) } catch { toast('Không đọc được file CSV', 'error') }
+  }
   const s = parseRes?.summary
   return (
     <div className="card">
       <div className="card-head"><h2>1 · Nhập JSON Asana</h2>
-        <label className="btn btn-sm"><FileJson size={15} /> Tải file .json<input type="file" accept=".json,application/json" hidden onChange={onFile} /></label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <label className="btn btn-sm"><FileJson size={15} /> Tải file .json<input type="file" accept=".json,application/json" hidden onChange={onFile} /></label>
+          <label className={`btn btn-sm ${rawCsv ? 'btn-primary' : ''}`}><FileJson size={15} /> {rawCsv ? 'CSV: đã nạp ✓' : 'Tải CSV (map email)'}<input type="file" accept=".csv,text/csv" hidden onChange={onCsv} /></label>
+        </div>
       </div>
       <textarea className="import-textarea" placeholder='Dán JSON dạng { "data": [ ... ] } ở đây…' value={rawJson} onChange={(e) => setRawJson(e.target.value)} spellCheck={false} />
+      <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>JSON giữ <b>cây việc con</b>. Thêm <b>CSV</b> (cùng project) → tự map người theo <b>email</b> (chính xác hơn tên). Ghép theo Task ID.</p>
       <div className="import-foot-inline">
-        <span className="muted">{rawJson ? `${(new Blob([rawJson]).size / 1024).toFixed(0)} KB` : 'Chưa có dữ liệu'}</span>
+        <span className="muted">{rawJson ? `JSON ${(new Blob([rawJson]).size / 1024).toFixed(0)} KB` : 'Chưa có dữ liệu'}{rawCsv ? ` · CSV ${(new Blob([rawCsv]).size / 1024).toFixed(0)} KB` : ''}</span>
         <button className="btn btn-primary" disabled={busy || !rawJson.trim()} onClick={onParse}><UploadCloud size={15} /> {busy ? 'Đang phân tích…' : 'Phân tích'}</button>
       </div>
 
@@ -370,7 +387,7 @@ function UserMapRow({ au, value, onSelect }) {
   const status = chosen ? 'matched' : suggest?.exact ? 'suggested' : suggest ? 'fuzzy' : tried ? 'unresolved' : 'searching'
   return (
     <tr>
-      <td>{au.name}<div className="muted" style={{ fontSize: 11 }}>gid {au.gid}</div></td>
+      <td>{au.name}<div className="muted" style={{ fontSize: 11 }}>{au.email || `gid ${au.gid}`}</div></td>
       <td>{au.count}</td>
       <td style={{ minWidth: 240 }}>
         <SearchUser value={value} onSelect={(id) => onSelect(id)} placeholder="Tìm user App…" autoFocus={false} />

@@ -46,6 +46,9 @@ export interface NormalizedUser {
   gid: string
   name: string
   count: number
+  email?: string | null // từ CSV (ghép theo Task ID) — để map người chuẩn
+  suggestedUserId?: string | null // app user khớp email (service điền)
+  suggestedBy?: 'email' | null
 }
 export interface NormalizedCustomField {
   gid: string
