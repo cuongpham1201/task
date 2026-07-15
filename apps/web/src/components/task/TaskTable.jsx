@@ -270,7 +270,7 @@ function AppSectionGrouped({ tasks, showContext }) {
     const g = (t.sectionId && byId.get(t.sectionId)) || noneGroup
     g.items.push(t)
   }
-  const groups = [...byId.values(), noneGroup] // giữ thứ tự section + nhóm chưa có ở cuối
+  const groups = [noneGroup, ...byId.values()] // "Chưa có section" lên đầu, rồi tới các section
 
   // Mobile: hiện nhóm thẻ (thu/mở), KHÔNG kéo-thả (đổi section qua chi tiết task).
   if (isMobile) {
